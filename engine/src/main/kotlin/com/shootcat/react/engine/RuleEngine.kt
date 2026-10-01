@@ -2,7 +2,9 @@ package com.shootcat.react.engine
 
 import com.shootcat.react.engine.model.GameObject
 import com.shootcat.react.engine.model.GameState
+import com.shootcat.react.engine.model.LoadDirection
 import com.shootcat.react.engine.model.Phase
+import com.shootcat.react.engine.model.Position
 import com.shootcat.react.engine.model.Props
 import com.shootcat.react.engine.model.Rule
 import com.shootcat.react.engine.model.RuleConditions
@@ -57,7 +59,7 @@ class RuleEngine(
 
         runPhase(stateRules, Phase.STATE, world, events, budget)
         if (!budget.exceeded) {
-            Physics.apply(world, world.snapshot().objects)
+            Physics.apply(world, types)
         }
         if (!budget.exceeded) {
             // Signals travel instantly: keep propagating until the network is stable.
@@ -132,9 +134,14 @@ class RuleEngine(
                 .mapNotNull { state.objectAt(it) }
                 .filter { matchesSource(it, c) }
 
-            Trigger.LOAD -> state.loadStack(target.position)
-                .takeIf { stack -> stack.sumOf { it.weight } >= c.minLoad }
-                .orEmpty()
+            Trigger.LOAD -> when (c.direction) {
+                LoadDirection.DOWN -> state.loadStack(target.position)
+                    .takeIf { stack -> stack.sumOf { it.load } >= c.minLoad }
+                    .orEmpty()
+                LoadDirection.UP -> state.liftRegion(target.position)
+                    .takeIf { gas -> gas.sumOf { it.lift } >= c.minLoad }
+                    .orEmpty()
+            }
 
             Trigger.SIGNAL -> {
                 val channel = target.string(Props.CHANNEL)
@@ -142,7 +149,7 @@ class RuleEngine(
                     emptyList()
                 } else {
                     state.objects.filter {
-                        it.id != target.id && it.string(Props.CHANNEL) == channel && matchesSource(it, c)
+                        it.id != target.id && it.string(Props.CHANNEL) == channel && isSignalling(it, c)
                     }
                 }
             }
@@ -150,6 +157,10 @@ class RuleEngine(
 
     private fun matchesSource(o: GameObject, c: RuleConditions): Boolean =
         (c.source == null || o.type == c.source) && (c.sourceState == null || o.state == c.sourceState)
+
+    /** Without an explicit source, any object in one of its type's signal states sends a signal. */
+    private fun isSignalling(o: GameObject, c: RuleConditions): Boolean =
+        if (c.source != null) matchesSource(o, c) else o.state in (types[o.type]?.signalStates ?: emptySet())
 
     private fun applyEffect(
         match: Match,
@@ -161,20 +172,20 @@ class RuleEngine(
         budget: Budget,
     ): Boolean {
         val target = world.byId(match.target.id) ?: return false
+        val source = match.sources.firstOrNull()?.let { world.byId(it.id) }
         val changesState = effect.targetState != null && effect.targetState != target.state
         val spawns = effect.spawnObject != null && (effect.targetState == null || changesState)
         if (!changesState && !spawns) return false
         if (!budget.consume()) return false
 
-        if (changesState) {
-            val newState = effect.targetState!!
-            world.setState(target.id, newState)
-            if (newState in types.require(target.type).vanishStates) world.remove(target.id)
-        }
+        if (changesState) setState(world, target, effect.targetState!!)
         var spawned: GameObject? = null
-        if (spawns) {
-            val cell = (listOf(target.position) + target.position.neighbours()).firstOrNull { world.isFree(it) }
-            if (cell != null) spawned = world.spawn(effect.spawnObject!!, cell, types)
+        if (spawns) spawned = spawn(world, effect.spawnObject!!, effect.spawnAmount, target.position)
+        if (source != null) {
+            if (effect.sourceConsume > 0 && source.isLiquid) {
+                world.setAmount(source.id, source.amount - effect.sourceConsume)
+            }
+            if (effect.sourceState != null && world.byId(source.id) != null) setState(world, source, effect.sourceState)
         }
         events += RuleEvent(
             ruleId = match.rule.id,
@@ -191,7 +202,50 @@ class RuleEngine(
         return true
     }
 
+    private fun setState(world: MutableWorld, o: GameObject, state: String) {
+        world.setState(o.id, state)
+        if (state in types.require(o.type).vanishStates) world.remove(o.id)
+    }
+
+    /**
+     * Spawns at [origin] if free, otherwise next to it (up first: steam rises off a fire).
+     * Liquids merge into neighbouring liquid. Gases bubble up through liquid to the nearest free cell.
+     */
+    private fun spawn(world: MutableWorld, type: String, amount: Int?, origin: Position): GameObject? {
+        val t = types.require(type)
+        val liquid = t.properties[Props.LIQUID]?.toBooleanStrictOrNull() == true
+        val gas = t.properties[Props.RISES]?.toBooleanStrictOrNull() == true
+        for (cell in listOf(origin) + origin.neighbours()) {
+            if (world.isFree(cell)) return world.spawn(type, cell, types, amount)
+            val existing = world.at(cell)
+            if (liquid && existing != null && existing.type == type && existing.amount < existing.capacity) {
+                val add = amount ?: existing.capacity
+                world.setAmount(existing.id, minOf(existing.capacity, existing.amount + add))
+                return world.byId(existing.id)
+            }
+        }
+        if (!gas) return null
+        // Bubbles squeeze past liquid and loose objects (never through walls) to the nearest free cell.
+        fun passable(p: Position) = world.inBounds(p) && !world.isWall(p) && world.at(p) != null
+        val seen = hashSetOf(origin)
+        var frontier = origin.neighbours().filter { passable(it) }
+        repeat(GAS_SEARCH_DEPTH) {
+            val next = mutableListOf<Position>()
+            for (cell in frontier) {
+                if (!seen.add(cell)) continue
+                for (n in cell.neighbours()) {
+                    if (n in seen) continue
+                    if (world.isFree(n)) return world.spawn(type, n, types, amount)
+                    if (passable(n)) next += n
+                }
+            }
+            frontier = next
+        }
+        return null
+    }
+
     companion object {
         const val DEFAULT_MAX_TRANSFORMATIONS = 100
+        private const val GAS_SEARCH_DEPTH = 4
     }
 }

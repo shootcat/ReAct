@@ -11,7 +11,7 @@ class DeterminismTest {
         val start = TestWorld.state(
             "#S......#",
             "#I.F..W.#",
-            "#..WWI..#",
+            "#..WW...#",
             "##.###.##",
             "##P###B##",
             "#########",

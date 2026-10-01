@@ -7,6 +7,8 @@ data class ObjectType(
     val properties: Map<String, String> = emptyMap(),
     /** Entering one of these states removes the object from the world (e.g. ICE -> MELTED). */
     val vanishStates: Set<String> = emptySet(),
+    /** In these states the object sends a signal on its channel (e.g. a pressed plate). */
+    val signalStates: Set<String> = emptySet(),
     val stateNames: Map<String, String> = emptyMap(),
     val description: String = "",
 ) {
@@ -33,8 +35,10 @@ class TypeCatalog(types: List<ObjectType>) {
         state: String? = null,
         properties: Map<String, String> = emptyMap(),
         movable: Boolean = false,
+        amount: Int? = null,
     ): GameObject {
         val t = require(type)
-        return GameObject(id, type, state ?: t.defaultState, position, t.properties + properties, movable)
+        val o = GameObject(id, type, state ?: t.defaultState, position, t.properties + properties, movable)
+        return if (o.isLiquid) o.copy(amount = (amount ?: o.capacity).coerceIn(1, o.capacity)) else o
     }
 }

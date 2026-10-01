@@ -16,6 +16,8 @@ data class EventRequirement(
     val rule: String,
     val source: String? = null,
     val withoutSource: String? = null,
+    /** Object id or type the rule must have acted on. */
+    val target: String? = null,
 )
 
 data class SolutionSpec(
@@ -27,6 +29,10 @@ data class SolutionSpec(
     val maxMoved: Int? = null,
     /** Objects that must still be at their starting position. */
     val unmoved: List<String> = emptyList(),
+    /** Objects the player must have moved. */
+    val moved: List<String> = emptyList(),
+    /** Rules that must not have fired (e.g. "without melting anything"). */
+    val forbids: List<String> = emptyList(),
 )
 
 data class LevelData(
@@ -42,8 +48,9 @@ data class LevelData(
     val goals: List<Goal>,
     val solutions: List<SolutionSpec>,
     val maxSteps: Int,
+    val noBuild: Set<Position> = emptySet(),
 ) {
-    fun initialState(): GameState = GameState(width, height, walls, objects.sortedBy { it.id })
+    fun initialState(): GameState = GameState(width, height, walls, objects.sortedBy { it.id }, noBuild = noBuild)
 }
 
 /** A level's spot on the world map; [icon] is an object type that represents the level. */

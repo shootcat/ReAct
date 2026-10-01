@@ -24,12 +24,15 @@ object SolutionClassifier {
         return level.solutions.filter { spec ->
             spec.requires.all { req -> events.any { it.satisfies(req) } } &&
                 (spec.maxMoved == null || moved.size <= spec.maxMoved) &&
-                spec.unmoved.none { it in moved }
+                spec.unmoved.none { it in moved } &&
+                spec.moved.all { it in moved } &&
+                spec.forbids.none { rule -> events.any { it.ruleId == rule } }
         }
     }
 
     private fun RuleEvent.satisfies(req: EventRequirement): Boolean =
         ruleId == req.rule &&
             (req.source == null || req.source in sourceTypes) &&
-            (req.withoutSource == null || req.withoutSource !in sourceTypes)
+            (req.withoutSource == null || req.withoutSource !in sourceTypes) &&
+            (req.target == null || req.target == targetId || req.target == targetType)
 }

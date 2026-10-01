@@ -1,72 +1,221 @@
 {
   "world": 1,
   "title": "Materie",
-  "levels": ["level_00", "level_01", "level_02"],
+  "levels": [
+    "level_00",
+    "level_01",
+    "level_02",
+    "level_03",
+    "level_04",
+    "level_05",
+    "level_06",
+    "level_07",
+    "level_08",
+    "level_09"
+  ],
   "map": [
-    { "level": "level_00", "x": 0.24, "y": 0.80, "icon": "FIRE" },
-    { "level": "level_01", "x": 0.68, "y": 0.58, "icon": "WATER" },
-    { "level": "level_02", "x": 0.32, "y": 0.33, "icon": "STONE" }
+    {
+      "level": "level_00",
+      "x": 0.2,
+      "y": 0.9,
+      "icon": "FIRE"
+    },
+    {
+      "level": "level_01",
+      "x": 0.52,
+      "y": 0.84,
+      "icon": "WATER"
+    },
+    {
+      "level": "level_02",
+      "x": 0.82,
+      "y": 0.75,
+      "icon": "STONE"
+    },
+    {
+      "level": "level_03",
+      "x": 0.55,
+      "y": 0.64,
+      "icon": "ICE"
+    },
+    {
+      "level": "level_04",
+      "x": 0.22,
+      "y": 0.55,
+      "icon": "STEAM"
+    },
+    {
+      "level": "level_05",
+      "x": 0.5,
+      "y": 0.45,
+      "icon": "PISTON"
+    },
+    {
+      "level": "level_06",
+      "x": 0.8,
+      "y": 0.37,
+      "icon": "HATCH"
+    },
+    {
+      "level": "level_07",
+      "x": 0.52,
+      "y": 0.27,
+      "icon": "WATER"
+    },
+    {
+      "level": "level_08",
+      "x": 0.22,
+      "y": 0.18,
+      "icon": "PLATE"
+    },
+    {
+      "level": "level_09",
+      "x": 0.56,
+      "y": 0.08,
+      "icon": "DOOR"
+    }
   ],
   "types": [
     {
       "type": "FIRE",
       "name": "Feuer",
       "default_state": "ACTIVE",
-      "state_names": { "ACTIVE": "brennt" },
-      "description": "Eine Flamme. Brennt genau dort, wo sie steht."
+      "properties": {
+        "gravity": true,
+        "density": 15,
+        "weight": 10
+      },
+      "state_names": {
+        "ACTIVE": "brennt",
+        "OUT": "erloschen"
+      },
+      "description": "Eine Feuerschale. Fällt, wenn nichts sie hält. Wasser löscht sie."
     },
     {
       "type": "ICE",
       "name": "Eis",
       "default_state": "SOLID",
-      "vanish_states": ["MELTED"],
-      "state_names": { "SOLID": "fest", "MELTED": "geschmolzen" },
-      "description": "Festgefroren. Bewegt sich nicht von selbst."
+      "properties": {
+        "gravity": true,
+        "density": 9,
+        "weight": 14
+      },
+      "vanish_states": [
+        "MELTED"
+      ],
+      "state_names": {
+        "SOLID": "fest",
+        "MELTED": "geschmolzen"
+      },
+      "description": "Fällt, schwimmt auf Wasser und schmilzt bei Hitze."
     },
     {
       "type": "WATER",
       "name": "Wasser",
       "default_state": "LIQUID",
-      "properties": { "gravity": true, "flows": true, "weight": 1 },
-      "vanish_states": ["EVAPORATED"],
-      "state_names": { "LIQUID": "flüssig", "EVAPORATED": "verdampft" },
-      "description": "Fällt, fließt und sammelt sich."
+      "properties": {
+        "liquid": true,
+        "capacity": 8,
+        "density": 10,
+        "weight": 2
+      },
+      "state_names": {
+        "LIQUID": "flüssig"
+      },
+      "description": "Fällt, läuft auseinander und füllt Becken. Löscht Feuer."
     },
     {
       "type": "STEAM",
       "name": "Dampf",
       "default_state": "GAS",
-      "properties": { "rises": true, "flows": true },
-      "state_names": { "GAS": "gasförmig" },
-      "description": "Leicht. Steigt auf und sammelt sich oben."
+      "properties": {
+        "rises": true,
+        "flows": true,
+        "lift": 1
+      },
+      "vanish_states": [
+        "CONDENSED"
+      ],
+      "state_names": {
+        "GAS": "gasförmig",
+        "CONDENSED": "kondensiert"
+      },
+      "description": "Steigt auf, sammelt sich oben und baut Druck auf."
     },
     {
       "type": "STONE",
       "name": "Stein",
       "default_state": "SOLID",
-      "properties": { "gravity": true, "weight": 3 },
-      "state_names": { "SOLID": "fest" },
-      "description": "Schwer. Fällt, wenn nichts ihn hält."
+      "properties": {
+        "gravity": true,
+        "density": 25,
+        "weight": 40
+      },
+      "state_names": {
+        "SOLID": "fest"
+      },
+      "description": "Schwer. Fällt und sinkt in Wasser."
     },
     {
       "type": "BUTTON",
       "name": "Schalter",
       "default_state": "UP",
-      "state_names": { "UP": "bereit", "PRESSED": "aktiviert" },
-      "description": "Sendet ein Signal, sobald er ausgelöst wurde."
+      "signal_states": [
+        "PRESSED"
+      ],
+      "state_names": {
+        "UP": "bereit",
+        "PRESSED": "aktiviert"
+      },
+      "description": "Ein Schwimmerschalter. Reagiert auf Wasser."
     },
     {
       "type": "PLATE",
       "name": "Druckplatte",
       "default_state": "UP",
-      "state_names": { "UP": "oben", "PRESSED": "gedrückt" },
+      "signal_states": [
+        "PRESSED"
+      ],
+      "state_names": {
+        "UP": "oben",
+        "PRESSED": "gedrückt"
+      },
       "description": "Sendet ein Signal, solange genug auf ihr lastet."
+    },
+    {
+      "type": "PISTON",
+      "name": "Kolben",
+      "default_state": "IDLE",
+      "signal_states": [
+        "PUSHED"
+      ],
+      "state_names": {
+        "IDLE": "in Ruhe",
+        "PUSHED": "hochgedrückt"
+      },
+      "description": "Sendet ein Signal, solange Dampf von unten drückt."
+    },
+    {
+      "type": "HATCH",
+      "name": "Klappe",
+      "default_state": "CLOSED",
+      "vanish_states": [
+        "OPEN"
+      ],
+      "state_names": {
+        "CLOSED": "zu",
+        "OPEN": "offen"
+      },
+      "description": "Klappt auf ein Signal hin weg."
     },
     {
       "type": "DOOR",
       "name": "Tür",
       "default_state": "LOCKED",
-      "state_names": { "LOCKED": "verschlossen", "UNLOCKED": "offen" },
+      "state_names": {
+        "LOCKED": "verschlossen",
+        "UNLOCKED": "offen"
+      },
       "description": "Öffnet sich auf ein Signal."
     }
   ],
@@ -75,46 +224,115 @@
       "id": "fire_melts_ice",
       "name": "Schmelzen",
       "trigger": "TOUCH",
-      "conditions": { "source": "FIRE", "target": "ICE", "target_state": "SOLID" },
-      "effect": { "target_state": "MELTED", "spawn_object": "WATER" }
+      "conditions": {
+        "source": "FIRE",
+        "source_state": "ACTIVE",
+        "target": "ICE",
+        "target_state": "SOLID"
+      },
+      "effect": {
+        "target_state": "MELTED",
+        "spawn_object": "WATER"
+      }
     },
     {
-      "id": "fire_evaporates_water",
-      "name": "Verdampfen",
+      "id": "water_douses_fire",
+      "name": "Löschen",
       "trigger": "TOUCH",
-      "conditions": { "source": "FIRE", "target": "WATER", "target_state": "LIQUID" },
-      "effect": { "target_state": "EVAPORATED", "spawn_object": "STEAM" }
+      "conditions": {
+        "source": "WATER",
+        "target": "FIRE",
+        "target_state": "ACTIVE"
+      },
+      "effect": {
+        "target_state": "OUT",
+        "spawn_object": "STEAM",
+        "source_consume": 3
+      }
     },
     {
-      "id": "water_presses_button",
+      "id": "steam_melts_ice",
+      "name": "Tauen",
+      "trigger": "TOUCH",
+      "conditions": {
+        "source": "STEAM",
+        "target": "ICE",
+        "target_state": "SOLID"
+      },
+      "effect": {
+        "target_state": "MELTED",
+        "spawn_object": "WATER",
+        "source_state": "CONDENSED"
+      }
+    },
+    {
+      "id": "water_triggers_button",
       "name": "Wasserkontakt",
       "trigger": "TOUCH",
-      "conditions": { "source": "WATER", "target": "BUTTON", "target_state": "UP" },
-      "effect": { "target_state": "PRESSED" }
+      "conditions": {
+        "source": "WATER",
+        "target": "BUTTON",
+        "target_state": "UP"
+      },
+      "effect": {
+        "target_state": "PRESSED"
+      }
     },
     {
       "id": "weight_presses_plate",
       "name": "Gewicht",
       "trigger": "LOAD",
-      "conditions": { "target": "PLATE", "min_load": 3 },
-      "effect": { "target_state": "PRESSED" },
-      "else_effect": { "target_state": "UP" }
+      "conditions": {
+        "target": "PLATE",
+        "min_load": 32
+      },
+      "effect": {
+        "target_state": "PRESSED"
+      },
+      "else_effect": {
+        "target_state": "UP"
+      }
     },
     {
-      "id": "button_opens_door",
-      "name": "Schalter-Signal",
-      "trigger": "SIGNAL",
-      "conditions": { "source": "BUTTON", "source_state": "PRESSED", "target": "DOOR" },
-      "effect": { "target_state": "UNLOCKED" },
-      "else_effect": { "target_state": "LOCKED" }
+      "id": "steam_lifts_piston",
+      "name": "Dampfdruck",
+      "trigger": "LOAD",
+      "conditions": {
+        "target": "PISTON",
+        "min_load": 2,
+        "direction": "UP"
+      },
+      "effect": {
+        "target_state": "PUSHED"
+      },
+      "else_effect": {
+        "target_state": "IDLE"
+      }
     },
     {
-      "id": "plate_opens_door",
-      "name": "Platten-Signal",
+      "id": "signal_opens_door",
+      "name": "Tür-Signal",
       "trigger": "SIGNAL",
-      "conditions": { "source": "PLATE", "source_state": "PRESSED", "target": "DOOR" },
-      "effect": { "target_state": "UNLOCKED" },
-      "else_effect": { "target_state": "LOCKED" }
+      "conditions": {
+        "target": "DOOR"
+      },
+      "effect": {
+        "target_state": "UNLOCKED"
+      },
+      "else_effect": {
+        "target_state": "LOCKED"
+      }
+    },
+    {
+      "id": "signal_opens_hatch",
+      "name": "Klappen-Signal",
+      "trigger": "SIGNAL",
+      "conditions": {
+        "target": "HATCH"
+      },
+      "effect": {
+        "target_state": "OPEN"
+      }
     }
   ]
 }

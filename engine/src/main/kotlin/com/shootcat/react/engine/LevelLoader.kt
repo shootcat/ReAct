@@ -4,6 +4,7 @@ import com.shootcat.react.engine.model.EventRequirement
 import com.shootcat.react.engine.model.GameObject
 import com.shootcat.react.engine.model.Goal
 import com.shootcat.react.engine.model.LevelData
+import com.shootcat.react.engine.model.LoadDirection
 import com.shootcat.react.engine.model.MapNode
 import com.shootcat.react.engine.model.ObjectType
 import com.shootcat.react.engine.model.Position
@@ -52,18 +53,21 @@ object LevelLoader {
         val dto = decode<LevelDto>(text, "level")
         val where = "level '${dto.id}'"
         if (dto.world != world.world) fail("$where belongs to world ${dto.world}, not ${world.world}")
-        val width = dto.grid.width
-        val height = dto.grid.height
+        val rows = dto.map.ifEmpty { dto.layout }
+        val width = dto.grid?.width ?: rows.firstOrNull()?.length ?: 0
+        val height = dto.grid?.height ?: rows.size
         if (width < 1 || height < 1) fail("$where has an empty grid")
 
-        val walls = parseLayout(dto.layout, width, height, where)
+        val (walls, mapNoBuild) = parseLayout(rows, width, height, dto.legend.keys, where)
+        val (mapObjects, legendNoBuild) = objectsFromMap(dto.map, dto.legend, where)
+        val noBuild = mapNoBuild + legendNoBuild
 
-        val objects = dto.objects.map { o ->
+        val objects = (dto.objects + mapObjects).map { o ->
             if (o.type !in world.types) fail("$where: object '${o.id}' has unknown type '${o.type}'")
             val p = Position(o.position.x, o.position.y)
             if (p.x !in 0 until width || p.y !in 0 until height) fail("$where: object '${o.id}' is outside the grid")
             if (p in walls) fail("$where: object '${o.id}' is placed inside a wall at $p")
-            world.types.create(o.id, o.type, p, o.state, o.properties.toStrings(), o.movable)
+            world.types.create(o.id, o.type, p, o.state, o.properties.toStrings(), o.movable, o.amount)
         }
         requireUnique(objects.map { it.id }, "object id in $where")
         requireUnique(objects.map { it.position }, "object position in $where")
@@ -82,14 +86,17 @@ object LevelLoader {
         val solutions = dto.solutions.map { s ->
             val kind = enumValue<SolutionKind>(s.kind, "$where solution '${s.id}'")
             s.requires.forEach { if (it.rule !in ruleIds) fail("$where: solution '${s.id}' needs unknown rule '${it.rule}'") }
-            s.unmoved.forEach { if (it !in ids) fail("$where: solution '${s.id}' refers to unknown object '$it'") }
+            (s.unmoved + s.moved).forEach { if (it !in ids) fail("$where: solution '${s.id}' refers to unknown object '$it'") }
+            s.forbids.forEach { if (it !in ruleIds) fail("$where: solution '${s.id}' forbids unknown rule '$it'") }
             SolutionSpec(
                 id = s.id,
                 kind = kind,
                 label = s.label ?: kind.label,
-                requires = s.requires.map { EventRequirement(it.rule, it.source, it.withoutSource) },
+                requires = s.requires.map { EventRequirement(it.rule, it.source, it.withoutSource, it.target) },
                 maxMoved = s.maxMoved,
                 unmoved = s.unmoved,
+                moved = s.moved,
+                forbids = s.forbids,
             )
         }
         requireUnique(solutions.map { it.id }, "solution id in $where")
@@ -107,31 +114,74 @@ object LevelLoader {
             goals = goals,
             solutions = solutions,
             maxSteps = dto.maxSteps,
+            noBuild = noBuild,
         )
     }
 
-    private fun parseLayout(layout: List<String>, width: Int, height: Int, where: String): Set<Position> {
-        if (layout.isEmpty()) return emptySet()
+    /**
+     * '#' wall, '.' free, ':' free but the player may not drop objects there.
+     * In a `map`, any [legend] symbol stands for an object on a free cell.
+     */
+    private fun parseLayout(
+        layout: List<String>,
+        width: Int,
+        height: Int,
+        legend: Set<Char>,
+        where: String,
+    ): Pair<Set<Position>, Set<Position>> {
+        if (layout.isEmpty()) return emptySet<Position>() to emptySet()
         if (layout.size != height) fail("$where: layout has ${layout.size} rows, grid height is $height")
         val walls = mutableSetOf<Position>()
+        val noBuild = mutableSetOf<Position>()
         layout.forEachIndexed { y, row ->
             if (row.length != width) fail("$where: layout row $y has ${row.length} cells, grid width is $width")
             row.forEachIndexed { x, c ->
                 when (c) {
                     '#' -> walls += Position(x, y)
                     '.' -> Unit
+                    ':' -> noBuild += Position(x, y)
+                    in legend -> Unit
                     else -> fail("$where: unknown layout symbol '$c' at ($x,$y)")
                 }
             }
         }
-        return walls
+        return walls to noBuild
+    }
+
+    /** Objects placed by symbol in an ASCII map. Ids default to "<type>_<x>_<y>". */
+    private fun objectsFromMap(
+        map: List<String>,
+        legend: Map<Char, LegendDto>,
+        where: String,
+    ): Pair<List<ObjectDto>, Set<Position>> {
+        val objects = mutableListOf<ObjectDto>()
+        val noBuild = mutableSetOf<Position>()
+        val counts = mutableMapOf<Char, Int>()
+        map.forEachIndexed { y, row ->
+            row.forEachIndexed { x, c ->
+                val entry = legend[c] ?: return@forEachIndexed
+                counts[c] = (counts[c] ?: 0) + 1
+                if (entry.id != null && counts.getValue(c) > 1) fail("$where: symbol '$c' has a fixed id but appears more than once")
+                objects += ObjectDto(
+                    id = entry.id ?: "${entry.type.lowercase()}_${x}_$y",
+                    type = entry.type,
+                    position = PositionDto(x, y),
+                    state = entry.state,
+                    movable = entry.movable,
+                    properties = entry.properties,
+                    amount = entry.amount,
+                )
+                if (entry.nobuild) noBuild += Position(x, y)
+            }
+        }
+        return objects to noBuild
     }
 
     private fun validateRule(rule: Rule, types: TypeCatalog, where: String) {
         val c = rule.conditions
         val referenced = listOfNotNull(c.source, c.target, rule.effect.spawnObject, rule.elseEffect?.spawnObject)
         referenced.forEach { if (it !in types) fail("$where: rule '${rule.id}' uses unknown type '$it'") }
-        if (rule.trigger != Trigger.LOAD && c.source == null) fail("$where: rule '${rule.id}' needs a source")
+        if (rule.trigger == Trigger.TOUCH && c.source == null) fail("$where: rule '${rule.id}' needs a source")
     }
 
     private fun <T> requireUnique(values: List<T>, what: String) {
@@ -162,6 +212,7 @@ object LevelLoader {
         defaultState = defaultState,
         properties = properties.toStrings(),
         vanishStates = vanishStates.toSet(),
+        signalStates = signalStates.toSet(),
         stateNames = stateNames,
         description = description,
     )
@@ -176,12 +227,19 @@ object LevelLoader {
             target = conditions.target,
             targetState = conditions.targetState,
             minLoad = conditions.minLoad,
+            direction = enumValue<LoadDirection>(conditions.direction, "rule '$id' direction"),
         ),
         effect = effect.toModel(),
         elseEffect = elseEffect?.toModel(),
     )
 
-    private fun EffectDto.toModel() = RuleEffect(targetState = targetState, spawnObject = spawnObject)
+    private fun EffectDto.toModel() = RuleEffect(
+        targetState = targetState,
+        spawnObject = spawnObject,
+        spawnAmount = spawnAmount,
+        sourceState = sourceState,
+        sourceConsume = sourceConsume,
+    )
 
     @Serializable
     private class WorldDto(
@@ -203,6 +261,7 @@ object LevelLoader {
         @SerialName("default_state") val defaultState: String,
         val properties: Map<String, JsonPrimitive> = emptyMap(),
         @SerialName("vanish_states") val vanishStates: List<String> = emptyList(),
+        @SerialName("signal_states") val signalStates: List<String> = emptyList(),
         @SerialName("state_names") val stateNames: Map<String, String> = emptyMap(),
         val description: String = "",
     )
@@ -224,12 +283,16 @@ object LevelLoader {
         val target: String,
         @SerialName("target_state") val targetState: String? = null,
         @SerialName("min_load") val minLoad: Int = 1,
+        val direction: String = "DOWN",
     )
 
     @Serializable
     private class EffectDto(
         @SerialName("target_state") val targetState: String? = null,
         @SerialName("spawn_object") val spawnObject: String? = null,
+        @SerialName("spawn_amount") val spawnAmount: Int? = null,
+        @SerialName("source_state") val sourceState: String? = null,
+        @SerialName("source_consume") val sourceConsume: Int = 0,
     )
 
     @Serializable
@@ -238,9 +301,11 @@ object LevelLoader {
         val title: String,
         val world: Int,
         val intro: String = "",
-        val grid: GridDto,
+        val grid: GridDto? = null,
         val layout: List<String> = emptyList(),
-        val objects: List<ObjectDto>,
+        val map: List<String> = emptyList(),
+        val legend: Map<Char, LegendDto> = emptyMap(),
+        val objects: List<ObjectDto> = emptyList(),
         val rules: List<RuleDto> = emptyList(),
         val goals: List<GoalDto>,
         val solutions: List<SolutionDto> = emptyList(),
@@ -249,6 +314,17 @@ object LevelLoader {
 
     @Serializable
     private class GridDto(val width: Int, val height: Int)
+
+    @Serializable
+    private class LegendDto(
+        val type: String,
+        val id: String? = null,
+        val state: String? = null,
+        val movable: Boolean = false,
+        val amount: Int? = null,
+        val properties: Map<String, JsonPrimitive> = emptyMap(),
+        val nobuild: Boolean = false,
+    )
 
     @Serializable
     private class PositionDto(val x: Int, val y: Int)
@@ -261,6 +337,7 @@ object LevelLoader {
         val state: String? = null,
         val movable: Boolean = false,
         val properties: Map<String, JsonPrimitive> = emptyMap(),
+        val amount: Int? = null,
     )
 
     @Serializable
@@ -277,6 +354,8 @@ object LevelLoader {
         val requires: List<RequirementDto> = emptyList(),
         @SerialName("max_moved") val maxMoved: Int? = null,
         val unmoved: List<String> = emptyList(),
+        val moved: List<String> = emptyList(),
+        val forbids: List<String> = emptyList(),
     )
 
     @Serializable
@@ -284,5 +363,6 @@ object LevelLoader {
         val rule: String,
         val source: String? = null,
         @SerialName("without_source") val withoutSource: String? = null,
+        val target: String? = null,
     )
 }

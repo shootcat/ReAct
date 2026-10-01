@@ -208,10 +208,10 @@ fun ReactionSymbols(
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         reaction.inputs.forEachIndexed { i, token ->
             if (i > 0) GlyphIcon(Glyph.PLUS, color = Palette.textDim, size = iconSize * 0.6f)
-            ObjectIcon(token.typeId, types, state = token.state, silhouette = silhouette, size = iconSize)
+            ObjectIcon(token.typeId, types, state = token.state, silhouette = silhouette, size = iconSize, symbol = token.symbol)
         }
         GlyphIcon(Glyph.ARROW, color = Palette.textDim, size = iconSize * 0.75f, modifier = Modifier.padding(horizontal = 2.dp))
-        ObjectIcon(reaction.output.typeId, types, state = reaction.output.state, silhouette = silhouette, size = iconSize)
+        ObjectIcon(reaction.output.typeId, types, state = reaction.output.state, silhouette = silhouette, size = iconSize, symbol = reaction.output.symbol)
     }
 }
 

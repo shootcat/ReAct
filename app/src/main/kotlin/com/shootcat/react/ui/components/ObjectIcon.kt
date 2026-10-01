@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.shootcat.react.engine.ReactionSymbol
 import com.shootcat.react.engine.model.Position
 import com.shootcat.react.engine.model.TypeCatalog
 import com.shootcat.react.ui.theme.Palette
@@ -39,6 +40,7 @@ fun ObjectIcon(
     silhouette: Boolean = false,
     size: Dp = 32.dp,
     background: Color = Palette.surfaceHigh,
+    symbol: ReactionSymbol? = null,
 ) {
     Box(
         modifier
@@ -55,7 +57,11 @@ fun ObjectIcon(
         ) {
             val w = this.size.width
             if (type == null) {
-                drawWeight(w)
+                when (symbol) {
+                    ReactionSymbol.PRESSURE -> drawPressure(w)
+                    ReactionSymbol.SIGNAL -> drawSignal(w)
+                    else -> drawWeight(w)
+                }
             } else {
                 // Slightly smaller and lower than a board cell, so raised parts (button caps) stay visible.
                 val obj = types.create("icon", type.id, Position(0, 0), state = state ?: type.defaultState)
@@ -82,4 +88,33 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawWeight(c: Float
     drawCircle(Palette.surfaceHigh, c * 0.06f, Offset(c * 0.5f, c * 0.3f))
     drawPath(body, Palette.stone)
     drawRect(Palette.stoneDark, Offset(c * 0.3f, c * 0.55f), Size(c * 0.4f, c * 0.06f))
+}
+
+/** Steam pressure: arrows pushing up. */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPressure(c: Float) {
+    for (i in 0..2) {
+        val x = c * (0.28f + 0.22f * i)
+        val arrow = Path().apply {
+            moveTo(x, c * 0.22f)
+            lineTo(x + c * 0.1f, c * 0.38f)
+            lineTo(x - c * 0.1f, c * 0.38f)
+            close()
+        }
+        drawPath(arrow, Palette.steam)
+        drawRect(Palette.steam, Offset(x - c * 0.03f, c * 0.38f), Size(c * 0.06f, c * 0.36f))
+    }
+}
+
+/** A signal: a small lightning bolt. */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSignal(c: Float) {
+    val bolt = Path().apply {
+        moveTo(c * 0.58f, c * 0.12f)
+        lineTo(c * 0.28f, c * 0.55f)
+        lineTo(c * 0.48f, c * 0.55f)
+        lineTo(c * 0.4f, c * 0.88f)
+        lineTo(c * 0.74f, c * 0.42f)
+        lineTo(c * 0.53f, c * 0.42f)
+        close()
+    }
+    drawPath(bolt, Palette.signal)
 }

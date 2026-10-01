@@ -133,7 +133,7 @@ fun Board(
                             val d = drag
                             drag = null
                             if (d != null) {
-                                if (currentHaptics && currentState.isFree(d.hover)) {
+                                if (currentHaptics && currentState.isBuildable(d.hover)) {
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 }
                                 currentOnMove(d.objectId, d.hover)
@@ -167,7 +167,9 @@ fun Board(
             drawWires(state, signalRules, cell, time)
 
             val d = drag
+            drawLiquids(state, previous, progress, cell, time)
             for (o in state.objects) {
+                if (o.isLiquid) continue
                 val prev = previous?.objectById(o.id)
                 val from = prev?.position ?: o.position
                 val x = from.x + (o.position.x - from.x) * progress
@@ -181,7 +183,7 @@ fun Board(
                 drawGameObject(o, Offset(x * cell, y * cell), cell, alpha, time, infoFor(o, state, thresholds))
             }
             if (previous != null) {
-                for (gone in previous.objects.filter { state.objectById(it.id) == null }) {
+                for (gone in previous.objects.filter { !it.isLiquid && state.objectById(it.id) == null }) {
                     val tl = Offset(gone.position.x * cell, gone.position.y * cell)
                     drawGameObject(gone, tl, cell, 1f - progress, time, infoFor(gone, previous, thresholds))
                 }
@@ -204,7 +206,7 @@ private fun infoFor(o: GameObject, state: GameState, thresholds: Map<String, Int
     if (threshold != null) {
         return ObjectInfo(load = state.loadStack(o.position).sumOf { it.weight }, threshold = threshold)
     }
-    if (!o.flag(Props.FLOWS)) return ObjectInfo()
+    if (!o.flag(Props.FLOWS) && !o.isLiquid) return ObjectInfo()
     // Fluids merge visually with neighbouring cells of the same fluid.
     fun same(p: Position) = state.objectAt(p)?.type == o.type
     val p = o.position
@@ -231,6 +233,12 @@ private fun DrawScope.drawBackground(state: GameState, cell: Float, showGrid: Bo
                 val below = p.down()
                 if (state.inBounds(below) && !state.isWall(below)) {
                     drawRect(Palette.wallShadow, Offset(tl.x, tl.y + cell * 0.92f), Size(cell + 0.5f, cell * 0.08f))
+                }
+            } else if (showGrid && p in state.noBuild) {
+                // Closed areas: the player cannot drop anything here.
+                for (k in 0..2) {
+                    val o = cell * (k / 3f)
+                    drawLine(Color.Black, Offset(tl.x + o, tl.y + cell), Offset(tl.x + cell, tl.y + o), strokeWidth = cell * 0.03f, alpha = 0.22f)
                 }
             } else if (showGrid && state.objectAt(p) == null) {
                 drawCircle(Color.White, cell * 0.03f, tl + Offset(cell / 2, cell / 2), alpha = 0.06f)
@@ -307,7 +315,7 @@ private fun DrawScope.drawMovableHints(
 
 private fun DrawScope.drawDrag(d: DragState, state: GameState, rules: List<Rule>, cell: Float, time: Float, showPreview: Boolean) {
     val target = Offset(d.hover.x * cell, d.hover.y * cell)
-    val free = state.isFree(d.hover) || state.objectById(d.objectId)?.position == d.hover
+    val free = state.isBuildable(d.hover) || state.objectById(d.objectId)?.position == d.hover
     if (state.inBounds(d.hover)) {
         drawRoundRect(
             if (free) Palette.success else Palette.danger,

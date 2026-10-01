@@ -1,29 +1,61 @@
 {
-  "id": "level_01",
-  "title": "Berührung",
+  "id": "level_06",
+  "title": "Zwei Wege",
   "world": 1,
-  "intro": "Der Schalter liegt tief unten.",
+  "intro": "Zwei Wege führen zur Tür.",
   "map": [
-    "##########",
-    "#........#",
-    "#.I......#",
-    "####.....#",
-    "#........D",
-    "#...F....#",
-    "#######.##",
-    "#######B##",
-    "##########"
+    "##############",
+    "#........#K#s#",
+    "#.i......#:#H#",
+    "####.....#:#:#",
+    "D.G.....F..#P#",
+    "######.###.###",
+    "######B###W###",
+    "##########W###",
+    "##############"
   ],
   "legend": {
+    "i": {
+      "type": "ICE",
+      "id": "ice_block_1"
+    },
     "F": {
       "type": "FIRE",
       "id": "fire_1",
       "movable": true
     },
-    "I": {
-      "type": "ICE",
-      "id": "ice_block_1",
+    "G": {
+      "type": "FIRE",
+      "id": "fire_2",
       "movable": true
+    },
+    "s": {
+      "type": "STONE",
+      "id": "stone_1"
+    },
+    "W": {
+      "type": "WATER"
+    },
+    "K": {
+      "type": "PISTON",
+      "id": "piston_1",
+      "properties": {
+        "channel": "B"
+      }
+    },
+    "H": {
+      "type": "HATCH",
+      "id": "hatch_1",
+      "properties": {
+        "channel": "B"
+      }
+    },
+    "P": {
+      "type": "PLATE",
+      "id": "plate_1",
+      "properties": {
+        "channel": "A"
+      }
     },
     "B": {
       "type": "BUTTON",
@@ -71,11 +103,9 @@
       "kind": "OVERRIDE",
       "requires": [
         {
-          "rule": "water_triggers_button"
+          "rule": "weight_presses_plate",
+          "source": "STONE"
         }
-      ],
-      "unmoved": [
-        "fire_1"
       ]
     }
   ]

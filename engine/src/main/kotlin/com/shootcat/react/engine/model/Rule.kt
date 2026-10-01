@@ -3,11 +3,13 @@ package com.shootcat.react.engine.model
 enum class Trigger {
     /** Source and target are orthogonally adjacent. */
     TOUCH,
-    /** The weight resting on top of the target reaches a threshold. */
+    /** Weight resting on the target (DOWN) or gas pressure pushing it from below (UP) reaches a threshold. */
     LOAD,
-    /** A source on the same signal channel as the target is in the required state. */
+    /** A signal arrives on the target's channel. */
     SIGNAL,
 }
+
+enum class LoadDirection { DOWN, UP }
 
 /** Fixed evaluation order inside one simulation step. */
 enum class Phase(val number: Int, val label: String) {
@@ -17,16 +19,24 @@ enum class Phase(val number: Int, val label: String) {
 }
 
 data class RuleConditions(
+    /** Source type; for SIGNAL rules null means "any object that is currently signalling". */
     val source: String? = null,
     val sourceState: String? = null,
     val target: String,
     val targetState: String? = null,
     val minLoad: Int = 1,
+    val direction: LoadDirection = LoadDirection.DOWN,
 )
 
 data class RuleEffect(
     val targetState: String? = null,
     val spawnObject: String? = null,
+    /** Amount for a spawned liquid; defaults to a full cell. */
+    val spawnAmount: Int? = null,
+    /** New state of the (first) source, e.g. steam condensing. */
+    val sourceState: String? = null,
+    /** Liquid amount the (first) source loses, e.g. water evaporating on a fire. */
+    val sourceConsume: Int = 0,
 )
 
 data class Rule(

@@ -4,7 +4,7 @@
 
 REACT ist ein deterministisches 2D-Logik-Puzzle für Android. Die Welt besteht aus Objekten, Zuständen und festen Regeln; der Spieler baut einen Versuch auf, startet die Simulation und beobachtet, was passiert.
 
-**Stand: Beta-Meilenstein (Phase 1).** Enthalten sind die Core Engine und genau drei Level (0–2) der Welt 1 „Materie“. Laut Spezifikation stoppt die Content-Entwicklung hier bis zum Beta-Feedback.
+**Stand:** Core Engine mit realistischer Physik und zehn Level (0–9) der Welt 1 „Materie“.
 
 ## APK herunterladen
 
@@ -45,13 +45,17 @@ app/                        Android-App (Kotlin, Jetpack Compose, MVVM/UDF)
 
 Jeder Simulationsschritt läuft in festen Phasen:
 
-1. **Zustand** – `TOUCH`- und `LOAD`-Regeln (z. B. Feuer + Eis → Wasser, Feuer + Wasser → Dampf, Gewicht auf Druckplatte)
-2. **Physik** – Wasser fällt, Dampf steigt. Ist der direkte Weg blockiert, rutschen Flüssigkeiten und Dampf diagonal auf ein freies Nachbarfeld (links zuerst), sonst fließen sie zur nächsten Öffnung in ihrer Reihe (bei Gleichstand nach links)
-3. **Signal** – `SIGNAL`-Regeln breiten sich aus, bis das Netz stabil ist
+1. **Zustand** – Regeln aus `world_01.json`: Feuer schmilzt Eis, Wasser löscht Feuer (es entsteht Dampf), Dampf taut Eis, Wasser löst Schalter aus, Gewicht drückt Platten, Dampfdruck hebt Kolben
+2. **Physik** – realistisches Verhalten jedes Materials:
+   - **Wasser** ist ein Volumen (bis 8 Einheiten pro Zelle): es fällt, füllt Becken von unten, läuft zu nahen Kanten und Gruben ab und verteilt sich sonst zu Pfützen
+   - **Eis** fällt und schwimmt auf Wasser (Auftrieb), **Stein** sinkt und verdrängt Wasser
+   - **Feuerschalen** fallen, sinken in Wasser und werden gelöscht
+   - **Dampf** steigt auf, perlt durch Wasser, sammelt sich unter Decken und drückt
+3. **Signal** – Schalter, Platten und Kolben senden Signale; Türen und Klappen reagieren, bis das Netz stabil ist
 
 Pro Schritt sind höchstens **100 Regel-Transformationen** erlaubt; darüber bricht die Simulation kontrolliert mit „Kurzschluss“ ab. Gleicher Aufbau ergibt immer exakt dieselbe Zeitleiste.
 
-Es gibt keine Level-Sonderfälle im Code: Alles kommt aus den JSON-Dateien. Neue Level brauchen nur eine neue Datei und einen Eintrag in `world_01.json`.
+Es gibt keine Level-Sonderfälle im Code: Alles kommt aus den JSON-Dateien. Level werden als ASCII-Karte mit Legende beschrieben (`#` Wand, `.` frei, `:` frei aber nicht bebaubar, Buchstaben laut `legend`). Neue Level brauchen nur eine neue Datei und einen Eintrag in `world_01.json`.
 
 ## Bauen und testen
 

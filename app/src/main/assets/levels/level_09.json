@@ -1,0 +1,104 @@
+{
+  "id": "level_09",
+  "title": "Finale",
+  "world": 1,
+  "intro": "Zwei Türen, ein Plan.",
+  "map": [
+    "##############",
+    "######K#####s#",
+    "######:#####H#",
+    "#..........#:#",
+    "#.i........#PE",
+    "####.......###",
+    "D....G....F###",
+    "########.#####",
+    "########B#####",
+    "##############"
+  ],
+  "legend": {
+    "F": {
+      "type": "FIRE",
+      "id": "fire_1",
+      "movable": true
+    },
+    "G": {
+      "type": "FIRE",
+      "id": "fire_2",
+      "movable": true
+    },
+    "i": {
+      "type": "ICE",
+      "id": "ice_block_1"
+    },
+    "s": {
+      "type": "STONE",
+      "id": "stone_1"
+    },
+    "K": {
+      "type": "PISTON",
+      "id": "piston_1",
+      "properties": {
+        "channel": "B"
+      }
+    },
+    "H": {
+      "type": "HATCH",
+      "id": "hatch_1",
+      "properties": {
+        "channel": "B"
+      }
+    },
+    "P": {
+      "type": "PLATE",
+      "id": "plate_1",
+      "properties": {
+        "channel": "C"
+      }
+    },
+    "B": {
+      "type": "BUTTON",
+      "id": "button_1",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "D": {
+      "type": "DOOR",
+      "id": "door_1",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "E": {
+      "type": "DOOR",
+      "id": "door_2",
+      "properties": {
+        "channel": "C"
+      }
+    }
+  },
+  "goals": [
+    {
+      "object_id": "door_1",
+      "required_state": "UNLOCKED"
+    },
+    {
+      "object_id": "door_2",
+      "required_state": "UNLOCKED"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "standard",
+      "kind": "STANDARD",
+      "requires": [
+        {
+          "rule": "water_triggers_button"
+        },
+        {
+          "rule": "steam_lifts_piston"
+        }
+      ]
+    }
+  ]
+}

@@ -1,18 +1,18 @@
 {
-  "id": "level_01",
-  "title": "Berührung",
+  "id": "level_07",
+  "title": "Kombination",
   "world": 1,
-  "intro": "Der Schalter liegt tief unten.",
+  "intro": "Der Brunnen ist verschlossen.",
   "map": [
-    "##########",
-    "#........#",
-    "#.I......#",
-    "####.....#",
-    "#........D",
-    "#...F....#",
-    "#######.##",
-    "#######B##",
-    "##########"
+    "##K###########",
+    "##:###########",
+    "#.....#......D",
+    "#F.G.s#..I...#",
+    "#####HB#######",
+    "#####:########",
+    "#####W########",
+    "#####W########",
+    "##############"
   ],
   "legend": {
     "F": {
@@ -20,10 +20,36 @@
       "id": "fire_1",
       "movable": true
     },
+    "G": {
+      "type": "FIRE",
+      "id": "fire_2",
+      "movable": true
+    },
     "I": {
       "type": "ICE",
       "id": "ice_block_1",
       "movable": true
+    },
+    "s": {
+      "type": "STONE",
+      "id": "stone_1"
+    },
+    "W": {
+      "type": "WATER"
+    },
+    "H": {
+      "type": "HATCH",
+      "id": "hatch_1",
+      "properties": {
+        "channel": "B"
+      }
+    },
+    "K": {
+      "type": "PISTON",
+      "id": "piston_1",
+      "properties": {
+        "channel": "B"
+      }
     },
     "B": {
       "type": "BUTTON",
@@ -53,6 +79,9 @@
       "requires": [
         {
           "rule": "water_triggers_button"
+        },
+        {
+          "rule": "steam_lifts_piston"
         }
       ]
     },
@@ -65,18 +94,6 @@
         }
       ],
       "max_moved": 1
-    },
-    {
-      "id": "override",
-      "kind": "OVERRIDE",
-      "requires": [
-        {
-          "rule": "water_triggers_button"
-        }
-      ],
-      "unmoved": [
-        "fire_1"
-      ]
     }
   ]
 }

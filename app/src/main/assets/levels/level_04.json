@@ -1,0 +1,97 @@
+{
+  "id": "level_04",
+  "title": "Dampfdruck",
+  "world": 1,
+  "intro": "Oben im Schacht sitzt ein Kolben.",
+  "map": [
+    "##########",
+    "######K###",
+    "######:###",
+    "######:###",
+    "#FG.I..:D#",
+    "######.###",
+    "######W###",
+    "######W###",
+    "##########"
+  ],
+  "legend": {
+    "F": {
+      "type": "FIRE",
+      "movable": true,
+      "id": "fire_1"
+    },
+    "G": {
+      "type": "FIRE",
+      "movable": true,
+      "id": "fire_2"
+    },
+    "I": {
+      "type": "ICE",
+      "movable": true,
+      "id": "ice_block_1"
+    },
+    "W": {
+      "type": "WATER"
+    },
+    "D": {
+      "type": "DOOR",
+      "id": "door_1",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "K": {
+      "type": "PISTON",
+      "id": "piston_1",
+      "properties": {
+        "channel": "A"
+      }
+    }
+  },
+  "goals": [
+    {
+      "object_id": "door_1",
+      "required_state": "UNLOCKED"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "standard",
+      "kind": "STANDARD",
+      "requires": [
+        {
+          "rule": "steam_lifts_piston"
+        }
+      ],
+      "moved": [
+        "fire_1",
+        "fire_2"
+      ],
+      "forbids": [
+        "fire_melts_ice"
+      ]
+    },
+    {
+      "id": "minimal",
+      "kind": "MINIMAL",
+      "requires": [
+        {
+          "rule": "steam_lifts_piston"
+        }
+      ],
+      "max_moved": 1
+    },
+    {
+      "id": "override",
+      "kind": "OVERRIDE",
+      "requires": [
+        {
+          "rule": "steam_lifts_piston"
+        },
+        {
+          "rule": "fire_melts_ice"
+        }
+      ]
+    }
+  ]
+}

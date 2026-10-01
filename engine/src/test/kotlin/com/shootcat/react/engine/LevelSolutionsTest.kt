@@ -9,130 +9,106 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/** Plays the beta levels the way a player would and checks solutions and their classification. */
+/** Plays every level the way a player would and checks solutions, failures and classification. */
 class LevelSolutionsTest {
 
     private fun p(x: Int, y: Int) = Position(x, y)
 
-    // Level 0 – FIRE + ICE -> WATER -> door
+    private fun solved(level: String, vararg moves: Pair<String, Position>, expect: Set<com.shootcat.react.engine.model.SolutionKind>) {
+        val a = Levels.attempt(level, *moves)
+        assertTrue(a.solved, "$level ${moves.toList()} should be solved but was ${a.result.outcome}")
+        assertEquals(expect, a.solutions, "$level ${moves.toList()}")
+    }
+
+    private fun fails(level: String, vararg moves: Pair<String, Position>) {
+        val a = Levels.attempt(level, *moves)
+        assertFalse(a.solved, "$level ${moves.toList()} should fail")
+    }
 
     @Test
-    fun `level 0 fire beside the ice opens the door`() {
+    fun `level 0 - melt water presses the button, then douses the fire`() {
         val a = Levels.attempt("level_00", "fire_1" to p(5, 4))
         assertTrue(a.solved)
         assertEquals(setOf(STANDARD), a.solutions)
-        val discovered = a.result.allEvents.filter { it.positive }.map { it.ruleId }.toSet()
-        assertEquals(
-            setOf("fire_melts_ice", "fire_evaporates_water", "water_presses_button", "button_opens_door"),
-            discovered,
-        )
+        val rules = a.result.allEvents.filter { it.positive }.map { it.ruleId }.toSet()
+        assertTrue(rules.containsAll(setOf("fire_melts_ice", "water_douses_fire", "water_triggers_button")))
+        assertEquals("OUT", a.result.frames.last().state.objectById("fire_1")?.state)
     }
 
     @Test
-    fun `level 0 the fire then boils the meltwater away – the button stays pressed`() {
-        val a = Levels.attempt("level_00", "fire_1" to p(5, 4))
-        val last = a.result.frames.last().state
-        assertEquals("PRESSED", last.objectById("button_1")?.state)
-        assertTrue(a.result.allEvents.any { it.ruleId == "fire_evaporates_water" })
-        assertEquals(1, last.objects.count { it.type == "STEAM" })
+    fun `level 0 - a fire on top sinks into its own melt water and covers the button`() {
+        fails("level_00", "fire_1" to p(6, 3))
+        assertEquals(Outcome.STABLE, Levels.attempt("level_00", "fire_1" to p(4, 4)).result.outcome)
     }
 
     @Test
-    fun `level 0 fire above the ice works too`() {
-        assertTrue(Levels.attempt("level_00", "fire_1" to p(6, 3)).solved)
+    fun `level 1 - the melt water runs off the ledge and finds the button`() {
+        solved("level_01", "fire_1" to p(1, 2), expect = setOf(STANDARD, MINIMAL))
+        solved("level_01", "ice_block_1" to p(4, 3), expect = setOf(STANDARD, MINIMAL, OVERRIDE))
+        fails("level_01", "fire_1" to p(3, 2))
     }
 
     @Test
-    fun `level 0 fire out of reach does nothing`() {
-        val a = Levels.attempt("level_00", "fire_1" to p(4, 4))
-        assertEquals(Outcome.STABLE, a.result.outcome)
+    fun `level 2 - stone or water make the weight`() {
+        solved("level_02", "stone_1" to p(5, 2), expect = setOf(STANDARD))
+        solved("level_02", "fire_1" to p(5, 2), expect = setOf(OVERRIDE))
+        fails("level_02", "fire_1" to p(6, 1))
     }
 
-    // Level 1 – WATER -> BUTTON
+    @Test
+    fun `level 3 - sinking objects raise the water, floating ice does not`() {
+        solved("level_03", "stone_1" to p(4, 2), expect = setOf(STANDARD, OVERRIDE))
+        solved("level_03", "fire_1" to p(4, 2), expect = setOf(STANDARD))
+        fails("level_03", "ice_block_1" to p(4, 2))
+    }
 
     @Test
-    fun `level 1 melting the ice on the ledge lets the water find the button`() {
-        val a = Levels.attempt("level_01", "fire_1" to p(1, 2))
+    fun `level 4 - two portions of steam lift the piston`() {
+        solved("level_04", "fire_1" to p(6, 4), "fire_2" to p(6, 5), expect = setOf(STANDARD))
+        solved("level_04", "fire_2" to p(5, 4), expect = setOf(MINIMAL, OVERRIDE))
+        fails("level_04", "fire_1" to p(6, 5))
+    }
+
+    @Test
+    fun `level 5 - steam, piston, hatch, stone, plate, door`() {
+        solved("level_05", "fire_2" to p(5, 4), expect = setOf(STANDARD, MINIMAL))
+        solved("level_05", "fire_1" to p(5, 4), "fire_2" to p(1, 4), expect = setOf(STANDARD))
+    }
+
+    @Test
+    fun `level 6 - water or pressure`() {
+        solved("level_06", "fire_1" to p(2, 1), expect = setOf(STANDARD, MINIMAL))
+        solved("level_06", "fire_1" to p(10, 4), "fire_2" to p(10, 5), expect = setOf(STANDARD, OVERRIDE))
+        fails("level_06", "fire_1" to p(3, 2))
+    }
+
+    @Test
+    fun `level 7 - melt, boil, push, drop, displace`() {
+        solved("level_07", "ice_block_1" to p(3, 2), expect = setOf(STANDARD, MINIMAL))
+        solved("level_07", "fire_1" to p(1, 2), "ice_block_1" to p(3, 2), expect = setOf(STANDARD))
+        fails("level_07", "ice_block_1" to p(2, 3))
+    }
+
+    @Test
+    fun `level 8 - water lifts the ice off the button`() {
+        val a = Levels.attempt("level_08", "fire_1" to p(6, 2))
         assertTrue(a.solved)
         assertEquals(setOf(STANDARD, MINIMAL), a.solutions)
+        val plug = a.result.frames.last().state.objectById("ice_plug")!!
+        assertTrue(plug.position.y < 5, "the plug floated up")
+        solved("level_08", "ice_block_1" to p(3, 2), expect = setOf(STANDARD, MINIMAL))
     }
 
     @Test
-    fun `level 1 fire from above works as well`() {
-        assertTrue(Levels.attempt("level_01", "fire_1" to p(2, 1)).solved)
+    fun `level 9 - both doors need their own chain`() {
+        solved("level_09", "fire_1" to p(1, 3), "fire_2" to p(9, 3), expect = setOf(STANDARD))
+        // Left where it is, the second bowl is doused by the melt water and blocks the way to the button.
+        fails("level_09", "fire_1" to p(1, 3))
     }
 
     @Test
-    fun `level 1 fire on the wrong side blocks the water`() {
-        val a = Levels.attempt("level_01", "fire_1" to p(3, 2))
-        assertFalse(a.solved)
-        assertTrue(a.result.allEvents.any { it.ruleId == "fire_melts_ice" })
-    }
-
-    @Test
-    fun `level 1 bringing the ice to the fire is the system override`() {
-        val a = Levels.attempt("level_01", "ice_block_1" to p(5, 5))
-        assertTrue(a.solved)
-        assertEquals(setOf(STANDARD, MINIMAL, OVERRIDE), a.solutions)
-    }
-
-    @Test
-    fun `level 1 ice on the button is not enough`() {
-        assertFalse(Levels.attempt("level_01", "ice_block_1" to p(7, 6)).solved)
-    }
-
-    @Test
-    fun `level 1 melting the ice right on the button is a plain standard solution`() {
-        val a = Levels.attempt("level_01", "ice_block_1" to p(7, 6), "fire_1" to p(7, 5))
-        assertTrue(a.solved)
-        assertEquals(setOf(STANDARD), a.solutions)
-    }
-
-    // Level 2 – HEAVY STONE -> PRESSURE PLATE, or water
-
-    @Test
-    fun `level 2 melting the support drops the stone onto the plate`() {
-        for (fire in listOf(p(5, 2), p(7, 2))) {
-            val a = Levels.attempt("level_02", "fire_1" to fire)
-            assertTrue(a.solved, "fire at $fire")
-            assertEquals(setOf(STANDARD), a.solutions, "fire at $fire")
-        }
-    }
-
-    @Test
-    fun `level 2 moving the dam away floods the shaft instead`() {
-        val a = Levels.attempt("level_02", "ice_block_2" to p(2, 2))
-        assertTrue(a.solved)
-        assertEquals(setOf(OVERRIDE), a.solutions)
-    }
-
-    @Test
-    fun `level 2 melting the dam boils the water that flows under the fire`() {
-        val a = Levels.attempt("level_02", "fire_1" to p(8, 2))
-        assertFalse(a.solved)
-        assertTrue(a.result.allEvents.count { it.ruleId == "fire_evaporates_water" } >= 2)
-    }
-
-    @Test
-    fun `level 2 both ways at once still count as the stone`() {
-        val a = Levels.attempt("level_02", "ice_block_2" to p(2, 2), "fire_1" to p(5, 2))
-        assertTrue(a.solved)
-    }
-
-    @Test
-    fun `level 2 fire inside the channel blocks everything`() {
-        assertFalse(Levels.attempt("level_02", "fire_1" to p(6, 3)).solved)
-        assertFalse(Levels.attempt("level_02", "fire_1" to p(7, 3)).solved)
-    }
-
-    @Test
-    fun `level 2 a single unit of water is too light`() {
-        val level = Levels.level("level_02")
-        val oneWater = level.initialState().let { s ->
-            s.copy(objects = s.objects.filter { it.id != "water_2" && it.id != "water_3" })
-        }
-        val result = Levels.simulate(level, oneWater.withObjectMoved("ice_block_2", p(2, 2))!!)
-        assertFalse(result.outcome == Outcome.SUCCESS)
-        assertEquals("UP", result.frames.last().state.objectById("plate_1")?.state)
+    fun `every solution finishes in reasonable time`() {
+        val a = Levels.attempt("level_09", "fire_1" to p(1, 3), "fire_2" to p(9, 3))
+        assertTrue(a.result.lastIndex <= 40, "took ${a.result.lastIndex} steps")
     }
 }

@@ -1,100 +1,158 @@
 package com.shootcat.react.engine
 
+import com.shootcat.react.engine.TestWorld.after
+import com.shootcat.react.engine.TestWorld.amountAt
 import com.shootcat.react.engine.TestWorld.positionsOf
-import com.shootcat.react.engine.model.GameState
+import com.shootcat.react.engine.TestWorld.totalWater
+import com.shootcat.react.engine.TestWorld.typeAt
 import com.shootcat.react.engine.model.Position
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class PhysicsTest {
 
-    private val engine = TestWorld.engine()
+    private val physicsOnly = TestWorld.engine(rules = emptyList())
 
-    private fun GameState.after(steps: Int): GameState {
-        var s = this
-        repeat(steps) { s = engine.step(s).state }
-        return s
-    }
+    // Solids
 
     @Test
-    fun `a stone falls one cell per step until it rests`() {
+    fun `solids fall one cell per step and stacks fall together`() {
         val start = TestWorld.state(
             "#S#",
+            "#I#",
             "#.#",
             "#.#",
             "###",
         )
-        assertEquals(listOf(Position(1, 1)), start.after(1).positionsOf("STONE"))
-        assertEquals(listOf(Position(1, 2)), start.after(2).positionsOf("STONE"))
-        assertEquals(listOf(Position(1, 2)), start.after(5).positionsOf("STONE"))
+        val s = start.after(1, physicsOnly)
+        assertEquals(listOf(Position(1, 1)), s.positionsOf("STONE"))
+        assertEquals(listOf(Position(1, 2)), s.positionsOf("ICE"))
+        assertEquals(listOf(Position(1, 3)), start.after(5, physicsOnly).positionsOf("ICE"))
     }
 
     @Test
-    fun `a stack falls together`() {
+    fun `a stone sinks through water and pushes it up`() {
         val start = TestWorld.state(
             "#S#",
             "#W#",
-            "#.#",
-            "#.#",
+            "#W#",
             "###",
         )
-        val s = start.after(1)
-        assertEquals(listOf(Position(1, 1)), s.positionsOf("STONE"))
-        assertEquals(listOf(Position(1, 2)), s.positionsOf("WATER"))
+        val s = start.after(2, physicsOnly)
+        assertEquals(listOf(Position(1, 2)), s.positionsOf("STONE"))
+        assertEquals(8, s.amountAt(1, 0))
+        assertEquals(8, s.amountAt(1, 1))
     }
 
     @Test
-    fun `water flows towards the nearest drop and falls`() {
-        val start = TestWorld.state(
-            "#######",
-            "#.W...#",
-            "####.##",
-            "#######",
+    fun `ice floats - it rests on water and rises when it is under water`() {
+        val onTop = TestWorld.state(
+            "#I#",
+            "#.#",
+            "#W#",
+            "###",
         )
-        // One step sideways, then it slides diagonally into the hole.
-        assertEquals(listOf(Position(3, 1)), start.after(1).positionsOf("WATER"))
-        assertEquals(listOf(Position(4, 2)), start.after(2).positionsOf("WATER"))
+        assertEquals(listOf(Position(1, 1)), onTop.after(4, physicsOnly).positionsOf("ICE"))
+
+        val underWater = TestWorld.state(
+            "#.#",
+            "#W#",
+            "#I#",
+            "###",
+        )
+        val s = underWater.after(1, physicsOnly)
+        assertEquals(listOf(Position(1, 1)), s.positionsOf("ICE"))
+        assertEquals(8, s.amountAt(1, 2))
     }
 
     @Test
-    fun `blocked water slides diagonally down, left first`() {
+    fun `a fire bowl falls and sinks in water`() {
         val start = TestWorld.state(
-            "#####",
-            "#.W.#",
-            "#.#.#",
-            "#####",
+            "#F#",
+            "#.#",
+            "#W#",
+            "###",
         )
-        assertEquals(listOf(Position(1, 2)), start.after(1).positionsOf("WATER"))
+        assertEquals(listOf(Position(1, 2)), start.after(3, physicsOnly).positionsOf("FIRE"))
+    }
+
+    // Liquids
+
+    @Test
+    fun `water falls and fills a container from the bottom`() {
+        val start = TestWorld.state(
+            "#W#",
+            "#.#",
+            "#4#",
+            "###",
+        )
+        val s = start.after(2, physicsOnly)
+        assertEquals(8, s.amountAt(1, 2))
+        assertEquals(4, s.amountAt(1, 1))
     }
 
     @Test
-    fun `water does not squeeze through corners`() {
+    fun `water on a flat floor spreads into a puddle and comes to rest`() {
         val start = TestWorld.state(
-            "#####",
-            "#FW.#",
-            "#.#.#",
-            "#####",
+            "#..........#",
+            "#....W.....#",
+            "############",
         )
-        // The fire blocks the left side, so the only way is down-right.
-        val s = TestWorld.engine(listOf(TestWorld.melt)).step(start).state
-        assertEquals(listOf(Position(3, 2)), s.positionsOf("WATER"))
+        val settled = start.after(30, physicsOnly)
+        assertEquals(8, settled.totalWater())
+        val wet = settled.objects.count { it.isLiquid }
+        assertTrue(wet >= 4, "puddle should cover several cells, was $wet")
+        assertEquals(settled, physicsOnly.step(settled).state, "a puddle is at rest")
     }
+
+    @Test
+    fun `water runs off towards a nearby edge`() {
+        val start = TestWorld.state(
+            "#W.....#",
+            "######.#",
+            "######.#",
+            "########",
+        )
+        val s = start.after(25, physicsOnly)
+        assertEquals(8, s.totalWater())
+        assertEquals(8, s.amountAt(6, 2), "all water ends up in the pit")
+    }
+
+    @Test
+    fun `water levels out between connected basins`() {
+        val start = TestWorld.state(
+            "#W.#",
+            "#W.#",
+            "####",
+        )
+        val s = start.after(30, physicsOnly)
+        assertEquals(16, s.totalWater())
+        assertTrue(kotlin.math.abs(s.amountAt(1, 1) - s.amountAt(2, 1)) <= 1)
+    }
+
+    @Test
+    fun `water volume is conserved`() {
+        var s = TestWorld.state(
+            "#W.W..W.#",
+            "#.#.##..#",
+            "#...#.3.#",
+            "##.##...#",
+            "#########",
+        )
+        val total = s.totalWater()
+        repeat(40) {
+            s = physicsOnly.step(s).state
+            assertEquals(total, s.totalWater())
+            assertTrue(s.objects.filter { it.isLiquid }.all { it.amount in 1..8 })
+        }
+    }
+
+    // Gases
 
     @Test
     fun `steam rises and slides around a ceiling`() {
         val start = TestWorld.state(
-            "#######",
-            "#.....#",
-            "###.###",
-            "#..V..#",
-            "#######",
-        )
-        // Straight up through the gap, then it rests under the ceiling.
-        assertEquals(listOf(Position(3, 2)), start.after(1).positionsOf("STEAM"))
-        assertEquals(listOf(Position(3, 1)), start.after(2).positionsOf("STEAM"))
-        assertEquals(listOf(Position(3, 1)), start.after(5).positionsOf("STEAM"))
-
-        val underLedge = TestWorld.state(
             "#######",
             "#.....#",
             "#.###.#",
@@ -102,64 +160,32 @@ class PhysicsTest {
             "#######",
         )
         // Tie between the two openings goes left: sideways first, then diagonally up.
-        assertEquals(listOf(Position(2, 3)), underLedge.after(1).positionsOf("STEAM"))
-        assertEquals(listOf(Position(1, 2)), underLedge.after(2).positionsOf("STEAM"))
+        assertEquals(listOf(Position(2, 3)), start.after(1, physicsOnly).positionsOf("STEAM"))
+        assertEquals(listOf(Position(1, 2)), start.after(2, physicsOnly).positionsOf("STEAM"))
     }
 
     @Test
-    fun `steam weighs nothing`() {
+    fun `trapped steam gathers in one pocket`() {
         val start = TestWorld.state(
+            "###.###",
+            "#V....#",
+            "#....V#",
+            "#######",
+        )
+        val s = start.after(10, physicsOnly)
+        assertEquals(setOf(Position(3, 0), Position(3, 1)), s.positionsOf("STEAM").toSet())
+    }
+
+    @Test
+    fun `steam bubbles up through water`() {
+        val start = TestWorld.state(
+            "#.#",
+            "#W#",
             "#V#",
-            "#P#",
             "###",
         )
-        assertEquals("UP", engine.step(start).state.objectById("plate_1_1")?.state)
-    }
-
-    @Test
-    fun `equal distance flows left`() {
-        val start = TestWorld.state(
-            "#######",
-            "#..W..#",
-            "#.###.#",
-            "#######",
-        )
-        assertEquals(listOf(Position(2, 1)), start.after(1).positionsOf("WATER"))
-    }
-
-    @Test
-    fun `water without a drop rests`() {
-        val start = TestWorld.state(
-            "######",
-            "#.W..#",
-            "######",
-        )
-        assertEquals(start.objects, engine.step(start).state.objects)
-    }
-
-    @Test
-    fun `fixed objects block the flow`() {
-        // Ice is frozen in place and does not react with water.
-        val start = TestWorld.state(
-            "#######",
-            "#.WI..#",
-            "####.##",
-            "#######",
-        )
-        assertEquals(listOf(Position(2, 1)), start.after(3).positionsOf("WATER"))
-    }
-
-    @Test
-    fun `water fills a shaft from the bottom`() {
-        val start = TestWorld.state(
-            "#....#",
-            "#.WWW#",
-            "##.###",
-            "##.###",
-            "##.###",
-            "######",
-        )
-        val settled = start.after(20)
-        assertEquals(listOf(Position(2, 2), Position(2, 3), Position(2, 4)), settled.positionsOf("WATER"))
+        val s = start.after(1, physicsOnly)
+        assertEquals("STEAM", s.typeAt(1, 1))
+        assertEquals(8, s.amountAt(1, 2))
     }
 }

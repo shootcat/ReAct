@@ -1,46 +1,58 @@
 package com.shootcat.react.engine
 
+import com.shootcat.react.engine.model.Position
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LevelFilesTest {
 
     @Test
-    fun `world file lists exactly the three beta levels`() {
-        assertEquals(listOf("level_00", "level_01", "level_02"), Levels.world.levelIds)
+    fun `world 1 lists ten levels, all on the map`() {
+        assertEquals((0..9).map { "level_%02d".format(it) }, Levels.world.levelIds)
         assertEquals(Levels.world.levelIds.toSet(), Levels.world.map.map { it.levelId }.toSet())
     }
 
     @Test
-    fun `every level loads and has a goal and solution classes`() {
+    fun `every level loads and has goals, solution classes and something to experiment with`() {
         for (id in Levels.world.levelIds) {
             val level = Levels.level(id)
             assertEquals(id, level.id)
             assertTrue(level.goals.isNotEmpty(), "$id has goals")
             assertTrue(level.solutions.isNotEmpty(), "$id has solution classes")
-            assertTrue(level.objects.any { it.movable }, "$id has something to experiment with")
+            assertTrue(level.objects.any { it.movable }, "$id has movable objects")
         }
     }
 
     @Test
-    fun `no level solves itself without the player`() {
+    fun `every level is at rest until the player acts`() {
         for (id in Levels.world.levelIds) {
             val level = Levels.level(id)
-            val result = Levels.simulate(level, level.initialState())
-            assertNotEquals(Outcome.SUCCESS, result.outcome, "$id must not be solved without moves")
+            val start = level.initialState()
+            val step = RuleEngine(Levels.world.types, level.rules).step(start)
+            assertEquals(start.objects, step.state.objects, "$id must not change by itself")
         }
     }
 
     @Test
-    fun `objects cannot be dropped onto walls or other objects`() {
-        val level = Levels.level("level_00")
-        val start = level.initialState()
-        assertEquals(null, start.withObjectMoved("fire_1", com.shootcat.react.engine.model.Position(0, 0)))
-        assertEquals(null, start.withObjectMoved("fire_1", com.shootcat.react.engine.model.Position(6, 4)))
-        assertEquals(null, start.withObjectMoved("ice_block_1", com.shootcat.react.engine.model.Position(3, 3)))
+    fun `no level solves itself`() {
+        for (id in Levels.world.levelIds) {
+            val level = Levels.level(id)
+            assertNotEquals(Outcome.SUCCESS, Levels.simulate(level, level.initialState()).outcome, id)
+        }
+    }
+
+    @Test
+    fun `objects cannot be dropped onto walls, other objects or closed areas`() {
+        val l0 = Levels.level("level_00").initialState()
+        assertNull(l0.withObjectMoved("fire_1", Position(0, 0)))
+        assertNull(l0.withObjectMoved("fire_1", Position(6, 4)))
+        assertNull(l0.withObjectMoved("ice_block_1", Position(3, 3)))
+        val l2 = Levels.level("level_02").initialState()
+        assertNull(l2.withObjectMoved("stone_1", Position(5, 4)), "the shaft interior is closed")
     }
 
     private fun withLevel(edit: (String) -> String) = edit(Levels.read("level_00"))
@@ -51,10 +63,10 @@ class LevelFilesTest {
             LevelLoader.parseLevel(withLevel { it.replace("\"type\": \"FIRE\"", "\"type\": \"LAVA\"") }, Levels.world)
         }
         assertFailsWith<LevelFormatException> {
-            LevelLoader.parseLevel(withLevel { it.replace("\"x\": 2, \"y\": 4", "\"x\": 0, \"y\": 4") }, Levels.world)
+            LevelLoader.parseLevel(withLevel { it.replace("\"#.F...i#\"", "\"#.F...Z#\"") }, Levels.world)
         }
         assertFailsWith<LevelFormatException> {
-            LevelLoader.parseLevel(withLevel { it.replace("\"######.#\",", "\"######.\",") }, Levels.world)
+            LevelLoader.parseLevel(withLevel { it.replace("\"######B#\"", "\"######B\"") }, Levels.world)
         }
         assertFailsWith<LevelFormatException> {
             LevelLoader.parseLevel(withLevel { it.replace("\"object_id\": \"door_1\"", "\"object_id\": \"door_9\"") }, Levels.world)
@@ -70,11 +82,13 @@ class LevelFilesTest {
         assertEquals(
             listOf(
                 "Feuer + Eis → Wasser",
-                "Feuer + Wasser → Dampf",
+                "Wasser + Feuer → Dampf",
+                "Dampf + Eis → Wasser",
                 "Wasser + Schalter → Schalter aktiviert",
-                "Gewicht ≥ 3 + Druckplatte → Druckplatte gedrückt",
-                "Schalter aktiviert → Tür offen",
-                "Druckplatte gedrückt → Tür offen",
+                "Gewicht + Druckplatte → Druckplatte gedrückt",
+                "Druck + Kolben → Kolben hochgedrückt",
+                "Signal + Tür → Tür offen",
+                "Signal + Klappe → Klappe offen",
             ),
             texts,
         )

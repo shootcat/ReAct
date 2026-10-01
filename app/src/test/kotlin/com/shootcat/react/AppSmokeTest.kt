@@ -66,7 +66,7 @@ class AppSmokeTest {
         compose.onNodeWithTag("discoveries").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("Feuer + Eis → Wasser").assertExists()
-        compose.onNodeWithText("Feuer + Wasser → Dampf").assertExists()
+        compose.onNodeWithText("Wasser + Feuer → Dampf").assertExists()
         shot("07_entdeckungen")
 
         // Back to the level, then to the map and into level 1.
@@ -90,19 +90,27 @@ class AppSmokeTest {
         compose.onNodeWithText("Gewicht").assertExists()
         shot("10_level2_aufbau")
 
-        // Level 2: drag the dam aside – the water alone is heavy enough (System-Override).
-        moveOnBoard(columns = 13, from = 8 to 3, to = 2 to 2)
+        // Level 2: drop the fire into the shaft – it melts the dam on its way down (System-Override).
+        moveOnBoard(columns = 12, from = 4 to 2, to = 5 to 2)
         compose.onNodeWithContentDescription("Start").performClick()
-        advance(millis = 2000)
+        advance(millis = 2500)
         shot("11_level2_simulation")
         advance(millis = 7000)
         compose.onNodeWithText("Geschafft").assertExists()
         compose.onNodeWithText("Override").assertExists()
         shot("12_level2_geloest")
 
-        compose.onNodeWithText("Karte").performClick()
+        compose.onNodeWithText("Nochmal").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("back").performClick()
         compose.waitForIdle()
         shot("13_weltkarte_fortschritt")
+
+        compose.onNodeWithTag("level_level_03").performClick()
+        compose.waitForIdle()
+        shot("15_level3_aufbau")
+        compose.onNodeWithTag("back").performClick()
+        compose.waitForIdle()
 
         compose.onNodeWithContentDescription("Einstellungen").performClick()
         compose.waitForIdle()

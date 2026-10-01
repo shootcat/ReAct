@@ -17,15 +17,19 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,6 +43,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -63,6 +68,7 @@ import kotlin.math.sin
 
 private val NodeSize = 68.dp
 private val NodeLabelWidth = 128.dp
+private val NodeSpacing = 104.dp
 private const val TAU = (2 * PI).toFloat()
 
 @Composable
@@ -97,28 +103,44 @@ fun WorldMapScreen(
                 .padding(top = 8.dp, bottom = 20.dp)
                 .clip(RoundedCornerShape(28.dp)),
         ) {
-            Canvas(Modifier.fillMaxSize()) {
-                if (size.minDimension <= 0f) return@Canvas
-                drawLandscape(time)
-                drawRoute(nodes, progress, content)
+            // The map is taller than the screen: it scrolls, starting at the next open level.
+            val contentHeight = maxOf(maxHeight, NodeSpacing * nodes.size + 40.dp)
+            val viewport = maxHeight
+            val scroll = rememberScrollState()
+            val density = LocalDensity.current
+            val focus = nodes.firstOrNull { isUnlocked(it.levelId) && it.levelId !in progress.completed } ?: nodes.lastOrNull { isUnlocked(it.levelId) }
+            LaunchedEffect(scroll.maxValue, focus?.levelId) {
+                if (focus != null && scroll.maxValue > 0) {
+                    val target = with(density) { (contentHeight * focus.y - viewport / 2).toPx() }
+                    scroll.scrollTo(target.toInt().coerceIn(0, scroll.maxValue))
+                }
             }
-            for ((i, node) in nodes.withIndex()) {
-                val level = content.level(node.levelId) ?: continue
-                MapNodeView(
-                    index = i,
-                    node = node,
-                    level = level,
-                    types = world.types,
-                    unlocked = isUnlocked(level.id),
-                    completed = level.id in progress.completed,
-                    found = progress.solutionsFor(level.id).size,
-                    pulse = time,
-                    onClick = { onOpenLevel(level.id) },
-                    modifier = Modifier.offset(
-                        x = maxWidth * node.x - NodeLabelWidth / 2,
-                        y = maxHeight * node.y - NodeSize / 2,
-                    ),
-                )
+            Box(Modifier.fillMaxSize().verticalScroll(scroll)) {
+                Box(Modifier.fillMaxWidth().height(contentHeight)) {
+                    Canvas(Modifier.fillMaxSize()) {
+                        if (size.minDimension <= 0f) return@Canvas
+                        drawLandscape(time)
+                        drawRoute(nodes, progress, content)
+                    }
+                    for ((i, node) in nodes.withIndex()) {
+                        val level = content.level(node.levelId) ?: continue
+                        MapNodeView(
+                            index = i,
+                            node = node,
+                            level = level,
+                            types = world.types,
+                            unlocked = isUnlocked(level.id),
+                            completed = level.id in progress.completed,
+                            found = progress.solutionsFor(level.id).size,
+                            pulse = time,
+                            onClick = { onOpenLevel(level.id) },
+                            modifier = Modifier.offset(
+                                x = maxWidth * node.x - NodeLabelWidth / 2,
+                                y = contentHeight * node.y - NodeSize / 2,
+                            ),
+                        )
+                    }
+                }
             }
         }
     }
@@ -210,36 +232,36 @@ private fun DrawScope.drawLandscape(time: Float) {
     drawRect(Brush.verticalGradient(listOf(Color(0xFF1A2232), Color(0xFF111821), Color(0xFF0E1814))))
 
     val peaks = Path().apply {
-        moveTo(0f, h * 0.36f)
-        lineTo(w * 0.14f, h * 0.2f)
-        lineTo(w * 0.28f, h * 0.34f)
-        lineTo(w * 0.46f, h * 0.13f)
-        lineTo(w * 0.66f, h * 0.33f)
-        lineTo(w * 0.82f, h * 0.18f)
+        moveTo(0f, h * 0.24f)
+        lineTo(w * 0.14f, h * 0.12f)
+        lineTo(w * 0.28f, h * 0.22f)
+        lineTo(w * 0.46f, h * 0.07f)
+        lineTo(w * 0.66f, h * 0.21f)
+        lineTo(w * 0.82f, h * 0.1f)
+        lineTo(w, h * 0.2f)
         lineTo(w, h * 0.32f)
-        lineTo(w, h * 0.46f)
-        lineTo(0f, h * 0.46f)
+        lineTo(0f, h * 0.32f)
         close()
     }
-    drawPath(peaks, Brush.verticalGradient(listOf(Color(0xFF2A3850), Color(0xFF172030)), h * 0.12f, h * 0.46f))
+    drawPath(peaks, Brush.verticalGradient(listOf(Color(0xFF2A3850), Color(0xFF172030)), h * 0.06f, h * 0.32f))
     val caps = Path().apply {
-        moveTo(w * 0.41f, h * 0.18f)
-        lineTo(w * 0.46f, h * 0.13f)
-        lineTo(w * 0.51f, h * 0.18f)
+        moveTo(w * 0.41f, h * 0.1f)
+        lineTo(w * 0.46f, h * 0.07f)
+        lineTo(w * 0.51f, h * 0.1f)
         close()
-        moveTo(w * 0.78f, h * 0.22f)
-        lineTo(w * 0.82f, h * 0.18f)
-        lineTo(w * 0.86f, h * 0.22f)
+        moveTo(w * 0.78f, h * 0.125f)
+        lineTo(w * 0.82f, h * 0.1f)
+        lineTo(w * 0.86f, h * 0.125f)
         close()
-        moveTo(w * 0.1f, h * 0.24f)
-        lineTo(w * 0.14f, h * 0.2f)
-        lineTo(w * 0.18f, h * 0.24f)
+        moveTo(w * 0.1f, h * 0.145f)
+        lineTo(w * 0.14f, h * 0.12f)
+        lineTo(w * 0.18f, h * 0.145f)
         close()
     }
     drawPath(caps, Palette.ice, alpha = 0.75f)
 
     // Fog over the unexplored regions.
-    drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.07f), Color.Transparent), 0f, h * 0.25f))
+    drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.07f), Color.Transparent), 0f, h * 0.12f))
 
     // Lake with a slow shimmer.
     val lakeCenter = Offset(w * 0.8f, h * 0.86f)

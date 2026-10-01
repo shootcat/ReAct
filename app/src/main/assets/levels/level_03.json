@@ -1,29 +1,36 @@
 {
-  "id": "level_01",
-  "title": "Berührung",
+  "id": "level_03",
+  "title": "Verdrängung",
   "world": 1,
-  "intro": "Der Schalter liegt tief unten.",
+  "intro": "Der Brunnen ist fast voll.",
   "map": [
     "##########",
-    "#........#",
-    "#.I......#",
-    "####.....#",
     "#........D",
-    "#...F....#",
-    "#######.##",
-    "#######B##",
+    "#.S..I.F.#",
+    "####.B####",
+    "####W#####",
+    "####W#####",
+    "####W#####",
     "##########"
   ],
   "legend": {
-    "F": {
-      "type": "FIRE",
-      "id": "fire_1",
+    "S": {
+      "type": "STONE",
+      "id": "stone_1",
       "movable": true
     },
     "I": {
       "type": "ICE",
       "id": "ice_block_1",
       "movable": true
+    },
+    "F": {
+      "type": "FIRE",
+      "id": "fire_1",
+      "movable": true
+    },
+    "W": {
+      "type": "WATER"
     },
     "B": {
       "type": "BUTTON",
@@ -57,16 +64,6 @@
       ]
     },
     {
-      "id": "minimal",
-      "kind": "MINIMAL",
-      "requires": [
-        {
-          "rule": "water_triggers_button"
-        }
-      ],
-      "max_moved": 1
-    },
-    {
       "id": "override",
       "kind": "OVERRIDE",
       "requires": [
@@ -74,8 +71,11 @@
           "rule": "water_triggers_button"
         }
       ],
-      "unmoved": [
-        "fire_1"
+      "moved": [
+        "stone_1"
+      ],
+      "forbids": [
+        "fire_melts_ice"
       ]
     }
   ]

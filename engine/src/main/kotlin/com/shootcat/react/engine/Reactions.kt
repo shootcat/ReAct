@@ -1,12 +1,24 @@
 package com.shootcat.react.engine
 
+import com.shootcat.react.engine.model.LoadDirection
 import com.shootcat.react.engine.model.Phase
 import com.shootcat.react.engine.model.Rule
 import com.shootcat.react.engine.model.Trigger
 import com.shootcat.react.engine.model.TypeCatalog
 
-/** One piece of a reaction, e.g. "Eis". [typeId] and [state] let the UI draw a matching icon. */
-data class ReactionToken(val text: String, val typeId: String? = null, val state: String? = null)
+/** Abstract inputs that are not objects. */
+enum class ReactionSymbol { WEIGHT, PRESSURE, SIGNAL }
+
+/**
+ * One piece of a reaction, e.g. "Eis". [typeId] and [state] let the UI draw a matching icon;
+ * [symbol] stands for abstract inputs such as weight or a signal.
+ */
+data class ReactionToken(
+    val text: String,
+    val typeId: String? = null,
+    val state: String? = null,
+    val symbol: ReactionSymbol? = null,
+)
 
 /** Human readable form of a rule for the Discovery Log: inputs → output. */
 data class Reaction(
@@ -33,18 +45,25 @@ object Reactions {
         }
         val inputs = when (rule.trigger) {
             Trigger.TOUCH -> listOf(sourceToken(rule, types), ReactionToken(targetName, c.target))
-            Trigger.LOAD -> listOf(ReactionToken("Gewicht ≥ ${c.minLoad}"), ReactionToken(targetName, c.target))
-            Trigger.SIGNAL -> listOf(sourceToken(rule, types))
+            Trigger.LOAD -> listOf(
+                if (c.direction == LoadDirection.UP) {
+                    ReactionToken("Druck", symbol = ReactionSymbol.PRESSURE)
+                } else {
+                    ReactionToken("Gewicht", symbol = ReactionSymbol.WEIGHT)
+                },
+                ReactionToken(targetName, c.target),
+            )
+            Trigger.SIGNAL -> listOf(
+                if (c.source == null) ReactionToken("Signal", symbol = ReactionSymbol.SIGNAL) else sourceToken(rule, types),
+                ReactionToken(targetName, c.target),
+            )
         }
         return Reaction(rule.id, rule.name, rule.phase, inputs, output)
     }
 
     private fun sourceToken(rule: Rule, types: TypeCatalog): ReactionToken {
         val source = rule.conditions.source ?: return ReactionToken("?")
-        val name = types.name(source)
-        val state = rule.conditions.sourceState
-        val text = if (state != null) "$name ${types[source]?.stateName(state) ?: state}" else name
-        return ReactionToken(text, source, state)
+        return ReactionToken(types.name(source), source, rule.conditions.sourceState)
     }
 
     /**

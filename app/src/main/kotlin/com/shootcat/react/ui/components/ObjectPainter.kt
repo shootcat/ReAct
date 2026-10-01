@@ -43,7 +43,7 @@ fun DrawScope.drawGameObject(
     info: ObjectInfo = ObjectInfo(),
 ) {
     when (obj.type) {
-        "FIRE" -> drawFire(topLeft, cell, alpha, time)
+        "FIRE" -> if (obj.state == "OUT") drawFireOut(topLeft, cell, alpha, time) else drawFire(topLeft, cell, alpha, time)
         "ICE" -> drawIce(topLeft, cell, alpha)
         "WATER" -> drawWater(topLeft, cell, alpha, time, info)
         "STEAM" -> drawSteam(topLeft, cell, alpha, time)
@@ -51,6 +51,8 @@ fun DrawScope.drawGameObject(
         "BUTTON" -> drawButton(topLeft, cell, alpha, obj.state == "PRESSED")
         "PLATE" -> drawPlate(topLeft, cell, alpha, obj.state == "PRESSED", info)
         "DOOR" -> drawDoor(topLeft, cell, alpha, obj.state == "UNLOCKED")
+        "PISTON" -> drawPiston(topLeft, cell, alpha, obj.state == "PUSHED")
+        "HATCH" -> drawHatch(topLeft, cell, alpha)
         else -> drawCircle(Palette.textDim, cell * 0.3f, topLeft + Offset(cell / 2, cell / 2), alpha)
     }
 }
@@ -346,5 +348,62 @@ private fun DrawScope.drawDoor(tl: Offset, c: Float, alpha: Float, open: Boolean
             alpha = alpha,
         )
         drawRoundRect(Palette.textDim, lockCenter + Offset(-c * 0.1f, -c * 0.06f), Size(c * 0.2f, c * 0.14f), CornerRadius(c * 0.03f), alpha = alpha)
+    }
+}
+
+/** An extinguished bowl: dark coals and a thin wisp of smoke. */
+private fun DrawScope.drawFireOut(tl: Offset, c: Float, alpha: Float, time: Float) {
+    val cx = tl.x + c / 2
+    val base = tl.y + c * 0.84f
+    drawArc(
+        color = Palette.stoneDark,
+        startAngle = 0f,
+        sweepAngle = 180f,
+        useCenter = true,
+        topLeft = Offset(cx - c * 0.3f, base - c * 0.1f),
+        size = Size(c * 0.6f, c * 0.22f),
+        alpha = alpha,
+    )
+    for (i in -1..1) {
+        drawCircle(Color(0xFF2B2B2B), c * 0.07f, Offset(cx + i * c * 0.11f, base - c * 0.06f), alpha = alpha)
+    }
+    val rise = time % 1f
+    drawCircle(
+        Palette.textDim,
+        c * (0.06f + 0.06f * rise),
+        Offset(cx + c * 0.05f * sin(rise * TAU), base - c * (0.2f + 0.45f * rise)),
+        alpha = alpha * 0.35f * (1f - rise),
+    )
+}
+
+/** A steam piston in the ceiling. Pushed up, it glows and sends its signal. */
+private fun DrawScope.drawPiston(tl: Offset, c: Float, alpha: Float, pushed: Boolean) {
+    drawRect(Palette.wall, tl, Size(c, c), alpha = alpha)
+    val housing = Offset(tl.x + c * 0.18f, tl.y)
+    drawRect(Palette.stoneDark, housing, Size(c * 0.64f, c * 0.32f), alpha = alpha)
+    val headY = tl.y + if (pushed) c * 0.42f else c * 0.72f
+    drawRect(Palette.stone, Offset(tl.x + c * 0.44f, tl.y + c * 0.3f), Size(c * 0.12f, headY - tl.y - c * 0.3f), alpha = alpha)
+    val head = if (pushed) Palette.signal else Palette.brass
+    if (pushed) {
+        val glow = Offset(tl.x + c / 2, headY + c * 0.08f)
+        drawCircle(
+            brush = Brush.radialGradient(listOf(Palette.signal.copy(alpha = 0.45f), Color.Transparent), glow, c * 0.6f),
+            radius = c * 0.6f,
+            center = glow,
+            alpha = alpha,
+        )
+    }
+    drawRoundRect(head, Offset(tl.x + c * 0.1f, headY), Size(c * 0.8f, c * 0.16f), CornerRadius(c * 0.04f), alpha = alpha)
+    drawLine(Palette.stoneDark, Offset(tl.x + c * 0.1f, headY + c * 0.16f), Offset(tl.x + c * 0.9f, headY + c * 0.16f), strokeWidth = c * 0.03f, alpha = alpha)
+}
+
+/** A trapdoor: a reinforced plank that drops away on a signal. */
+private fun DrawScope.drawHatch(tl: Offset, c: Float, alpha: Float) {
+    val plank = Offset(tl.x, tl.y)
+    drawRect(Palette.woodDark, plank, Size(c, c * 0.36f), alpha = alpha)
+    drawRect(Palette.wood, Offset(tl.x, tl.y + c * 0.04f), Size(c, c * 0.24f), alpha = alpha)
+    for (x in listOf(0.18f, 0.82f)) {
+        drawRect(Palette.stoneDark, Offset(tl.x + c * (x - 0.06f), tl.y), Size(c * 0.12f, c * 0.36f), alpha = alpha)
+        drawCircle(Palette.stone, c * 0.04f, Offset(tl.x + c * x, tl.y + c * 0.18f), alpha = alpha)
     }
 }

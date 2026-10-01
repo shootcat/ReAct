@@ -1,17 +1,16 @@
 {
-  "id": "level_01",
-  "title": "Berührung",
+  "id": "level_08",
+  "title": "Auftrieb",
   "world": 1,
-  "intro": "Der Schalter liegt tief unten.",
+  "intro": "Eis liegt auf dem Schalter.",
   "map": [
     "##########",
-    "#........#",
-    "#.I......#",
-    "####.....#",
     "#........D",
-    "#...F....#",
-    "#######.##",
-    "#######B##",
+    "#.F..I.J.#",
+    "####.#####",
+    "####:#####",
+    "####i#####",
+    "####B#####",
     "##########"
   ],
   "legend": {
@@ -24,6 +23,15 @@
       "type": "ICE",
       "id": "ice_block_1",
       "movable": true
+    },
+    "J": {
+      "type": "ICE",
+      "id": "ice_block_2",
+      "movable": true
+    },
+    "i": {
+      "type": "ICE",
+      "id": "ice_plug"
     },
     "B": {
       "type": "BUTTON",
@@ -65,18 +73,6 @@
         }
       ],
       "max_moved": 1
-    },
-    {
-      "id": "override",
-      "kind": "OVERRIDE",
-      "requires": [
-        {
-          "rule": "water_triggers_button"
-        }
-      ],
-      "unmoved": [
-        "fire_1"
-      ]
     }
   ]
 }
