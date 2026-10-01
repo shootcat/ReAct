@@ -25,7 +25,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
@@ -45,13 +44,18 @@ class AppSmokeTest {
     @get:Rule
     val compose = createEmptyComposeRule()
 
-    /** Starts the app; [unlockAll] first stores progress with every level unlocked. */
+    /**
+     * Starts the app with a defined progress: nothing done, or (with [unlockAll]) every level open.
+     * The progress is written through the running app's own preferences, then the app is started
+     * again so a fresh view model reads it.
+     */
     private fun launch(unlockAll: Boolean = false): ActivityScenario<MainActivity> {
-        if (unlockAll) {
-            val levels = (0 until 12).map { "level_%02d".format(it) }.toSet()
-            RuntimeEnvironment.getApplication()
-                .getSharedPreferences("react_progress", Context.MODE_PRIVATE)
-                .edit().putStringSet("completed", levels).commit()
+        val completed = if (unlockAll) (0 until 12).map { "level_%02d".format(it) }.toSet() else emptySet()
+        ActivityScenario.launch(MainActivity::class.java).use { first ->
+            first.onActivity { activity ->
+                activity.getSharedPreferences("react_progress", Context.MODE_PRIVATE)
+                    .edit().clear().putStringSet("completed", completed).commit()
+            }
         }
         return ActivityScenario.launch(MainActivity::class.java).also { compose.waitForIdle() }
     }
@@ -65,7 +69,7 @@ class AppSmokeTest {
         shot("02_weltkarte")
 
         // Level 0: no start button – every move counts immediately.
-        compose.onNodeWithTag("level_level_00").performClick()
+        openLevel("level_00")
         compose.onNodeWithContentDescription("Ziel").assertExists()
         compose.onNodeWithContentDescription("Start").assertDoesNotExist()
         compose.onNodeWithContentDescription("Rückgängig").assertIsNotEnabled()
@@ -107,8 +111,7 @@ class AppSmokeTest {
         compose.waitForIdle()
         compose.onNodeWithTag("back").performClick()
         compose.waitForIdle()
-        compose.onNodeWithTag("level_level_01").performClick()
-        compose.waitForIdle()
+        openLevel("level_01")
         shot("08_level1_start")
 
         // Level 1: melt the ice on the ledge from the left, the water finds the button.
