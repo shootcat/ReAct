@@ -106,6 +106,7 @@ fun WorldMapScreen(
             // The map is taller than the screen: it scrolls, starting at the next open level.
             val contentHeight = maxOf(maxHeight, NodeSpacing * nodes.size + 40.dp)
             val viewport = maxHeight
+            val mapWidth = maxWidth
             val scroll = rememberScrollState()
             val density = LocalDensity.current
             val focus = nodes.firstOrNull { isUnlocked(it.levelId) && it.levelId !in progress.completed } ?: nodes.lastOrNull { isUnlocked(it.levelId) }
@@ -135,7 +136,7 @@ fun WorldMapScreen(
                             pulse = time,
                             onClick = { onOpenLevel(level.id) },
                             modifier = Modifier.offset(
-                                x = maxWidth * node.x - NodeLabelWidth / 2,
+                                x = mapWidth * node.x - NodeLabelWidth / 2,
                                 y = contentHeight * node.y - NodeSize / 2,
                             ),
                         )

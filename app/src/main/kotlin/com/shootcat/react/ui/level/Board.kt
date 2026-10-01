@@ -204,7 +204,7 @@ private const val LIFT = 0.6f
 private fun infoFor(o: GameObject, state: GameState, thresholds: Map<String, Int>): ObjectInfo {
     val threshold = thresholds[o.type]
     if (threshold != null) {
-        return ObjectInfo(load = state.loadStack(o.position).sumOf { it.weight }, threshold = threshold)
+        return ObjectInfo(load = state.loadStack(o.position).sumOf { it.load }, threshold = threshold)
     }
     if (!o.flag(Props.FLOWS) && !o.isLiquid) return ObjectInfo()
     // Fluids merge visually with neighbouring cells of the same fluid.
