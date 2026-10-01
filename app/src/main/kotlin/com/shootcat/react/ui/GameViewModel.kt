@@ -93,7 +93,6 @@ sealed interface GameEvent {
     data object Replay : GameEvent
     data object DismissCompletion : GameEvent
     data object NextLevel : GameEvent
-    data object DismissToast : GameEvent
     data object Back : GameEvent
 }
 
@@ -157,7 +156,6 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(completion = null) }
                 if (next != null) openLevel(next) else onEvent(GameEvent.OpenMap)
             }
-            GameEvent.DismissToast -> _state.update { it.copy(toast = null) }
             GameEvent.Back -> back()
         }
     }

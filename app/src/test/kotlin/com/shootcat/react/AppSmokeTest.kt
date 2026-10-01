@@ -157,6 +157,7 @@ class AppSmokeTest {
         compose.waitForIdle()
 
         // Heat conduction: the fire on the metal rod melts the ice in the closed chamber.
+        shot("19_weltkarte_alles_offen")
         openLevel("level_10")
         shot("20_level10_waermeleiter")
         moveOnBoard("level_10", from = 2 to 2, to = 4 to 2)
@@ -168,6 +169,7 @@ class AppSmokeTest {
         compose.waitForIdle()
 
         // Burning wood: the beam burns away and the stone drops onto the plate.
+        compose.onNodeWithText("Brandschneise").assertExists()
         shot("22_level11_brandschneise")
         moveOnBoard("level_11", from = 1 to 2, to = 3 to 2)
         advance(millis = 2800)
@@ -178,6 +180,7 @@ class AppSmokeTest {
         compose.waitForIdle()
 
         // Steam pressure: boiling water in the closed chamber pushes the gate away.
+        compose.onNodeWithText("Überdruck").assertExists()
         shot("24_level12_ueberdruck")
         moveOnBoard("level_12", from = 2 to 2, to = 3 to 2)
         advance(millis = 2000)
@@ -196,8 +199,12 @@ class AppSmokeTest {
     }
 
     private fun openLevel(id: String) {
-        compose.onNodeWithTag("level_$id").performScrollTo().performClick()
+        compose.onNodeWithTag("level_$id").performScrollTo()
         compose.waitForIdle()
+        compose.onNodeWithTag("level_$id").performClick()
+        compose.waitForIdle()
+        // Only the level screen has the history dock.
+        compose.onNodeWithContentDescription("Rückgängig").assertExists("level $id did not open")
     }
 
     /** Tap-to-select an object, then tap the target cell (grid coordinates of the level file). */

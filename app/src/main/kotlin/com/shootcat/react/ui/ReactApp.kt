@@ -3,7 +3,6 @@ package com.shootcat.react.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -112,7 +111,6 @@ fun ReactApp(viewModel: GameViewModel) {
                     DiscoveryToast(
                         toast = toast,
                         types = content.world.types,
-                        onClick = { onEvent(GameEvent.DismissToast) },
                         modifier = Modifier.align(Alignment.TopCenter).padding(top = 60.dp, start = 24.dp, end = 24.dp),
                     )
                 }
@@ -121,15 +119,14 @@ fun ReactApp(viewModel: GameViewModel) {
     }
 }
 
-/** New discoveries, shown as symbols only. */
+/** New discoveries, shown as symbols only. Touches pass through to the board – the world keeps running. */
 @Composable
-private fun DiscoveryToast(toast: Toast, types: TypeCatalog, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun DiscoveryToast(toast: Toast, types: TypeCatalog, modifier: Modifier = Modifier) {
     Column(
         modifier
             .clip(RoundedCornerShape(20.dp))
             .background(Palette.surfaceHigh)
             .border(1.dp, Palette.accent, RoundedCornerShape(20.dp))
-            .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
