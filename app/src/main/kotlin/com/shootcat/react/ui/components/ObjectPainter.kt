@@ -292,14 +292,14 @@ private fun DrawScope.drawPlate(tl: Offset, c: Float, alpha: Float, pressed: Boo
         )
     }
     drawRoundRect(Palette.brass, slab, Size(c * 0.88f, slabHeight), CornerRadius(c * 0.04f), alpha = alpha)
-    // Notches: how much weight is needed, and how much rests on the plate right now.
-    val n = info.threshold
-    if (n > 0) {
-        val gap = c * 0.8f / n
-        for (i in 0 until n) {
-            val center = Offset(tl.x + c * 0.1f + gap * (i + 0.5f), tl.y + c * 0.45f)
-            val filled = i < info.load
-            drawCircle(if (filled) Palette.signal else Palette.wallTop, c * 0.07f, center, alpha = alpha)
+    // Gauge: how much of the needed weight rests on the plate right now.
+    if (info.threshold > 0) {
+        val fill = (info.load.toFloat() / info.threshold).coerceIn(0f, 1f)
+        val barTopLeft = Offset(tl.x + c * 0.15f, tl.y + c * 0.42f)
+        val bar = Size(c * 0.7f, c * 0.1f)
+        drawRoundRect(Palette.wallTop, barTopLeft, bar, CornerRadius(c * 0.05f), alpha = alpha)
+        if (fill > 0f) {
+            drawRoundRect(Palette.signal, barTopLeft, Size(bar.width * fill, bar.height), CornerRadius(c * 0.05f), alpha = alpha)
         }
     }
 }
