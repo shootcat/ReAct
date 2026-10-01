@@ -1,0 +1,104 @@
+{
+  "world": 1,
+  "title": "Materie",
+  "levels": ["level_00", "level_01", "level_02"],
+  "map": [
+    { "level": "level_00", "x": 0.22, "y": 0.78 },
+    { "level": "level_01", "x": 0.58, "y": 0.56 },
+    { "level": "level_02", "x": 0.30, "y": 0.27 }
+  ],
+  "types": [
+    {
+      "type": "FIRE",
+      "name": "Feuer",
+      "default_state": "ACTIVE",
+      "state_names": { "ACTIVE": "brennt" },
+      "description": "Eine Flamme. Brennt genau dort, wo sie steht."
+    },
+    {
+      "type": "ICE",
+      "name": "Eis",
+      "default_state": "SOLID",
+      "vanish_states": ["MELTED"],
+      "state_names": { "SOLID": "fest", "MELTED": "geschmolzen" },
+      "description": "Festgefroren. Bewegt sich nicht von selbst."
+    },
+    {
+      "type": "WATER",
+      "name": "Wasser",
+      "default_state": "LIQUID",
+      "properties": { "gravity": true, "liquid": true, "weight": 1 },
+      "state_names": { "LIQUID": "flüssig" },
+      "description": "Fällt, fließt und sammelt sich."
+    },
+    {
+      "type": "STONE",
+      "name": "Stein",
+      "default_state": "SOLID",
+      "properties": { "gravity": true, "weight": 3 },
+      "state_names": { "SOLID": "fest" },
+      "description": "Schwer. Fällt, wenn nichts ihn hält."
+    },
+    {
+      "type": "BUTTON",
+      "name": "Schalter",
+      "default_state": "UP",
+      "state_names": { "UP": "bereit", "PRESSED": "aktiviert" },
+      "description": "Sendet ein Signal, sobald er ausgelöst wurde."
+    },
+    {
+      "type": "PLATE",
+      "name": "Druckplatte",
+      "default_state": "UP",
+      "state_names": { "UP": "oben", "PRESSED": "gedrückt" },
+      "description": "Sendet ein Signal, solange genug auf ihr lastet."
+    },
+    {
+      "type": "DOOR",
+      "name": "Tür",
+      "default_state": "LOCKED",
+      "state_names": { "LOCKED": "verschlossen", "UNLOCKED": "offen" },
+      "description": "Öffnet sich auf ein Signal."
+    }
+  ],
+  "rules": [
+    {
+      "id": "fire_melts_ice",
+      "name": "Schmelzen",
+      "trigger": "TOUCH",
+      "conditions": { "source": "FIRE", "target": "ICE", "target_state": "SOLID" },
+      "effect": { "target_state": "MELTED", "spawn_object": "WATER" }
+    },
+    {
+      "id": "water_presses_button",
+      "name": "Wasserkontakt",
+      "trigger": "TOUCH",
+      "conditions": { "source": "WATER", "target": "BUTTON", "target_state": "UP" },
+      "effect": { "target_state": "PRESSED" }
+    },
+    {
+      "id": "weight_presses_plate",
+      "name": "Gewicht",
+      "trigger": "LOAD",
+      "conditions": { "target": "PLATE", "min_load": 3 },
+      "effect": { "target_state": "PRESSED" },
+      "else_effect": { "target_state": "UP" }
+    },
+    {
+      "id": "button_opens_door",
+      "name": "Schalter-Signal",
+      "trigger": "SIGNAL",
+      "conditions": { "source": "BUTTON", "source_state": "PRESSED", "target": "DOOR" },
+      "effect": { "target_state": "UNLOCKED" },
+      "else_effect": { "target_state": "LOCKED" }
+    },
+    {
+      "id": "plate_opens_door",
+      "name": "Platten-Signal",
+      "trigger": "SIGNAL",
+      "conditions": { "source": "PLATE", "source_state": "PRESSED", "target": "DOOR" },
+      "effect": { "target_state": "UNLOCKED" },
+      "else_effect": { "target_state": "LOCKED" }
+    }
+  ]
+}

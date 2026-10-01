@@ -1,0 +1,33 @@
+{
+  "id": "level_01",
+  "title": "Berührung",
+  "world": 1,
+  "intro": "Der Schalter liegt tief unten. Ziel: Öffne die Tür.",
+  "grid": { "width": 10, "height": 9 },
+  "layout": [
+    "##########",
+    "#........#",
+    "#........#",
+    "####.....#",
+    "#.........",
+    "#........#",
+    "#######.##",
+    "#######.##",
+    "##########"
+  ],
+  "objects": [
+    { "id": "ice_block_1", "type": "ICE", "position": { "x": 2, "y": 2 }, "movable": true },
+    { "id": "fire_1", "type": "FIRE", "position": { "x": 4, "y": 5 }, "movable": true },
+    { "id": "button_1", "type": "BUTTON", "position": { "x": 7, "y": 7 }, "properties": { "channel": "A" } },
+    { "id": "door_1", "type": "DOOR", "position": { "x": 9, "y": 4 }, "properties": { "channel": "A" } }
+  ],
+  "rules": [],
+  "goals": [
+    { "object_id": "door_1", "required_state": "UNLOCKED" }
+  ],
+  "solutions": [
+    { "id": "standard", "kind": "STANDARD", "requires": [ { "rule": "water_presses_button" } ] },
+    { "id": "minimal", "kind": "MINIMAL", "requires": [ { "rule": "water_presses_button" } ], "max_moved": 1 },
+    { "id": "override", "kind": "OVERRIDE", "requires": [ { "rule": "water_presses_button" } ], "unmoved": ["fire_1"] }
+  ]
+}

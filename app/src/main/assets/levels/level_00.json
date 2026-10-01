@@ -1,0 +1,29 @@
+{
+  "id": "level_00",
+  "title": "Schmelzpunkt",
+  "world": 1,
+  "intro": "Ziehe Objekte mit dem Finger. Drücke dann ▶ Start und beobachte, was passiert. Ziel: Öffne die Tür.",
+  "grid": { "width": 8, "height": 7 },
+  "layout": [
+    "########",
+    "#......#",
+    "#......#",
+    "#.......",
+    "#......#",
+    "######.#",
+    "########"
+  ],
+  "objects": [
+    { "id": "fire_1", "type": "FIRE", "position": { "x": 2, "y": 4 }, "state": "ACTIVE", "movable": true },
+    { "id": "ice_block_1", "type": "ICE", "position": { "x": 6, "y": 4 }, "state": "SOLID" },
+    { "id": "button_1", "type": "BUTTON", "position": { "x": 6, "y": 5 }, "properties": { "channel": "A" } },
+    { "id": "door_1", "type": "DOOR", "position": { "x": 7, "y": 3 }, "state": "LOCKED", "properties": { "channel": "A" } }
+  ],
+  "rules": [],
+  "goals": [
+    { "object_id": "door_1", "required_state": "UNLOCKED" }
+  ],
+  "solutions": [
+    { "id": "standard", "kind": "STANDARD", "requires": [ { "rule": "water_presses_button" } ] }
+  ]
+}
