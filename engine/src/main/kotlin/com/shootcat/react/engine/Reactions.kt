@@ -47,13 +47,27 @@ object Reactions {
         return ReactionToken(text, source, state)
     }
 
-    /** One line for the step log, e.g. "Feuer + Eis → Wasser" or "Druckplatte → oben". */
-    fun describeEvent(event: RuleEvent, rules: List<Rule>, types: TypeCatalog): String {
+    /**
+     * What one step-log entry shows: the rule's reaction for a match, or "target before → after"
+     * for an else-effect (e.g. a plate springing back up).
+     */
+    fun describeEvent(event: RuleEvent, rules: List<Rule>, types: TypeCatalog): Reaction {
         val rule = rules.firstOrNull { it.id == event.ruleId }
-        if (event.positive && rule != null) return describe(rule, types).text
-        val target = types.name(event.targetType)
-        val state = event.newState?.let { types[event.targetType]?.stateName(it) ?: it } ?: ""
-        return "$target → $state".trim()
+        if (event.positive && rule != null) return describe(rule, types)
+        val type = types[event.targetType]
+        val name = type?.name ?: event.targetType
+        fun token(state: String?) = ReactionToken(
+            text = state?.let { "$name ${type?.stateName(it) ?: it}" } ?: name,
+            typeId = event.targetType,
+            state = state,
+        )
+        return Reaction(
+            ruleId = event.ruleId,
+            name = rule?.name ?: event.ruleId,
+            phase = event.phase,
+            inputs = listOf(token(event.previousState)),
+            output = token(event.newState),
+        )
     }
 
     /** Types that react with [type] on touch (either way round). Used for the subtle reaction preview. */

@@ -32,6 +32,39 @@ class RuleEngineTest {
     }
 
     @Test
+    fun `fire touching water turns it into steam that rises`() {
+        val start = TestWorld.state(
+            "#####",
+            "#...#",
+            "#FW.#",
+            "#####",
+        )
+        val result = engine.step(start)
+        assertEquals(0, result.state.count("WATER"))
+        // Created in phase 1 at the water's cell, risen one cell in phase 2.
+        assertEquals("STEAM", result.state.typeAt(2, 1))
+        val event = result.events.single()
+        assertEquals("evaporate", event.ruleId)
+        assertEquals("LIQUID", event.previousState)
+        assertEquals("EVAPORATED", event.newState)
+    }
+
+    @Test
+    fun `melting and evaporating happen one step after another`() {
+        val start = TestWorld.state(
+            "#####",
+            "#...#",
+            "#FI.#",
+            "#####",
+        )
+        val first = engine.step(start)
+        assertEquals("WATER", first.state.typeAt(2, 2))
+        val second = engine.step(first.state)
+        assertEquals(0, second.state.count("WATER"))
+        assertEquals(1, second.state.count("STEAM"))
+    }
+
+    @Test
     fun `ice without fire stays frozen in place`() {
         val start = TestWorld.state(
             "#####",

@@ -34,6 +34,7 @@ object LevelLoader {
     fun parseWorld(text: String): WorldData {
         val dto = decode<WorldDto>(text, "world")
         val types = TypeCatalog(dto.types.map { it.toModel() })
+        dto.map.forEach { n -> n.icon?.let { if (it !in types) fail("world ${dto.world}: map icon '$it' is not a type") } }
         val rules = dto.rules.map { it.toModel() }
         rules.forEach { validateRule(it, types, "world ${dto.world}") }
         requireUnique(rules.map { it.id }, "rule id in world ${dto.world}")
@@ -41,7 +42,7 @@ object LevelLoader {
             world = dto.world,
             title = dto.title,
             levelIds = dto.levels,
-            map = dto.map.map { MapNode(it.level, it.x, it.y) },
+            map = dto.map.map { MapNode(it.level, it.x, it.y, it.icon) },
             types = types,
             rules = rules,
         )
@@ -193,7 +194,7 @@ object LevelLoader {
     )
 
     @Serializable
-    private class MapNodeDto(val level: String, val x: Float, val y: Float)
+    private class MapNodeDto(val level: String, val x: Float, val y: Float, val icon: String? = null)
 
     @Serializable
     private class TypeDto(

@@ -38,12 +38,13 @@ fun ObjectIcon(
     state: String? = null,
     silhouette: Boolean = false,
     size: Dp = 32.dp,
+    background: Color = Palette.surfaceHigh,
 ) {
     Box(
         modifier
             .size(size)
-            .clip(RoundedCornerShape(8.dp))
-            .background(Palette.surfaceHigh),
+            .clip(RoundedCornerShape(size * 0.25f))
+            .background(background),
         contentAlignment = Alignment.Center,
     ) {
         val type = typeId?.let { types[it] }

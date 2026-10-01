@@ -16,13 +16,15 @@ Alle Builds sind mit demselben Schlüssel signiert und installieren sich als Upd
 
 ## Spielen
 
-1. Auf der Weltkarte ein Level wählen.
-2. Markierte (gestrichelt umrandete) Objekte ziehen – oder antippen und dann ein freies Feld antippen.
-3. **▶ Start** – die Simulation läuft Schritt für Schritt.
-4. Mit der Zeitleiste vor- und zurückspulen und sehen, in welcher Phase was passiert ist.
-5. **Bearbeiten** ändert den Aufbau, **Reset** stellt den Levelanfang wieder her.
+1. Startbildschirm → **Spielen** → auf der Weltkarte ein Level wählen.
+2. Markierte Objekte ziehen – oder antippen und dann ein freies Feld antippen.
+3. **▶** startet die Simulation, sie läuft Schritt für Schritt.
+4. Mit der Zeitleiste vor- und zurückspulen; Symbole zeigen, welche Reaktion in welcher Phase passiert ist.
+5. **Bearbeiten** ändert den Aufbau, **↺** stellt den Levelanfang wieder her.
 
-Das **Discovery Log** (Reaktions-Matrix) sammelt jede beobachtete Reaktion; unbekannte erscheinen als Silhouette. Beim Abschluss zeigt das Spiel, welche Lösungsklassen gefunden wurden (Standard-Weg, Minimal-Weg, System-Override).
+Die Oberfläche arbeitet bewusst mit Symbolen statt Text. Das **Discovery Log** (Reaktions-Matrix) sammelt jede beobachtete Reaktion; unbekannte erscheinen als Silhouette. Beim Abschluss zeigt das Spiel, welche Lösungsklassen gefunden wurden (Standard-Weg, Minimal-Weg, System-Override).
+
+**Einstellungen:** Simulationstempo, Reaktions-Vorschau, Markierungen, Schritt-Symbole, Level-Texte (standardmäßig aus), Vibration und Fortschritt zurücksetzen.
 
 ## Projektstruktur
 
@@ -43,8 +45,8 @@ app/                        Android-App (Kotlin, Jetpack Compose, MVVM/UDF)
 
 Jeder Simulationsschritt läuft in festen Phasen:
 
-1. **Zustand** – `TOUCH`- und `LOAD`-Regeln (z. B. Feuer + Eis → Wasser, Gewicht auf Druckplatte)
-2. **Physik** – Schwerkraft, Flüssigkeiten fließen zum nächsten Abgrund (bei Gleichstand nach links)
+1. **Zustand** – `TOUCH`- und `LOAD`-Regeln (z. B. Feuer + Eis → Wasser, Feuer + Wasser → Dampf, Gewicht auf Druckplatte)
+2. **Physik** – Wasser fällt, Dampf steigt. Ist der direkte Weg blockiert, rutschen Flüssigkeiten und Dampf diagonal auf ein freies Nachbarfeld (links zuerst), sonst fließen sie zur nächsten Öffnung in ihrer Reihe (bei Gleichstand nach links)
 3. **Signal** – `SIGNAL`-Regeln breiten sich aus, bis das Netz stabil ist
 
 Pro Schritt sind höchstens **100 Regel-Transformationen** erlaubt; darüber bricht die Simulation kontrolliert mit „Kurzschluss“ ab. Gleicher Aufbau ergibt immer exakt dieselbe Zeitleiste.

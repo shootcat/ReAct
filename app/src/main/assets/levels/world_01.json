@@ -3,9 +3,9 @@
   "title": "Materie",
   "levels": ["level_00", "level_01", "level_02"],
   "map": [
-    { "level": "level_00", "x": 0.22, "y": 0.78 },
-    { "level": "level_01", "x": 0.58, "y": 0.56 },
-    { "level": "level_02", "x": 0.30, "y": 0.27 }
+    { "level": "level_00", "x": 0.24, "y": 0.80, "icon": "FIRE" },
+    { "level": "level_01", "x": 0.68, "y": 0.58, "icon": "WATER" },
+    { "level": "level_02", "x": 0.32, "y": 0.33, "icon": "STONE" }
   ],
   "types": [
     {
@@ -27,9 +27,18 @@
       "type": "WATER",
       "name": "Wasser",
       "default_state": "LIQUID",
-      "properties": { "gravity": true, "liquid": true, "weight": 1 },
-      "state_names": { "LIQUID": "flüssig" },
+      "properties": { "gravity": true, "flows": true, "weight": 1 },
+      "vanish_states": ["EVAPORATED"],
+      "state_names": { "LIQUID": "flüssig", "EVAPORATED": "verdampft" },
       "description": "Fällt, fließt und sammelt sich."
+    },
+    {
+      "type": "STEAM",
+      "name": "Dampf",
+      "default_state": "GAS",
+      "properties": { "rises": true, "flows": true },
+      "state_names": { "GAS": "gasförmig" },
+      "description": "Leicht. Steigt auf und sammelt sich oben."
     },
     {
       "type": "STONE",
@@ -68,6 +77,13 @@
       "trigger": "TOUCH",
       "conditions": { "source": "FIRE", "target": "ICE", "target_state": "SOLID" },
       "effect": { "target_state": "MELTED", "spawn_object": "WATER" }
+    },
+    {
+      "id": "fire_evaporates_water",
+      "name": "Verdampfen",
+      "trigger": "TOUCH",
+      "conditions": { "source": "FIRE", "target": "WATER", "target_state": "LIQUID" },
+      "effect": { "target_state": "EVAPORATED", "spawn_object": "STEAM" }
     },
     {
       "id": "water_presses_button",

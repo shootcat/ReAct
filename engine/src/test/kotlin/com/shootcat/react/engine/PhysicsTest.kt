@@ -51,9 +51,69 @@ class PhysicsTest {
             "####.##",
             "#######",
         )
+        // One step sideways, then it slides diagonally into the hole.
         assertEquals(listOf(Position(3, 1)), start.after(1).positionsOf("WATER"))
-        assertEquals(listOf(Position(4, 1)), start.after(2).positionsOf("WATER"))
-        assertEquals(listOf(Position(4, 2)), start.after(3).positionsOf("WATER"))
+        assertEquals(listOf(Position(4, 2)), start.after(2).positionsOf("WATER"))
+    }
+
+    @Test
+    fun `blocked water slides diagonally down, left first`() {
+        val start = TestWorld.state(
+            "#####",
+            "#.W.#",
+            "#.#.#",
+            "#####",
+        )
+        assertEquals(listOf(Position(1, 2)), start.after(1).positionsOf("WATER"))
+    }
+
+    @Test
+    fun `water does not squeeze through corners`() {
+        val start = TestWorld.state(
+            "#####",
+            "#FW.#",
+            "#.#.#",
+            "#####",
+        )
+        // The fire blocks the left side, so the only way is down-right.
+        val s = TestWorld.engine(listOf(TestWorld.melt)).step(start).state
+        assertEquals(listOf(Position(3, 2)), s.positionsOf("WATER"))
+    }
+
+    @Test
+    fun `steam rises and slides around a ceiling`() {
+        val start = TestWorld.state(
+            "#######",
+            "#.....#",
+            "###.###",
+            "#..V..#",
+            "#######",
+        )
+        // Straight up through the gap, then it rests under the ceiling.
+        assertEquals(listOf(Position(3, 2)), start.after(1).positionsOf("STEAM"))
+        assertEquals(listOf(Position(3, 1)), start.after(2).positionsOf("STEAM"))
+        assertEquals(listOf(Position(3, 1)), start.after(5).positionsOf("STEAM"))
+
+        val underLedge = TestWorld.state(
+            "#######",
+            "#.....#",
+            "#.###.#",
+            "#..V..#",
+            "#######",
+        )
+        // Tie between the two openings goes left: sideways first, then diagonally up.
+        assertEquals(listOf(Position(2, 3)), underLedge.after(1).positionsOf("STEAM"))
+        assertEquals(listOf(Position(1, 2)), underLedge.after(2).positionsOf("STEAM"))
+    }
+
+    @Test
+    fun `steam weighs nothing`() {
+        val start = TestWorld.state(
+            "#V#",
+            "#P#",
+            "###",
+        )
+        assertEquals("UP", engine.step(start).state.objectById("plate_1_1")?.state)
     }
 
     @Test
@@ -79,9 +139,10 @@ class PhysicsTest {
 
     @Test
     fun `fixed objects block the flow`() {
+        // Ice is frozen in place and does not react with water.
         val start = TestWorld.state(
             "#######",
-            "#.WF..#",
+            "#.WI..#",
             "####.##",
             "#######",
         )

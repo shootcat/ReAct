@@ -7,6 +7,9 @@ import com.shootcat.react.data.GameContent
 import com.shootcat.react.data.GameRepository
 import com.shootcat.react.data.Progress
 import com.shootcat.react.data.ProgressStore
+import com.shootcat.react.data.Settings
+import com.shootcat.react.data.SettingsStore
+import com.shootcat.react.engine.Reaction
 import com.shootcat.react.engine.Outcome
 import com.shootcat.react.engine.Reactions
 import com.shootcat.react.engine.RuleEngine
@@ -24,7 +27,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-enum class Screen { MAP, LEVEL, DISCOVERIES }
+enum class Screen { TITLE, MAP, LEVEL, DISCOVERIES, SETTINGS }
 
 enum class Mode {
     /** The player arranges movable objects. */
@@ -56,13 +59,16 @@ data class Completion(
     val nextLevelId: String?,
 )
 
-data class Toast(val id: Long, val title: String, val lines: List<String>)
+data class Toast(val id: Long, val reactions: List<Reaction>)
 
 data class GameUiState(
     val content: GameContent? = null,
     val loadError: String? = null,
-    val screen: Screen = Screen.MAP,
+    val screen: Screen = Screen.TITLE,
+    /** Where Discoveries/Settings return to. */
+    val returnScreen: Screen = Screen.TITLE,
     val progress: Progress = Progress(),
+    val settings: Settings = Settings(),
     val session: LevelSession? = null,
     val completion: Completion? = null,
     val toast: Toast? = null,
@@ -76,9 +82,13 @@ data class GameUiState(
 
 sealed interface GameEvent {
     data class OpenLevel(val levelId: String) : GameEvent
+    data object OpenTitle : GameEvent
     data object OpenMap : GameEvent
     data object OpenDiscoveries : GameEvent
-    data object CloseDiscoveries : GameEvent
+    data object OpenSettings : GameEvent
+    data object CloseOverlay : GameEvent
+    data class UpdateSettings(val settings: Settings) : GameEvent
+    data object ResetProgress : GameEvent
     data class Move(val objectId: String, val to: Position) : GameEvent
     data object Start : GameEvent
     data object Edit : GameEvent
@@ -97,6 +107,7 @@ sealed interface GameEvent {
 class GameViewModel(app: Application) : AndroidViewModel(app) {
 
     private val store = ProgressStore(app)
+    private val settingsStore = SettingsStore(app)
     private val _state = MutableStateFlow(load(app))
     val state: StateFlow<GameUiState> = _state.asStateFlow()
 
@@ -106,7 +117,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun load(app: Application): GameUiState =
         try {
-            GameUiState(content = GameRepository.load(app), progress = store.load())
+            GameUiState(content = GameRepository.load(app), progress = store.load(), settings = settingsStore.load())
         } catch (e: Exception) {
             GameUiState(loadError = e.message ?: e.toString())
         }
@@ -114,16 +125,25 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     fun onEvent(event: GameEvent) {
         when (event) {
             is GameEvent.OpenLevel -> openLevel(event.levelId)
+            GameEvent.OpenTitle -> {
+                stopPlayback()
+                _state.update { it.copy(screen = Screen.TITLE, session = null, completion = null) }
+            }
             GameEvent.OpenMap -> {
                 stopPlayback()
                 _state.update { it.copy(screen = Screen.MAP, session = null, completion = null) }
             }
-            GameEvent.OpenDiscoveries -> {
-                pause()
-                _state.update { it.copy(screen = Screen.DISCOVERIES) }
+            GameEvent.OpenDiscoveries -> openOverlay(Screen.DISCOVERIES)
+            GameEvent.OpenSettings -> openOverlay(Screen.SETTINGS)
+            GameEvent.CloseOverlay -> _state.update { it.copy(screen = it.returnScreen) }
+            is GameEvent.UpdateSettings -> {
+                settingsStore.save(event.settings)
+                _state.update { it.copy(settings = event.settings) }
             }
-            GameEvent.CloseDiscoveries ->
-                _state.update { it.copy(screen = if (it.session != null) Screen.LEVEL else Screen.MAP) }
+            GameEvent.ResetProgress -> {
+                store.clear()
+                _state.update { it.copy(progress = Progress()) }
+            }
             is GameEvent.Move -> updateSession { s ->
                 if (s.mode != Mode.SETUP) s else s.setup.withObjectMoved(event.objectId, event.to)?.let { s.copy(setup = it) } ?: s
             }
@@ -164,10 +184,19 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         val st = _state.value
         when {
             st.completion != null -> onEvent(GameEvent.DismissCompletion)
-            st.screen == Screen.DISCOVERIES -> onEvent(GameEvent.CloseDiscoveries)
+            st.screen == Screen.DISCOVERIES || st.screen == Screen.SETTINGS -> onEvent(GameEvent.CloseOverlay)
             st.screen == Screen.LEVEL && st.session?.mode == Mode.SIMULATION -> onEvent(GameEvent.Edit)
             st.screen == Screen.LEVEL -> onEvent(GameEvent.OpenMap)
+            st.screen == Screen.MAP -> onEvent(GameEvent.OpenTitle)
             else -> Unit
+        }
+    }
+
+    private fun openOverlay(screen: Screen) {
+        pause()
+        _state.update {
+            val from = if (it.screen == Screen.DISCOVERIES || it.screen == Screen.SETTINGS) it.returnScreen else it.screen
+            it.copy(screen = screen, returnScreen = from)
         }
     }
 
@@ -209,7 +238,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         playJob?.cancel()
         playJob = viewModelScope.launch {
             while (true) {
-                delay(STEP_MILLIS)
+                delay(_state.value.settings.speed.stepMillis)
                 val s = session() ?: break
                 val sim = s.simulation ?: break
                 if (!s.playing || s.frameIndex >= sim.lastIndex) break
@@ -298,10 +327,9 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun showDiscoveries(ruleIds: List<String>) {
         val content = _state.value.content ?: return
-        val lines = ruleIds.mapNotNull { id -> content.allRules.firstOrNull { it.id == id } }
-            .map { Reactions.describe(it, content.world.types).text }
-        val title = if (lines.size == 1) "Neue Entdeckung" else "${lines.size} neue Entdeckungen"
-        val toast = Toast(++toastCounter, title, lines)
+        val reactions = ruleIds.mapNotNull { id -> content.allRules.firstOrNull { it.id == id } }
+            .map { Reactions.describe(it, content.world.types) }
+        val toast = Toast(++toastCounter, reactions)
         _state.update { it.copy(toast = toast) }
         toastJob?.cancel()
         toastJob = viewModelScope.launch {
@@ -316,9 +344,8 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { st -> st.session?.let { st.copy(session = transform(it)) } ?: st }
     }
 
-    companion object {
-        const val STEP_MILLIS = 420L
-        private const val TOAST_MILLIS = 3500L
-        private const val COMPLETION_DELAY_MILLIS = 900L
+    private companion object {
+        const val TOAST_MILLIS = 3500L
+        const val COMPLETION_DELAY_MILLIS = 900L
     }
 }

@@ -30,6 +30,10 @@ class ProgressStore(context: Context) {
             .apply()
     }
 
+    fun clear() {
+        prefs.edit().clear().apply()
+    }
+
     private fun read(key: String): Set<String> = prefs.getStringSet(key, null)?.toSet() ?: emptySet()
 
     private companion object {

@@ -15,8 +15,20 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
-/** Extra data some objects visualise, e.g. how much weight rests on a plate. */
-data class ObjectInfo(val load: Int = 0, val threshold: Int = 0)
+/**
+ * Extra data some objects visualise: the weight resting on a plate, and for fluids whether
+ * the same fluid continues to the left/right/below/above (so pools render as one body).
+ */
+data class ObjectInfo(
+    val load: Int = 0,
+    val threshold: Int = 0,
+    val joinLeft: Boolean = false,
+    val joinRight: Boolean = false,
+    val joinBelow: Boolean = false,
+    val joinAbove: Boolean = false,
+)
+
+private const val TAU = (2 * PI).toFloat()
 
 /**
  * Minimal diorama look: every object type gets a clear, simple shape.
@@ -33,7 +45,8 @@ fun DrawScope.drawGameObject(
     when (obj.type) {
         "FIRE" -> drawFire(topLeft, cell, alpha, time)
         "ICE" -> drawIce(topLeft, cell, alpha)
-        "WATER" -> drawWater(topLeft, cell, alpha, time)
+        "WATER" -> drawWater(topLeft, cell, alpha, time, info)
+        "STEAM" -> drawSteam(topLeft, cell, alpha, time)
         "STONE" -> drawStone(topLeft, cell, alpha)
         "BUTTON" -> drawButton(topLeft, cell, alpha, obj.state == "PRESSED")
         "PLATE" -> drawPlate(topLeft, cell, alpha, obj.state == "PRESSED", info)
@@ -52,8 +65,8 @@ private fun DrawScope.drawFire(tl: Offset, c: Float, alpha: Float, time: Float) 
         center = glowCenter,
         alpha = alpha,
     )
-    val flicker = 1f + 0.07f * sin(time * 2f * PI.toFloat() * 3f)
-    val sway = c * 0.03f * sin(time * 2f * PI.toFloat() * 2f)
+    val flicker = 1f + 0.07f * sin(time * TAU * 3f)
+    val sway = c * 0.03f * sin(time * TAU * 2f)
     val h = c * 0.66f * flicker
     val w = c * 0.27f
     val outer = Path().apply {
@@ -124,28 +137,91 @@ private fun DrawScope.drawIce(tl: Offset, c: Float, alpha: Float) {
     )
 }
 
-private fun DrawScope.drawWater(tl: Offset, c: Float, alpha: Float, time: Float) {
-    val inset = c * 0.03f
-    val origin = tl + Offset(inset, c * 0.12f)
-    val s = Size(c - 2 * inset, c * 0.85f)
-    drawRoundRect(
-        brush = Brush.verticalGradient(listOf(Palette.waterLight, Palette.water), origin.y, origin.y + s.height),
-        topLeft = origin,
-        size = s,
-        cornerRadius = CornerRadius(c * 0.1f),
-        alpha = alpha * 0.9f,
-    )
-    val phase = time * 2f * PI.toFloat()
-    val wave = Path().apply {
-        moveTo(origin.x + c * 0.08f, origin.y + c * 0.12f)
-        val steps = 6
-        for (i in 1..steps) {
-            val x = origin.x + c * 0.08f + (s.width - c * 0.16f) * i / steps
-            val y = origin.y + c * 0.12f + c * 0.025f * cos(phase + i)
-            lineTo(x, y)
-        }
+/**
+ * Water fills its cell and merges with neighbouring water. The top of a pool is a moving wave;
+ * the wave uses the absolute x position, so it runs seamlessly across neighbouring cells.
+ */
+private fun DrawScope.drawWater(tl: Offset, c: Float, alpha: Float, time: Float, info: ObjectInfo) {
+    val gap = c * 0.04f
+    val left = tl.x + if (info.joinLeft) 0f else gap
+    val right = tl.x + c - if (info.joinRight) 0f else gap
+    val bottom = tl.y + c - if (info.joinBelow) 0f else gap * 0.5f
+    val surface = !info.joinAbove
+    val top = tl.y + if (surface) c * 0.2f else 0f
+
+    fun waveY(x: Float): Float {
+        val u = x / c
+        return top + c * 0.045f * sin(u * TAU * 0.8f + time * TAU) +
+            c * 0.02f * sin(u * TAU * 1.9f - time * TAU * 2f)
     }
-    drawPath(wave, Color.White, alpha = alpha * 0.55f, style = Stroke(width = c * 0.035f, cap = StrokeCap.Round))
+
+    val steps = 10
+    val body = Path().apply {
+        moveTo(left, bottom)
+        if (surface) {
+            lineTo(left, waveY(left))
+            for (i in 1..steps) {
+                val x = left + (right - left) * i / steps
+                lineTo(x, waveY(x))
+            }
+        } else {
+            lineTo(left, top)
+            lineTo(right, top)
+        }
+        lineTo(right, bottom)
+        close()
+    }
+    drawPath(
+        body,
+        Brush.verticalGradient(listOf(Palette.waterLight, Palette.water), top - c * 0.1f, bottom + c * 0.6f),
+        alpha = alpha * 0.92f,
+    )
+    if (surface) {
+        val crest = Path().apply {
+            moveTo(left, waveY(left))
+            for (i in 1..steps) {
+                val x = left + (right - left) * i / steps
+                lineTo(x, waveY(x))
+            }
+        }
+        drawPath(crest, Color.White, alpha = alpha * 0.6f, style = Stroke(width = c * 0.035f, cap = StrokeCap.Round))
+    }
+    // Drifting light reflections inside the water.
+    val shimmerX = tl.x + c * (0.25f + 0.5f * ((time + tl.x / c * 0.37f) % 1f))
+    drawLine(
+        Color.White,
+        Offset(shimmerX - c * 0.08f, tl.y + c * 0.62f),
+        Offset(shimmerX + c * 0.08f, tl.y + c * 0.62f),
+        strokeWidth = c * 0.025f,
+        cap = StrokeCap.Round,
+        alpha = alpha * 0.25f,
+    )
+}
+
+/** Soft, slowly drifting puffs. */
+private fun DrawScope.drawSteam(tl: Offset, c: Float, alpha: Float, time: Float) {
+    val t = time * TAU
+    val puffs = listOf(
+        Triple(0.34f, 0.6f, 0.27f),
+        Triple(0.64f, 0.52f, 0.3f),
+        Triple(0.48f, 0.32f, 0.25f),
+    )
+    puffs.forEachIndexed { i, (x, y, r) ->
+        val center = tl + Offset(
+            c * (x + 0.05f * sin(t + i * 2.1f)),
+            c * (y + 0.04f * cos(t * 2f + i)),
+        )
+        drawCircle(
+            brush = Brush.radialGradient(
+                listOf(Palette.steam.copy(alpha = 0.75f), Palette.steam.copy(alpha = 0f)),
+                center,
+                c * r,
+            ),
+            radius = c * r,
+            center = center,
+            alpha = alpha,
+        )
+    }
 }
 
 private fun DrawScope.drawStone(tl: Offset, c: Float, alpha: Float) {
@@ -153,7 +229,7 @@ private fun DrawScope.drawStone(tl: Offset, c: Float, alpha: Float) {
     val radii = floatArrayOf(0.44f, 0.4f, 0.46f, 0.42f, 0.45f, 0.39f, 0.44f, 0.41f)
     val path = Path().apply {
         radii.forEachIndexed { i, r ->
-            val a = (i / radii.size.toFloat()) * 2f * PI.toFloat() - PI.toFloat() / 2
+            val a = (i / radii.size.toFloat()) * TAU - PI.toFloat() / 2
             val p = center + Offset(cos(a) * r * c, sin(a) * r * c * 0.9f)
             if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y)
         }
@@ -232,7 +308,11 @@ private fun DrawScope.drawDoor(tl: Offset, c: Float, alpha: Float, open: Boolean
     val frameSize = Size(c * 0.76f, c * 0.94f)
     if (open) {
         drawRect(
-            brush = Brush.verticalGradient(listOf(Palette.signal.copy(alpha = 0.9f), Palette.accent.copy(alpha = 0.4f)), frame.y, frame.y + frameSize.height),
+            brush = Brush.verticalGradient(
+                listOf(Palette.signal.copy(alpha = 0.9f), Palette.accent.copy(alpha = 0.4f)),
+                frame.y,
+                frame.y + frameSize.height,
+            ),
             topLeft = frame,
             size = frameSize,
             alpha = alpha,

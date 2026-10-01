@@ -20,7 +20,7 @@
     { "id": "stone_1", "type": "STONE", "position": { "x": 6, "y": 1 } },
     { "id": "ice_block_1", "type": "ICE", "position": { "x": 6, "y": 2 } },
     { "id": "fire_1", "type": "FIRE", "position": { "x": 3, "y": 2 }, "movable": true },
-    { "id": "ice_block_2", "type": "ICE", "position": { "x": 8, "y": 3 } },
+    { "id": "ice_block_2", "type": "ICE", "position": { "x": 8, "y": 3 }, "movable": true },
     { "id": "water_1", "type": "WATER", "position": { "x": 9, "y": 3 } },
     { "id": "water_2", "type": "WATER", "position": { "x": 10, "y": 3 } },
     { "id": "water_3", "type": "WATER", "position": { "x": 11, "y": 3 } },

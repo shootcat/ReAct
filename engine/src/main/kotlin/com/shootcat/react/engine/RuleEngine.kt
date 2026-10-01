@@ -17,6 +17,7 @@ data class RuleEvent(
     val positive: Boolean,
     val targetId: String,
     val targetType: String,
+    val previousState: String,
     val newState: String?,
     val sourceIds: List<String>,
     val sourceTypes: List<String>,
@@ -34,7 +35,7 @@ data class StepResult(
  * Deterministic, data-driven rule engine. A step runs three fixed phases:
  *
  * 1. [Phase.STATE]   – TOUCH and LOAD rules, evaluated once against the state at the start of the phase.
- * 2. [Phase.PHYSICS] – gravity and liquid flow.
+ * 2. [Phase.PHYSICS] – falling, rising and flowing.
  * 3. [Phase.SIGNAL]  – SIGNAL rules, propagated until nothing changes any more.
  *
  * Per target and phase only one effect applies: the first matching rule (in rule order) wins,
@@ -181,6 +182,7 @@ class RuleEngine(
             positive = positive,
             targetId = target.id,
             targetType = target.type,
+            previousState = target.state,
             newState = if (changesState) effect.targetState else null,
             sourceIds = match.sources.map { it.id },
             sourceTypes = match.sources.map { it.type },

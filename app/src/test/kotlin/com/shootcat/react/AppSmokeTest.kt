@@ -7,10 +7,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.click
-import androidx.compose.ui.test.isRoot
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onFirst
-import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -41,32 +39,35 @@ class AppSmokeTest {
     @Test
     fun playAllBetaLevelsThroughTheUi() {
         compose.onNodeWithText("REACT").assertExists()
-        shot("01_weltkarte")
+        shot("01_titel")
+        compose.onNodeWithText("Spielen").performClick()
+        compose.waitForIdle()
+        shot("02_weltkarte")
 
         // Level 0: fire next to the ice on the button.
         compose.onNodeWithTag("level_level_00").performClick()
-        compose.onNodeWithText("Ziel: Tür offen").assertExists()
-        shot("02_level0_aufbau")
+        compose.onNodeWithContentDescription("Ziel").assertExists()
+        shot("03_level0_aufbau")
         moveOnBoard(columns = 8, from = 2 to 4, to = 5 to 4)
-        compose.onNodeWithText("Verschoben: 1 Objekt").assertExists()
 
-        compose.onNodeWithText("Start").performClick()
+        compose.onNodeWithContentDescription("Start").performClick()
         advance(millis = 500)
-        shot("03_level0_simulation")
+        shot("04_level0_simulation")
         advance(millis = 3000)
-        compose.onNodeWithText("Level geschafft!").assertExists()
+        compose.onNodeWithText("Geschafft").assertExists()
         compose.onNodeWithText("Standard-Weg").assertExists()
-        shot("04_level_geschafft", compose.onAllNodes(isRoot()).onLast())
+        shot("05_geschafft")
 
-        compose.onNodeWithText("Weiter experimentieren").performClick()
+        compose.onNodeWithText("Nochmal").performClick()
         compose.waitForIdle()
-        compose.onNodeWithText("Schritt 2 / 2").assertExists()
-        shot("05_level0_zeitleiste")
+        compose.onNodeWithText("Bearbeiten").assertExists()
+        shot("06_level0_zeitleiste")
 
         compose.onNodeWithTag("discoveries").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("Feuer + Eis → Wasser").assertExists()
-        shot("06_entdeckungen")
+        compose.onNodeWithText("Feuer + Wasser → Dampf").assertExists()
+        shot("07_entdeckungen")
 
         // Back to the level, then to the map and into level 1.
         compose.onNodeWithTag("back").performClick()
@@ -75,33 +76,38 @@ class AppSmokeTest {
         compose.waitForIdle()
         compose.onNodeWithTag("level_level_01").performClick()
         compose.waitForIdle()
-        shot("07_level1_aufbau")
+        shot("08_level1_aufbau")
 
         // Level 1: melt the ice on the ledge from the left, the water finds the button.
         moveOnBoard(columns = 10, from = 4 to 5, to = 1 to 2)
-        compose.onNodeWithText("Start").performClick()
+        compose.onNodeWithContentDescription("Start").performClick()
         advance(millis = 6000)
-        compose.onNodeWithText("Level geschafft!").assertExists()
-        shot("08_level1_geloest", compose.onAllNodes(isRoot()).onFirst())
+        compose.onNodeWithText("Geschafft").assertExists()
+        shot("09_level1_geloest")
 
-        compose.onNodeWithText("Nächstes Level").performClick()
+        compose.onNodeWithText("Weiter").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("Gewicht").assertExists()
-        shot("09_level2_aufbau")
+        shot("10_level2_aufbau")
 
-        // Level 2: melt the dam – the water alone is heavy enough (System-Override).
-        moveOnBoard(columns = 13, from = 3 to 2, to = 8 to 2)
-        compose.onNodeWithText("Start").performClick()
-        advance(millis = 2500)
-        shot("10_level2_simulation")
-        advance(millis = 6000)
-        compose.onNodeWithText("Level geschafft!").assertExists()
+        // Level 2: drag the dam aside – the water alone is heavy enough (System-Override).
+        moveOnBoard(columns = 13, from = 8 to 3, to = 2 to 2)
+        compose.onNodeWithContentDescription("Start").performClick()
+        advance(millis = 2000)
+        shot("11_level2_simulation")
+        advance(millis = 7000)
+        compose.onNodeWithText("Geschafft").assertExists()
         compose.onNodeWithText("System-Override").assertExists()
-        shot("11_level2_geloest", compose.onAllNodes(isRoot()).onFirst())
+        shot("12_level2_geloest")
 
-        compose.onNodeWithText("Zur Weltkarte").performClick()
+        compose.onNodeWithText("Karte").performClick()
         compose.waitForIdle()
-        shot("12_weltkarte_fortschritt")
+        shot("13_weltkarte_fortschritt")
+
+        compose.onNodeWithContentDescription("Einstellungen").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Tempo").assertExists()
+        shot("14_einstellungen")
     }
 
     /** Tap-to-select an object, then tap the target cell. */

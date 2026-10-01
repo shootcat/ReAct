@@ -4,21 +4,20 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
@@ -32,22 +31,32 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.shootcat.react.data.GameContent
 import com.shootcat.react.data.Progress
+import com.shootcat.react.data.Settings
 import com.shootcat.react.engine.Outcome
 import com.shootcat.react.engine.Reactions
 import com.shootcat.react.engine.SimulationResult
+import com.shootcat.react.engine.model.GameState
+import com.shootcat.react.engine.model.LevelData
 import com.shootcat.react.engine.model.Phase
 import com.shootcat.react.ui.GameEvent
-import com.shootcat.react.ui.GameViewModel
 import com.shootcat.react.ui.LevelSession
 import com.shootcat.react.ui.Mode
-import com.shootcat.react.ui.components.DiscoveryBadge
 import com.shootcat.react.ui.components.Glyph
 import com.shootcat.react.ui.components.GlyphIcon
-import com.shootcat.react.ui.components.ScreenHeader
+import com.shootcat.react.ui.components.ObjectIcon
+import com.shootcat.react.ui.components.PhaseBadge
+import com.shootcat.react.ui.components.PillButton
+import com.shootcat.react.ui.components.PlayButton
+import com.shootcat.react.ui.components.ReactionSymbols
+import com.shootcat.react.ui.components.RoundIconButton
+import com.shootcat.react.ui.components.TopBar
 import com.shootcat.react.ui.theme.Palette
 import kotlin.math.roundToInt
 
@@ -56,11 +65,12 @@ fun LevelScreen(
     session: LevelSession,
     content: GameContent,
     progress: Progress,
+    settings: Settings,
     onEvent: (GameEvent) -> Unit,
 ) {
     val level = session.level
-    val types = content.world.types
     val sim = session.simulation?.takeIf { session.mode == Mode.SIMULATION }
+    val stepMillis = settings.speed.stepMillis
 
     // Animate each single step forward; jumps (scrubbing, reset) snap.
     val anim = remember { Animatable(1f) }
@@ -72,7 +82,7 @@ fun LevelScreen(
         if (forward) {
             animFrom = session.frameIndex - 1
             anim.snapTo(0f)
-            anim.animateTo(1f, tween((GameViewModel.STEP_MILLIS * 0.85f).toInt(), easing = FastOutSlowInEasing))
+            anim.animateTo(1f, tween((stepMillis * 0.85f).toInt(), easing = FastOutSlowInEasing))
         } else {
             animFrom = null
             anim.snapTo(1f)
@@ -80,114 +90,131 @@ fun LevelScreen(
     }
     val previous = if (sim != null) animFrom?.let { sim.frames.getOrNull(it)?.state } else null
     val overload = sim != null && sim.outcome == Outcome.OVERLOAD && session.frameIndex == sim.lastIndex
-
-    val index = content.indexOf(level.id)
-    val goal = level.goals.joinToString(", ") { g ->
-        val type = level.objects.firstOrNull { it.id == g.objectId }?.type
-        val name = type?.let { types.name(it) } ?: g.objectId
-        val state = type?.let { types[it]?.stateName(g.requiredState) } ?: g.requiredState
-        "$name $state"
-    }
+    val shown = session.shownState
 
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
-        ScreenHeader(
-            overline = "Welt ${level.world} · Level $index",
+        TopBar(
             title = level.title,
+            overline = "${level.world}·${content.indexOf(level.id)}",
             onBack = { onEvent(GameEvent.OpenMap) },
         ) {
-            DiscoveryBadge(progress.discoveries.size, content.allRules.size) { onEvent(GameEvent.OpenDiscoveries) }
+            GoalChip(level, shown, content)
+            RoundIconButton(
+                Glyph.LOG,
+                "Entdeckungen",
+                { onEvent(GameEvent.OpenDiscoveries) },
+                size = 40.dp,
+                tint = Palette.accent,
+                modifier = Modifier.testTag("discoveries"),
+            )
+            RoundIconButton(Glyph.GEAR, "Einstellungen", { onEvent(GameEvent.OpenSettings) }, size = 40.dp)
         }
-        Text(level.intro, style = MaterialTheme.typography.bodyMedium, color = Palette.textDim)
-        Spacer(Modifier.height(4.dp))
-        Text("Ziel: $goal", style = MaterialTheme.typography.labelLarge, color = Palette.accent)
+        if (settings.levelTexts && level.intro.isNotEmpty()) {
+            Text(level.intro, style = MaterialTheme.typography.bodySmall, color = Palette.textDim)
+        }
 
         Board(
-            state = session.shownState,
+            state = shown,
             previous = previous,
             progress = anim.value,
             rules = level.rules,
             editable = session.mode == Mode.SETUP,
             overload = overload,
             onMove = { id, to -> onEvent(GameEvent.Move(id, to)) },
-            modifier = Modifier.weight(1f).fillMaxWidth().padding(vertical = 10.dp),
+            modifier = Modifier.weight(1f).fillMaxWidth().padding(vertical = 8.dp),
+            showMarkers = settings.markers,
+            showPreview = settings.reactionPreview,
+            haptics = settings.haptics,
         )
 
         if (sim == null) {
-            SetupControls(session.movedCount, onEvent)
+            SetupDock(session.movedCount, onEvent)
         } else {
-            SimulationControls(session, sim, content, onEvent)
+            SimulationDock(session, sim, content, settings, onEvent)
+        }
+    }
+}
+
+/** The goal as symbols: target ring + the goal object in its required state; glows when reached. */
+@Composable
+private fun GoalChip(level: LevelData, shown: GameState, content: GameContent) {
+    val reached = level.goals.all { shown.objectById(it.objectId)?.state == it.requiredState }
+    val color = if (reached) Palette.success else Palette.accent
+    Row(
+        Modifier
+            .height(40.dp)
+            .clip(RoundedCornerShape(50))
+            .background(Palette.surfaceHigh)
+            .border(1.dp, color.copy(alpha = 0.6f), RoundedCornerShape(50))
+            .semantics { contentDescription = "Ziel" }
+            .padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        GlyphIcon(Glyph.TARGET, color = color, size = 18.dp)
+        for (goal in level.goals) {
+            val type = level.objects.firstOrNull { it.id == goal.objectId }?.type
+            ObjectIcon(type, content.world.types, state = goal.requiredState, size = 26.dp, background = Palette.surface)
         }
     }
 }
 
 @Composable
-private fun SetupControls(moved: Int, onEvent: (GameEvent) -> Unit) {
-    Column(Modifier.padding(bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(
-            if (moved == 0) {
-                "Ziehe die markierten Objekte – oder tippe eins an und dann ein freies Feld."
-            } else {
-                "Verschoben: $moved ${if (moved == 1) "Objekt" else "Objekte"}"
-            },
-            style = MaterialTheme.typography.bodySmall,
-            color = Palette.textDim,
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedButton(onClick = { onEvent(GameEvent.Reset) }, enabled = moved > 0) {
-                GlyphIcon(Glyph.RESET, size = 18.dp)
-                Spacer(Modifier.width(8.dp))
-                Text("Reset")
-            }
-            Button(onClick = { onEvent(GameEvent.Start) }, modifier = Modifier.weight(1f)) {
-                GlyphIcon(Glyph.PLAY, size = 18.dp)
-                Spacer(Modifier.width(8.dp))
-                Text("Start", fontWeight = FontWeight.Bold)
-            }
-        }
+private fun SetupDock(moved: Int, onEvent: (GameEvent) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 20.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RoundIconButton(Glyph.RESET, "Reset", { onEvent(GameEvent.Reset) }, size = 52.dp, enabled = moved > 0, tint = Palette.accent)
+        Spacer(Modifier.width(32.dp))
+        PlayButton(onClick = { onEvent(GameEvent.Start) })
+        Spacer(Modifier.width(32.dp))
+        // Keeps the play button centred.
+        Spacer(Modifier.size(52.dp))
     }
 }
 
 @Composable
-private fun SimulationControls(
+private fun SimulationDock(
     session: LevelSession,
     sim: SimulationResult,
     content: GameContent,
+    settings: Settings,
     onEvent: (GameEvent) -> Unit,
 ) {
     val last = sim.lastIndex
-    val frame = sim.frames[session.frameIndex]
     val atEnd = session.frameIndex == last
 
     Column(Modifier.padding(bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        StepLog(session.frameIndex, frame.events.map { event ->
-            "Phase ${event.phase.number} · ${event.phase.label}: " +
-                Reactions.describeEvent(event, session.level.rules, content.world.types)
-        })
+        val counter = "${session.frameIndex}/$last"
+        if (atEnd && session.finished && sim.outcome != Outcome.SUCCESS) {
+            OutcomeChip(sim.outcome, counter)
+        } else if (settings.stepDetails) {
+            StepSymbols(session, sim, content, counter)
+        }
 
-        if (atEnd && session.finished) OutcomeBanner(sim)
-
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "Schritt ${session.frameIndex} / $last",
-                style = MaterialTheme.typography.labelLarge,
-                color = Palette.text,
-                modifier = Modifier.weight(1f),
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RoundIconButton(Glyph.TO_START, "Zum Anfang", { onEvent(GameEvent.Seek(0)) }, size = 40.dp, enabled = session.frameIndex > 0, background = Palette.surface)
+            Spacer(Modifier.width(6.dp))
+            RoundIconButton(Glyph.STEP_BACK, "Schritt zurück", { onEvent(GameEvent.StepBack) }, size = 40.dp, enabled = session.frameIndex > 0, background = Palette.surface)
+            Spacer(Modifier.width(10.dp))
+            RoundIconButton(
+                if (session.playing) Glyph.PAUSE else Glyph.PLAY,
+                if (session.playing) "Pause" else "Abspielen",
+                { onEvent(GameEvent.TogglePlay) },
+                size = 52.dp,
+                enabled = last > 0,
+                tint = Palette.accent,
             )
-            IconButton(onClick = { onEvent(GameEvent.Seek(0)) }, enabled = session.frameIndex > 0) {
-                GlyphIcon(Glyph.TO_START, color = Palette.text)
-            }
-            IconButton(onClick = { onEvent(GameEvent.StepBack) }, enabled = session.frameIndex > 0) {
-                GlyphIcon(Glyph.STEP_BACK, color = Palette.text)
-            }
-            IconButton(onClick = { onEvent(GameEvent.TogglePlay) }, enabled = last > 0) {
-                GlyphIcon(if (session.playing) Glyph.PAUSE else Glyph.PLAY, color = Palette.accent, size = 24.dp)
-            }
-            IconButton(onClick = { onEvent(GameEvent.StepForward) }, enabled = !atEnd) {
-                GlyphIcon(Glyph.STEP_FORWARD, color = Palette.text)
-            }
-            IconButton(onClick = { onEvent(GameEvent.Seek(last)) }, enabled = !atEnd) {
-                GlyphIcon(Glyph.TO_END, color = Palette.text)
-            }
+            Spacer(Modifier.width(10.dp))
+            RoundIconButton(Glyph.STEP_FORWARD, "Schritt vor", { onEvent(GameEvent.StepForward) }, size = 40.dp, enabled = !atEnd, background = Palette.surface)
+            Spacer(Modifier.width(6.dp))
+            RoundIconButton(Glyph.TO_END, "Zum Ende", { onEvent(GameEvent.Seek(last)) }, size = 40.dp, enabled = !atEnd, background = Palette.surface)
         }
         if (last > 0) {
             Slider(
@@ -202,63 +229,76 @@ private fun SimulationControls(
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(onClick = { onEvent(GameEvent.Edit) }, modifier = Modifier.weight(1f)) {
-                GlyphIcon(Glyph.EDIT, size = 18.dp)
-                Spacer(Modifier.width(8.dp))
-                Text("Bearbeiten")
-            }
-            OutlinedButton(onClick = { onEvent(GameEvent.Reset) }, modifier = Modifier.weight(1f)) {
-                GlyphIcon(Glyph.RESET, size = 18.dp)
-                Spacer(Modifier.width(8.dp))
-                Text("Reset")
-            }
+            PillButton(Glyph.EDIT, "Bearbeiten", { onEvent(GameEvent.Edit) }, Modifier.weight(1f))
+            PillButton(Glyph.RESET, "Reset", { onEvent(GameEvent.Reset) }, Modifier.weight(1f))
         }
     }
 }
 
-/** What happened in the shown step – the player's debugging aid. */
+private const val MAX_STEP_SYMBOLS = 2
+
+/** What happened in the shown step, as symbols with their phase number. */
 @Composable
-private fun StepLog(frameIndex: Int, lines: List<String>) {
-    val shown = when {
-        frameIndex == 0 -> listOf("Startaufstellung")
-        lines.isEmpty() -> listOf("Phase ${Phase.PHYSICS.number} · ${Phase.PHYSICS.label}: Dinge fallen und fließen")
-        lines.size > 3 -> lines.take(3) + "… und ${lines.size - 3} weitere Reaktionen"
-        else -> lines
-    }
-    Column(
+private fun StepSymbols(session: LevelSession, sim: SimulationResult, content: GameContent, counter: String) {
+    val events = sim.frames[session.frameIndex].events
+    Row(
         Modifier
             .fillMaxWidth()
-            .heightIn(min = 56.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .height(48.dp)
+            .clip(RoundedCornerShape(14.dp))
             .background(Palette.surface)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        for (line in shown) {
-            Text(line, style = MaterialTheme.typography.bodySmall, color = Palette.text)
+        when {
+            session.frameIndex == 0 -> GlyphIcon(Glyph.TARGET, color = Palette.textDim, size = 18.dp)
+            events.isEmpty() -> {
+                PhaseBadge(Phase.PHYSICS.number)
+                GlyphIcon(Glyph.STEP_FORWARD, color = Palette.textDim, size = 16.dp, modifier = Modifier.padding(start = 2.dp))
+            }
+            else -> {
+                for (event in events.take(MAX_STEP_SYMBOLS)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        PhaseBadge(event.phase.number)
+                        ReactionSymbols(
+                            Reactions.describeEvent(event, session.level.rules, content.world.types),
+                            content.world.types,
+                            iconSize = 22.dp,
+                        )
+                    }
+                }
+                if (events.size > MAX_STEP_SYMBOLS) {
+                    Text("+${events.size - MAX_STEP_SYMBOLS}", color = Palette.textDim, style = MaterialTheme.typography.labelLarge)
+                }
+            }
         }
+        Spacer(Modifier.weight(1f))
+        Text(counter, style = MaterialTheme.typography.labelMedium, color = Palette.textDim, maxLines = 1)
     }
 }
 
 @Composable
-private fun OutcomeBanner(sim: SimulationResult) {
-    val (color, text) = when (sim.outcome) {
-        Outcome.SUCCESS -> Palette.success to "Ziel erreicht!"
-        Outcome.STABLE -> Palette.textDim to
-            "Stillstand: Nichts verändert sich mehr. Bearbeite den Aufbau und versuch etwas anderes."
-        Outcome.OVERLOAD -> Palette.danger to
-            "Kurzschluss! Mehr als 100 Reaktionen in einem Schritt – die Kettenreaktion wurde abgebrochen."
-        Outcome.TIMEOUT -> Palette.accent to
-            "Zeitlimit: Nach ${sim.lastIndex} Schritten ist noch nichts entschieden."
+private fun OutcomeChip(outcome: Outcome, counter: String) {
+    val (glyph, color, word) = when (outcome) {
+        Outcome.SUCCESS -> Triple(Glyph.CHECK, Palette.success, "Geschafft")
+        Outcome.STABLE -> Triple(Glyph.PAUSE, Palette.textDim, "Stillstand")
+        Outcome.OVERLOAD -> Triple(Glyph.BOLT, Palette.danger, "Kurzschluss")
+        Outcome.TIMEOUT -> Triple(Glyph.TO_END, Palette.accent, "Zeitlimit")
     }
-    Text(
-        text,
-        style = MaterialTheme.typography.bodyMedium,
-        color = color,
-        fontWeight = FontWeight.SemiBold,
-        modifier = Modifier
+    Row(
+        Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .height(48.dp)
+            .clip(RoundedCornerShape(14.dp))
             .background(color.copy(alpha = 0.12f))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-    )
+            .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        GlyphIcon(glyph, color = color, size = 20.dp)
+        Spacer(Modifier.width(10.dp))
+        Text(word, color = color, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+        Spacer(Modifier.weight(1f))
+        Text(counter, style = MaterialTheme.typography.labelMedium, color = Palette.textDim, maxLines = 1)
+    }
 }

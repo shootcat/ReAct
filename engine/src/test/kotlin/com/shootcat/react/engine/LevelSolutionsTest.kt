@@ -22,7 +22,19 @@ class LevelSolutionsTest {
         assertTrue(a.solved)
         assertEquals(setOf(STANDARD), a.solutions)
         val discovered = a.result.allEvents.filter { it.positive }.map { it.ruleId }.toSet()
-        assertEquals(setOf("fire_melts_ice", "water_presses_button", "button_opens_door"), discovered)
+        assertEquals(
+            setOf("fire_melts_ice", "fire_evaporates_water", "water_presses_button", "button_opens_door"),
+            discovered,
+        )
+    }
+
+    @Test
+    fun `level 0 the fire then boils the meltwater away – the button stays pressed`() {
+        val a = Levels.attempt("level_00", "fire_1" to p(5, 4))
+        val last = a.result.frames.last().state
+        assertEquals("PRESSED", last.objectById("button_1")?.state)
+        assertTrue(a.result.allEvents.any { it.ruleId == "fire_evaporates_water" })
+        assertEquals(1, last.objects.count { it.type == "STEAM" })
     }
 
     @Test
@@ -88,10 +100,23 @@ class LevelSolutionsTest {
     }
 
     @Test
-    fun `level 2 melting the dam floods the shaft instead`() {
-        val a = Levels.attempt("level_02", "fire_1" to p(8, 2))
+    fun `level 2 moving the dam away floods the shaft instead`() {
+        val a = Levels.attempt("level_02", "ice_block_2" to p(2, 2))
         assertTrue(a.solved)
         assertEquals(setOf(OVERRIDE), a.solutions)
+    }
+
+    @Test
+    fun `level 2 melting the dam boils the water that flows under the fire`() {
+        val a = Levels.attempt("level_02", "fire_1" to p(8, 2))
+        assertFalse(a.solved)
+        assertTrue(a.result.allEvents.count { it.ruleId == "fire_evaporates_water" } >= 2)
+    }
+
+    @Test
+    fun `level 2 both ways at once still count as the stone`() {
+        val a = Levels.attempt("level_02", "ice_block_2" to p(2, 2), "fire_1" to p(5, 2))
+        assertTrue(a.solved)
     }
 
     @Test
@@ -106,7 +131,7 @@ class LevelSolutionsTest {
         val oneWater = level.initialState().let { s ->
             s.copy(objects = s.objects.filter { it.id != "water_2" && it.id != "water_3" })
         }
-        val result = Levels.simulate(level, oneWater.withObjectMoved("fire_1", p(8, 2))!!)
+        val result = Levels.simulate(level, oneWater.withObjectMoved("ice_block_2", p(2, 2))!!)
         assertFalse(result.outcome == Outcome.SUCCESS)
         assertEquals("UP", result.frames.last().state.objectById("plate_1")?.state)
     }

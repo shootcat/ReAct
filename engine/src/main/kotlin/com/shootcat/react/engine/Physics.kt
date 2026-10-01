@@ -7,9 +7,12 @@ import com.shootcat.react.engine.model.Props
 /**
  * Phase 2: forces and movement. Every object moves at most one cell per step.
  *
- * - Objects with [Props.GRAVITY] fall when the cell below is free.
- * - Objects that are also [Props.LIQUID] and cannot fall flow one cell towards the nearest
- *   drop on their row (a free cell with a free cell below). Ties go left; without a drop they rest.
+ * - [Props.GRAVITY] objects fall (bottom row first), [Props.RISES] objects rise (top row first).
+ * - When the straight way is blocked, [Props.FLOWS] objects slide diagonally onto a free
+ *   neighbour cell below (or above, when rising) – left first. Diagonal moves need the side
+ *   cell to be free too, so nothing squeezes through corners.
+ * - Otherwise they flow one cell towards the nearest opening on their row: a free cell with a
+ *   free cell below (above). Ties go left; without an opening they rest.
  */
 internal object Physics {
 
@@ -17,30 +20,44 @@ internal object Physics {
         .thenBy { it.position.x }
         .thenBy { it.id }
 
-    fun apply(world: MutableWorld, objects: List<GameObject>): Boolean {
-        var moved = false
-        for (candidate in objects.filter { it.flag(Props.GRAVITY) }.sortedWith(bottomUp)) {
-            val o = world.byId(candidate.id) ?: continue
-            val below = o.position.down()
-            if (world.isFree(below)) {
-                world.move(o.id, below)
-                moved = true
-                continue
-            }
-            if (o.flag(Props.LIQUID)) {
-                val dx = flowDirection(world, o.position)
-                if (dx != 0) {
-                    world.move(o.id, Position(o.position.x + dx, o.position.y))
-                    moved = true
-                }
-            }
-        }
-        return moved
+    private val topDown = compareBy<GameObject> { it.position.y }
+        .thenBy { it.position.x }
+        .thenBy { it.id }
+
+    fun apply(world: MutableWorld, objects: List<GameObject>) {
+        objects.filter { it.flag(Props.GRAVITY) }
+            .sortedWith(bottomUp)
+            .forEach { move(world, it.id, dy = 1) }
+        objects.filter { it.flag(Props.RISES) && !it.flag(Props.GRAVITY) }
+            .sortedWith(topDown)
+            .forEach { move(world, it.id, dy = -1) }
     }
 
-    private fun flowDirection(world: MutableWorld, p: Position): Int {
-        val left = distanceToDrop(world, p, -1)
-        val right = distanceToDrop(world, p, 1)
+    private fun move(world: MutableWorld, id: String, dy: Int) {
+        val o = world.byId(id) ?: return
+        val p = o.position
+        val straight = Position(p.x, p.y + dy)
+        if (world.isFree(straight)) {
+            world.move(id, straight)
+            return
+        }
+        if (!o.flag(Props.FLOWS)) return
+
+        for (dx in DIRECTIONS) {
+            val side = Position(p.x + dx, p.y)
+            val diagonal = Position(p.x + dx, p.y + dy)
+            if (world.isFree(side) && world.isFree(diagonal)) {
+                world.move(id, diagonal)
+                return
+            }
+        }
+        val dx = flowDirection(world, p, dy)
+        if (dx != 0) world.move(id, Position(p.x + dx, p.y))
+    }
+
+    private fun flowDirection(world: MutableWorld, p: Position, dy: Int): Int {
+        val left = distanceToOpening(world, p, -1, dy)
+        val right = distanceToOpening(world, p, 1, dy)
         return when {
             left == null && right == null -> 0
             right == null -> -1
@@ -50,13 +67,15 @@ internal object Physics {
         }
     }
 
-    private fun distanceToDrop(world: MutableWorld, p: Position, dx: Int): Int? {
+    private fun distanceToOpening(world: MutableWorld, p: Position, dx: Int, dy: Int): Int? {
         var d = 1
         while (true) {
             val cell = Position(p.x + dx * d, p.y)
             if (!world.isFree(cell)) return null
-            if (world.isFree(cell.down())) return d
+            if (world.isFree(Position(cell.x, cell.y + dy))) return d
             d++
         }
     }
+
+    private val DIRECTIONS = intArrayOf(-1, 1)
 }

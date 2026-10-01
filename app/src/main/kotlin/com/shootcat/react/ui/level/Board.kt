@@ -30,7 +30,12 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.testTag
 import com.shootcat.react.engine.Reactions
 import com.shootcat.react.engine.model.GameObject
@@ -64,7 +69,11 @@ fun Board(
     overload: Boolean,
     onMove: (String, Position) -> Unit,
     modifier: Modifier = Modifier,
+    showMarkers: Boolean = true,
+    showPreview: Boolean = true,
+    haptics: Boolean = true,
 ) {
+    val haptic = LocalHapticFeedback.current
     val transition = rememberInfiniteTransition(label = "board")
     val time by transition.animateFloat(
         initialValue = 0f,
@@ -76,6 +85,7 @@ fun Board(
     var selected by remember { mutableStateOf<String?>(null) }
     val currentState by rememberUpdatedState(state)
     val currentOnMove by rememberUpdatedState(onMove)
+    val currentHaptics by rememberUpdatedState(haptics)
 
     LaunchedEffect(editable) {
         drag = null
@@ -92,6 +102,7 @@ fun Board(
         Canvas(
             Modifier
                 .size(cellDp * state.width, cellDp * state.height)
+                .clip(RoundedCornerShape(18.dp))
                 .testTag("board")
                 .pointerInput(editable) {
                     if (!editable) return@pointerInput
@@ -121,7 +132,12 @@ fun Board(
                         onDragEnd = {
                             val d = drag
                             drag = null
-                            if (d != null) currentOnMove(d.objectId, d.hover)
+                            if (d != null) {
+                                if (currentHaptics && currentState.isFree(d.hover)) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                }
+                                currentOnMove(d.objectId, d.hover)
+                            }
                         },
                         onDragCancel = { drag = null },
                     )
@@ -147,7 +163,7 @@ fun Board(
         ) {
             val cell = size.width / state.width
             if (cell <= 0f) return@Canvas
-            drawBackground(state, cell)
+            drawBackground(state, cell, showGrid = editable)
             drawWires(state, signalRules, cell, time)
 
             val d = drag
@@ -172,9 +188,10 @@ fun Board(
             }
 
             if (editable) {
-                drawMovableHints(state, cell, selected, d?.objectId, time)
-                if (d != null) drawDrag(d, state, rules, cell, time)
+                drawMovableHints(state, cell, selected, d?.objectId, time, showMarkers)
+                if (d != null) drawDrag(d, state, rules, cell, time, showPreview)
             }
+            drawVignette()
             if (overload) drawOverload(cell, time)
         }
     }
@@ -183,27 +200,55 @@ fun Board(
 private const val LIFT = 0.6f
 
 private fun infoFor(o: GameObject, state: GameState, thresholds: Map<String, Int>): ObjectInfo {
-    val threshold = thresholds[o.type] ?: return ObjectInfo()
-    return ObjectInfo(load = state.loadStack(o.position).sumOf { it.weight }, threshold = threshold)
+    val threshold = thresholds[o.type]
+    if (threshold != null) {
+        return ObjectInfo(load = state.loadStack(o.position).sumOf { it.weight }, threshold = threshold)
+    }
+    if (!o.flag(Props.FLOWS)) return ObjectInfo()
+    // Fluids merge visually with neighbouring cells of the same fluid.
+    fun same(p: Position) = state.objectAt(p)?.type == o.type
+    val p = o.position
+    return ObjectInfo(
+        joinLeft = same(p.left()),
+        joinRight = same(p.right()),
+        joinBelow = same(p.down()),
+        joinAbove = same(p.up()),
+    )
 }
 
-private fun DrawScope.drawBackground(state: GameState, cell: Float) {
+private fun DrawScope.drawBackground(state: GameState, cell: Float, showGrid: Boolean) {
     drawRect(Brush.verticalGradient(listOf(Palette.backgroundTop, Palette.background)))
     for (y in 0 until state.height) {
         for (x in 0 until state.width) {
             val p = Position(x, y)
             val tl = Offset(x * cell, y * cell)
             if (state.isWall(p)) {
-                drawRect(if ((x + y) % 2 == 0) Palette.wall else Palette.wallAlt, tl, Size(cell + 0.5f, cell + 0.5f))
+                drawRect(if ((x * 7 + y * 3) % 4 == 0) Palette.wallAlt else Palette.wall, tl, Size(cell + 0.5f, cell + 0.5f))
                 val above = p.up()
                 if (state.inBounds(above) && !state.isWall(above)) {
                     drawRect(Palette.wallTop, tl, Size(cell + 0.5f, cell * 0.1f))
                 }
-            } else if (state.objectAt(p) == null) {
-                drawCircle(Color.White, cell * 0.035f, tl + Offset(cell / 2, cell / 2), alpha = 0.07f)
+                val below = p.down()
+                if (state.inBounds(below) && !state.isWall(below)) {
+                    drawRect(Palette.wallShadow, Offset(tl.x, tl.y + cell * 0.92f), Size(cell + 0.5f, cell * 0.08f))
+                }
+            } else if (showGrid && state.objectAt(p) == null) {
+                drawCircle(Color.White, cell * 0.03f, tl + Offset(cell / 2, cell / 2), alpha = 0.06f)
             }
         }
     }
+}
+
+/** Darkened edges give the board a small diorama feel. */
+private fun DrawScope.drawVignette() {
+    val r = size.maxDimension * 0.75f
+    drawRect(
+        brush = Brush.radialGradient(
+            listOf(Color.Transparent, Color.Black.copy(alpha = 0.38f)),
+            center = Offset(size.width / 2, size.height / 2),
+            radius = r,
+        ),
+    )
 }
 
 /** Dashed lines between signal sources and the objects they drive; bright while the signal is on. */
@@ -231,9 +276,17 @@ private fun DrawScope.drawWires(state: GameState, signalRules: List<Rule>, cell:
     }
 }
 
-private fun DrawScope.drawMovableHints(state: GameState, cell: Float, selected: String?, dragged: String?, time: Float) {
+private fun DrawScope.drawMovableHints(
+    state: GameState,
+    cell: Float,
+    selected: String?,
+    dragged: String?,
+    time: Float,
+    showMarkers: Boolean,
+) {
     val pulse = 0.5f + 0.5f * sin(time * 2f * PI.toFloat() * 2f)
     for (o in state.objects.filter { it.movable && it.id != dragged }) {
+        if (!showMarkers && o.id != selected) continue
         val inset = cell * 0.02f
         val tl = Offset(o.position.x * cell + inset, o.position.y * cell + inset)
         val s = Size(cell - 2 * inset, cell - 2 * inset)
@@ -252,7 +305,7 @@ private fun DrawScope.drawMovableHints(state: GameState, cell: Float, selected: 
     }
 }
 
-private fun DrawScope.drawDrag(d: DragState, state: GameState, rules: List<Rule>, cell: Float, time: Float) {
+private fun DrawScope.drawDrag(d: DragState, state: GameState, rules: List<Rule>, cell: Float, time: Float, showPreview: Boolean) {
     val target = Offset(d.hover.x * cell, d.hover.y * cell)
     val free = state.isFree(d.hover) || state.objectById(d.objectId)?.position == d.hover
     if (state.inBounds(d.hover)) {
@@ -266,7 +319,7 @@ private fun DrawScope.drawDrag(d: DragState, state: GameState, rules: List<Rule>
         )
     }
     // Subtle reaction preview: hint that something *could* happen here, never what.
-    if (free) {
+    if (free && showPreview) {
         val partners = Reactions.touchPartners(d.type, rules)
         val glow = 0.25f + 0.2f * sin(time * 2f * PI.toFloat() * 3f)
         for (n in d.hover.neighbours()) {

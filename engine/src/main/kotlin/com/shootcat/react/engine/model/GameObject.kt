@@ -4,8 +4,10 @@ package com.shootcat.react.engine.model
 object Props {
     /** The object falls down when the cell below is free. */
     const val GRAVITY = "gravity"
-    /** The object flows sideways towards the nearest drop when it cannot fall. */
-    const val LIQUID = "liquid"
+    /** The object rises when the cell above is free (e.g. steam). */
+    const val RISES = "rises"
+    /** A blocked object slides diagonally or flows sideways instead of stopping (water, steam). */
+    const val FLOWS = "flows"
     /** Contribution to the load on whatever the object rests on. */
     const val WEIGHT = "weight"
     /** Signal channel shared by sensors and the actuators they drive. */

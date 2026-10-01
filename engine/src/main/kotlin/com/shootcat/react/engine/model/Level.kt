@@ -46,7 +46,8 @@ data class LevelData(
     fun initialState(): GameState = GameState(width, height, walls, objects.sortedBy { it.id })
 }
 
-data class MapNode(val levelId: String, val x: Float, val y: Float)
+/** A level's spot on the world map; [icon] is an object type that represents the level. */
+data class MapNode(val levelId: String, val x: Float, val y: Float, val icon: String? = null)
 
 data class WorldData(
     val world: Int,

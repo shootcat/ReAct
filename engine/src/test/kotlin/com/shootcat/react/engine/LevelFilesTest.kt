@@ -70,6 +70,7 @@ class LevelFilesTest {
         assertEquals(
             listOf(
                 "Feuer + Eis → Wasser",
+                "Feuer + Wasser → Dampf",
                 "Wasser + Schalter → Schalter aktiviert",
                 "Gewicht ≥ 3 + Druckplatte → Druckplatte gedrückt",
                 "Schalter aktiviert → Tür offen",

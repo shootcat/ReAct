@@ -16,7 +16,12 @@ object TestWorld {
         listOf(
             ObjectType("FIRE", "Feuer", "ACTIVE"),
             ObjectType("ICE", "Eis", "SOLID", vanishStates = setOf("MELTED")),
-            ObjectType("WATER", "Wasser", "LIQUID", mapOf("gravity" to "true", "liquid" to "true", "weight" to "1")),
+            ObjectType(
+                "WATER", "Wasser", "LIQUID",
+                mapOf("gravity" to "true", "flows" to "true", "weight" to "1"),
+                vanishStates = setOf("EVAPORATED"),
+            ),
+            ObjectType("STEAM", "Dampf", "GAS", mapOf("rises" to "true", "flows" to "true")),
             ObjectType("STONE", "Stein", "SOLID", mapOf("gravity" to "true", "weight" to "3")),
             ObjectType("BUTTON", "Schalter", "UP"),
             ObjectType("PLATE", "Druckplatte", "UP"),
@@ -29,6 +34,11 @@ object TestWorld {
         "melt", "Schmelzen", Trigger.TOUCH,
         RuleConditions(source = "FIRE", target = "ICE", targetState = "SOLID"),
         RuleEffect(targetState = "MELTED", spawnObject = "WATER"),
+    )
+    val evaporate = Rule(
+        "evaporate", "Verdampfen", Trigger.TOUCH,
+        RuleConditions(source = "FIRE", target = "WATER", targetState = "LIQUID"),
+        RuleEffect(targetState = "EVAPORATED", spawnObject = "STEAM"),
     )
     val waterButton = Rule(
         "water_button", "Wasserkontakt", Trigger.TOUCH,
@@ -54,19 +64,19 @@ object TestWorld {
         elseEffect = RuleEffect(targetState = "LOCKED"),
     )
 
-    val rules = listOf(melt, waterButton, plateLoad, buttonDoor, plateDoor)
+    val rules = listOf(melt, evaporate, waterButton, plateLoad, buttonDoor, plateDoor)
 
     fun engine(rules: List<Rule> = this.rules, max: Int = RuleEngine.DEFAULT_MAX_TRANSFORMATIONS) =
         RuleEngine(types, rules, max)
 
     private val symbols = mapOf(
-        'F' to "FIRE", 'I' to "ICE", 'W' to "WATER", 'S' to "STONE",
+        'F' to "FIRE", 'I' to "ICE", 'W' to "WATER", 'S' to "STONE", 'V' to "STEAM",
         'B' to "BUTTON", 'P' to "PLATE", 'D' to "DOOR",
     )
 
     /**
      * Builds a state from ASCII rows: '#' wall, '.' empty, F fire, I ice, W water, S stone,
-     * B button, P plate, D door. Sensors and doors share channel "A". Ids are "<type>_<x>_<y>".
+     * V steam (vapour), B button, P plate, D door. Sensors and doors share channel "A". Ids are "<type>_<x>_<y>".
      */
     fun state(vararg rows: String): GameState {
         val walls = mutableSetOf<Position>()
