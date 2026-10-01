@@ -22,17 +22,14 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.core.app.ActivityScenario
 import com.shootcat.react.data.Progress
-import com.shootcat.react.data.ProgressStore
 import com.shootcat.react.engine.LevelLoader
 import com.shootcat.react.ui.GameUiState
 import com.shootcat.react.ui.GameViewModel
 import com.shootcat.react.ui.level.Viewport
-import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
@@ -55,23 +52,18 @@ class AppSmokeTest {
     @get:Rule
     val compose = createEmptyComposeRule()
 
-    /** Robolectric keeps the preferences between tests: every test starts without progress. */
-    @Before
-    fun clearProgress() {
-        ProgressStore(RuntimeEnvironment.getApplication()).clear()
-    }
-
-    /** Starts the app; [completed] levels are set directly in the view model's state. */
+    /**
+     * Starts the app with exactly the [completed] levels, set directly in the view model's state
+     * (stored progress can survive from an earlier test).
+     */
     private fun launch(completed: Set<String> = emptySet()): ActivityScenario<MainActivity> {
         val scenario = ActivityScenario.launch(MainActivity::class.java)
-        if (completed.isNotEmpty()) {
-            scenario.onActivity { activity ->
-                val viewModel = ViewModelProvider(activity)[GameViewModel::class.java]
-                val field = GameViewModel::class.java.getDeclaredField("_state").apply { isAccessible = true }
-                @Suppress("UNCHECKED_CAST")
-                val state = field.get(viewModel) as MutableStateFlow<GameUiState>
-                state.update { it.copy(progress = Progress(completed = completed)) }
-            }
+        scenario.onActivity { activity ->
+            val viewModel = ViewModelProvider(activity)[GameViewModel::class.java]
+            val field = GameViewModel::class.java.getDeclaredField("_state").apply { isAccessible = true }
+            @Suppress("UNCHECKED_CAST")
+            val state = field.get(viewModel) as MutableStateFlow<GameUiState>
+            state.update { it.copy(progress = Progress(completed = completed)) }
         }
         compose.waitForIdle()
         return scenario
