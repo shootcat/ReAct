@@ -11,8 +11,8 @@ import kotlin.test.assertTrue
 class LevelFilesTest {
 
     @Test
-    fun `world 1 lists ten levels, all on the map`() {
-        assertEquals((0..9).map { "level_%02d".format(it) }, Levels.world.levelIds)
+    fun `world 1 lists thirteen levels, all on the map`() {
+        assertEquals((0..12).map { "level_%02d".format(it) }, Levels.world.levelIds)
         assertEquals(Levels.world.levelIds.toSet(), Levels.world.map.map { it.levelId }.toSet())
     }
 
@@ -81,9 +81,13 @@ class LevelFilesTest {
         val texts = Levels.world.rules.map { Reactions.describe(it, Levels.world.types).text }
         assertEquals(
             listOf(
-                "Feuer + Eis → Wasser",
+                "Hitze + Eis → Wasser",
                 "Wasser + Feuer → Dampf",
                 "Dampf + Eis → Wasser",
+                "Hitze + Holz → Holz brennt",
+                "Wasser + Holz → Dampf",
+                "Hitze + Metall → Metall heiß",
+                "Metall + Wasser → Dampf",
                 "Wasser + Schalter → Schalter aktiviert",
                 "Gewicht + Druckplatte → Druckplatte gedrückt",
                 "Druck + Kolben → Kolben hochgedrückt",

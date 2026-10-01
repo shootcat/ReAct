@@ -3,6 +3,7 @@ package com.shootcat.react.engine
 import com.shootcat.react.engine.TestWorld.after
 import com.shootcat.react.engine.TestWorld.amountAt
 import com.shootcat.react.engine.TestWorld.positionsOf
+import com.shootcat.react.engine.TestWorld.totalSteam
 import com.shootcat.react.engine.TestWorld.totalWater
 import com.shootcat.react.engine.TestWorld.typeAt
 import com.shootcat.react.engine.model.Position
@@ -151,29 +152,33 @@ class PhysicsTest {
     // Gases
 
     @Test
-    fun `steam rises and slides around a ceiling`() {
+    fun `steam rises, spreads under the ceiling and keeps its volume`() {
         val start = TestWorld.state(
             "#######",
             "#.....#",
-            "#.###.#",
+            "#.....#",
             "#..V..#",
             "#######",
         )
-        // Tie between the two openings goes left: sideways first, then diagonally up.
-        assertEquals(listOf(Position(2, 3)), start.after(1, physicsOnly).positionsOf("STEAM"))
-        assertEquals(listOf(Position(1, 2)), start.after(2, physicsOnly).positionsOf("STEAM"))
+        val s = start.after(12, physicsOnly)
+        assertEquals(8, s.totalSteam())
+        assertTrue(s.objects.filter { it.isGas }.all { it.position.y == 1 }, "all steam collected at the ceiling")
+        assertTrue(s.objects.count { it.isGas } >= 3, "and spread out under it")
     }
 
     @Test
-    fun `trapped steam gathers in one pocket`() {
+    fun `steam runs along a ceiling into a dome and fills it from the top`() {
         val start = TestWorld.state(
-            "###.###",
-            "#V....#",
-            "#....V#",
+            "####.##",
+            "####.##",
+            "#.....#",
+            "#V...V#",
             "#######",
         )
-        val s = start.after(10, physicsOnly)
-        assertEquals(setOf(Position(3, 0), Position(3, 1)), s.positionsOf("STEAM").toSet())
+        val s = start.after(20, physicsOnly)
+        assertEquals(16, s.totalSteam())
+        assertEquals(8, s.objects.first { it.position == Position(4, 0) }.amount)
+        assertEquals(8, s.objects.first { it.position == Position(4, 1) }.amount)
     }
 
     @Test
@@ -187,5 +192,56 @@ class PhysicsTest {
         val s = start.after(1, physicsOnly)
         assertEquals("STEAM", s.typeAt(1, 1))
         assertEquals(8, s.amountAt(1, 2))
+    }
+
+    @Test
+    fun `steam volume is conserved`() {
+        var s = TestWorld.state(
+            "#.......#",
+            "#.##.#..#",
+            "#V.c.Wb.#",
+            "##V#..V.#",
+            "#########",
+        )
+        val total = s.totalSteam()
+        repeat(40) {
+            s = physicsOnly.step(s).state
+            assertEquals(total, s.totalSteam())
+            assertTrue(s.objects.filter { it.isGas }.all { it.amount in 1..8 })
+        }
+    }
+
+    @Test
+    fun `a stone falling into steam pushes it aside`() {
+        val start = TestWorld.state(
+            "#S#",
+            "#.#",
+            "#V#",
+            "###",
+        )
+        val s = start.after(2, physicsOnly)
+        assertEquals(listOf(Position(1, 2)), s.positionsOf("STONE"))
+        assertEquals(8, s.totalSteam())
+    }
+
+    // Wood
+
+    @Test
+    fun `wood floats on water and rises through it`() {
+        val onTop = TestWorld.state(
+            "#O#",
+            "#.#",
+            "#W#",
+            "###",
+        )
+        assertEquals(listOf(Position(1, 1)), onTop.after(4, physicsOnly).positionsOf("WOOD"))
+        val underWater = TestWorld.state(
+            "#.#",
+            "#W#",
+            "#W#",
+            "#O#",
+            "###",
+        )
+        assertEquals(listOf(Position(1, 1)), underWater.after(2, physicsOnly).positionsOf("WOOD"))
     }
 }

@@ -11,68 +11,89 @@
     "level_06",
     "level_07",
     "level_08",
-    "level_09"
+    "level_09",
+    "level_10",
+    "level_11",
+    "level_12"
   ],
   "map": [
     {
       "level": "level_00",
-      "x": 0.2,
-      "y": 0.9,
+      "x": 0.22,
+      "y": 0.94,
       "icon": "FIRE"
     },
     {
       "level": "level_01",
       "x": 0.52,
-      "y": 0.84,
+      "y": 0.867,
       "icon": "WATER"
     },
     {
       "level": "level_02",
-      "x": 0.82,
-      "y": 0.75,
+      "x": 0.8,
+      "y": 0.793,
       "icon": "STONE"
     },
     {
       "level": "level_03",
       "x": 0.55,
-      "y": 0.64,
+      "y": 0.72,
       "icon": "ICE"
     },
     {
       "level": "level_04",
-      "x": 0.22,
-      "y": 0.55,
+      "x": 0.24,
+      "y": 0.647,
       "icon": "STEAM"
     },
     {
       "level": "level_05",
-      "x": 0.5,
-      "y": 0.45,
+      "x": 0.48,
+      "y": 0.573,
       "icon": "PISTON"
     },
     {
       "level": "level_06",
-      "x": 0.8,
-      "y": 0.37,
+      "x": 0.78,
+      "y": 0.5,
       "icon": "HATCH"
     },
     {
       "level": "level_07",
-      "x": 0.52,
-      "y": 0.27,
+      "x": 0.55,
+      "y": 0.427,
       "icon": "WATER"
     },
     {
       "level": "level_08",
-      "x": 0.22,
-      "y": 0.18,
-      "icon": "PLATE"
+      "x": 0.24,
+      "y": 0.353,
+      "icon": "WOOD"
     },
     {
       "level": "level_09",
-      "x": 0.56,
-      "y": 0.08,
+      "x": 0.5,
+      "y": 0.28,
       "icon": "DOOR"
+    },
+    {
+      "level": "level_10",
+      "x": 0.8,
+      "y": 0.207,
+      "icon": "METAL"
+    },
+    {
+      "level": "level_11",
+      "x": 0.58,
+      "y": 0.133,
+      "icon": "PLATE"
+    },
+    {
+      "level": "level_12",
+      "x": 0.3,
+      "y": 0.06,
+      "icon": "GATE"
     }
   ],
   "types": [
@@ -83,13 +104,15 @@
       "properties": {
         "gravity": true,
         "density": 15,
-        "weight": 10
+        "weight": 10,
+        "heat": 6,
+        "heat_state": "ACTIVE"
       },
       "state_names": {
         "ACTIVE": "brennt",
         "OUT": "erloschen"
       },
-      "description": "Eine Feuerschale. Fällt, wenn nichts sie hält. Wasser löscht sie."
+      "description": "Eine Feuerschale. Fällt, wenn nichts sie hält. Gibt Hitze ab, Wasser löscht sie."
     },
     {
       "type": "ICE",
@@ -129,18 +152,14 @@
       "name": "Dampf",
       "default_state": "GAS",
       "properties": {
-        "rises": true,
-        "flows": true,
+        "gas": true,
+        "capacity": 8,
         "lift": 1
       },
-      "vanish_states": [
-        "CONDENSED"
-      ],
       "state_names": {
-        "GAS": "gasförmig",
-        "CONDENSED": "kondensiert"
+        "GAS": "gasförmig"
       },
-      "description": "Steigt auf, sammelt sich oben und baut Druck auf."
+      "description": "Steigt auf, breitet sich unter Decken aus, füllt geschlossene Kammern und baut Druck auf."
     },
     {
       "type": "STONE",
@@ -155,6 +174,48 @@
         "SOLID": "fest"
       },
       "description": "Schwer. Fällt und sinkt in Wasser."
+    },
+    {
+      "type": "WOOD",
+      "name": "Holz",
+      "default_state": "DRY",
+      "properties": {
+        "gravity": true,
+        "density": 6,
+        "weight": 8,
+        "heat": 4,
+        "heat_state": "BURNING",
+        "fuel": 10,
+        "burnt_state": "ASH"
+      },
+      "vanish_states": [
+        "ASH"
+      ],
+      "state_names": {
+        "DRY": "trocken",
+        "BURNING": "brennt",
+        "CHARRED": "verkohlt",
+        "ASH": "verbrannt"
+      },
+      "description": "Leicht: schwimmt auf Wasser und steigt darin auf. Fängt Feuer und brennt ab."
+    },
+    {
+      "type": "METAL",
+      "name": "Metall",
+      "default_state": "COLD",
+      "properties": {
+        "gravity": true,
+        "density": 30,
+        "weight": 30,
+        "conducts": true,
+        "heat": 3,
+        "heat_state": "HOT"
+      },
+      "state_names": {
+        "COLD": "kalt",
+        "HOT": "heiß"
+      },
+      "description": "Schwer. Leitet Hitze weiter – jedes Stück Metall ein bisschen weniger."
     },
     {
       "type": "BUTTON",
@@ -217,16 +278,28 @@
         "UNLOCKED": "offen"
       },
       "description": "Öffnet sich auf ein Signal."
+    },
+    {
+      "type": "GATE",
+      "name": "Schieber",
+      "default_state": "IDLE",
+      "properties": {
+        "pushable": true,
+        "resist": 2
+      },
+      "state_names": {
+        "IDLE": "in Ruhe"
+      },
+      "description": "Eine Sperre, die Dampfdruck vor sich herschiebt."
     }
   ],
   "rules": [
     {
-      "id": "fire_melts_ice",
+      "id": "heat_melts_ice",
       "name": "Schmelzen",
       "trigger": "TOUCH",
       "conditions": {
-        "source": "FIRE",
-        "source_state": "ACTIVE",
+        "source_hot": true,
         "target": "ICE",
         "target_state": "SOLID"
       },
@@ -247,6 +320,7 @@
       "effect": {
         "target_state": "OUT",
         "spawn_object": "STEAM",
+        "spawn_amount": 6,
         "source_consume": 3
       }
     },
@@ -262,7 +336,66 @@
       "effect": {
         "target_state": "MELTED",
         "spawn_object": "WATER",
-        "source_state": "CONDENSED"
+        "source_consume": 4
+      }
+    },
+    {
+      "id": "heat_ignites_wood",
+      "name": "Entzünden",
+      "trigger": "TOUCH",
+      "conditions": {
+        "source_hot": true,
+        "target": "WOOD",
+        "target_state": "DRY"
+      },
+      "effect": {
+        "target_state": "BURNING"
+      }
+    },
+    {
+      "id": "water_douses_wood",
+      "name": "Ablöschen",
+      "trigger": "TOUCH",
+      "conditions": {
+        "source": "WATER",
+        "target": "WOOD",
+        "target_state": "BURNING"
+      },
+      "effect": {
+        "target_state": "CHARRED",
+        "spawn_object": "STEAM",
+        "spawn_amount": 4,
+        "source_consume": 2
+      }
+    },
+    {
+      "id": "metal_conducts",
+      "name": "Wärmeleitung",
+      "trigger": "HEAT",
+      "conditions": {
+        "target": "METAL",
+        "min_load": 1
+      },
+      "effect": {
+        "target_state": "HOT"
+      },
+      "else_effect": {
+        "target_state": "COLD"
+      }
+    },
+    {
+      "id": "metal_boils_water",
+      "name": "Sieden",
+      "trigger": "TOUCH",
+      "conditions": {
+        "source": "METAL",
+        "source_state": "HOT",
+        "target": "WATER"
+      },
+      "effect": {
+        "spawn_object": "STEAM",
+        "spawn_amount": 2,
+        "target_consume": 1
       }
     },
     {
@@ -299,7 +432,7 @@
       "trigger": "LOAD",
       "conditions": {
         "target": "PISTON",
-        "min_load": 2,
+        "min_load": 9,
         "direction": "UP"
       },
       "effect": {

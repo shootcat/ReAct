@@ -7,6 +7,8 @@ enum class Trigger {
     LOAD,
     /** A signal arrives on the target's channel. */
     SIGNAL,
+    /** Heat conducted into the target (its temperature) reaches a threshold. */
+    HEAT,
 }
 
 enum class LoadDirection { DOWN, UP }
@@ -26,17 +28,21 @@ data class RuleConditions(
     val targetState: String? = null,
     val minLoad: Int = 1,
     val direction: LoadDirection = LoadDirection.DOWN,
+    /** TOUCH: any hot neighbour counts as source (fire, burning wood, hot metal …). */
+    val sourceHot: Boolean = false,
 )
 
 data class RuleEffect(
     val targetState: String? = null,
     val spawnObject: String? = null,
-    /** Amount for a spawned liquid; defaults to a full cell. */
+    /** Amount for a spawned liquid or gas; defaults to a full cell. */
     val spawnAmount: Int? = null,
     /** New state of the (first) source, e.g. steam condensing. */
     val sourceState: String? = null,
-    /** Liquid amount the (first) source loses, e.g. water evaporating on a fire. */
+    /** Amount the (first) source loses if it is a liquid or gas, e.g. water evaporating on a fire. */
     val sourceConsume: Int = 0,
+    /** Amount the target loses if it is a liquid or gas, e.g. water boiling on hot metal. */
+    val targetConsume: Int = 0,
 )
 
 data class Rule(

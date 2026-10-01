@@ -4,22 +4,34 @@ package com.shootcat.react.engine.model
 object Props {
     /** Solid that falls when nothing holds it. */
     const val GRAVITY = "gravity"
-    /** Gas that rises (steam). */
-    const val RISES = "rises"
-    /** A blocked gas slides diagonally or drifts sideways towards an opening. */
-    const val FLOWS = "flows"
     /** Volume liquid (water): each cell holds an amount that falls, spreads and levels out. */
     const val LIQUID = "liquid"
-    /** Maximum liquid amount per cell. */
+    /** Volume gas (steam): rises, bubbles through liquids, collects under ceilings and fills chambers. */
+    const val GAS = "gas"
+    /** Maximum amount per cell of a liquid or gas. */
     const val CAPACITY = "capacity"
     /** Relative density, liquids are 10: lighter solids float, heavier ones sink. */
     const val DENSITY = "density"
     /** Load on whatever the object rests on (for liquids: per unit of amount). */
     const val WEIGHT = "weight"
-    /** Upward push of a gas, e.g. steam pressure against a piston. */
+    /** Upward push of a gas per unit of amount, e.g. steam pressure against a piston. */
     const val LIFT = "lift"
     /** Signal channel shared by sensors and the actuators they drive. */
     const val CHANNEL = "channel"
+    /** Heat the object gives off (fire, burning wood, hot metal) … */
+    const val HEAT = "heat"
+    /** … but only while it is in this state. Without it the object is always hot. */
+    const val HEAT_STATE = "heat_state"
+    /** Passes heat on to touching conductors; every cell of metal costs one degree. */
+    const val CONDUCTS = "conducts"
+    /** Steps a burning object lasts before it is used up. */
+    const val FUEL = "fuel"
+    /** State a burnt-out object ends up in. */
+    const val BURNT_STATE = "burnt_state"
+    /** A barrier that gas pressure pushes along when the pressure difference is high enough. */
+    const val PUSHABLE = "pushable"
+    /** Pressure difference (gas units per cell) a pushable barrier withstands. */
+    const val RESIST = "resist"
 }
 
 /** Liquid density everything else is compared with. */
@@ -27,7 +39,9 @@ const val LIQUID_DENSITY = 10
 
 /**
  * Every thing in the world is a [GameObject]: a type, a state, a position and properties.
- * Liquids additionally carry an [amount] (how full their cell is). Behaviour never depends on the id.
+ * Liquids and gases additionally carry an [amount] (how full their cell is), conductors a
+ * temperature [temp] and burning things the number of steps they have [burnt]. Behaviour never
+ * depends on the id.
  */
 data class GameObject(
     val id: String,
@@ -35,22 +49,43 @@ data class GameObject(
     val state: String,
     val position: Position,
     val properties: Map<String, String> = emptyMap(),
-    /** Whether the player may drag this object while setting up an experiment. */
+    /** Whether the player may drag this object. */
     val movable: Boolean = false,
     val amount: Int = 0,
+    val temp: Int = 0,
+    val burnt: Int = 0,
 ) {
     fun flag(key: String): Boolean = properties[key]?.toBooleanStrictOrNull() ?: false
     fun int(key: String, default: Int = 0): Int = properties[key]?.toIntOrNull() ?: default
     fun string(key: String): String? = properties[key]
 
     val isLiquid: Boolean get() = flag(Props.LIQUID)
+    val isGas: Boolean get() = flag(Props.GAS)
+    /** Liquids and gases are volumes rather than single things. */
+    val isFluid: Boolean get() = isLiquid || isGas
     val falls: Boolean get() = flag(Props.GRAVITY)
-    val rises: Boolean get() = flag(Props.RISES)
+    val rises: Boolean get() = isGas
+    val conducts: Boolean get() = flag(Props.CONDUCTS)
     val density: Int get() = int(Props.DENSITY, LIQUID_DENSITY)
     val capacity: Int get() = int(Props.CAPACITY, 8)
 
-    /** Load this object puts on what is below it. */
-    val load: Int get() = if (isLiquid) amount * int(Props.WEIGHT) else int(Props.WEIGHT)
+    /** Load this object puts on what is below it. Gas weighs nothing. */
+    val load: Int
+        get() = when {
+            isLiquid -> amount * int(Props.WEIGHT)
+            isGas -> 0
+            else -> int(Props.WEIGHT)
+        }
 
-    val lift: Int get() = int(Props.LIFT)
+    /** Upward push: gas pushes with its whole amount. */
+    val lift: Int get() = if (isGas) amount * int(Props.LIFT) else int(Props.LIFT)
+
+    /** Heat given off right now (0 when cold, out or not a heat source at all). */
+    val heatOutput: Int
+        get() {
+            val heat = int(Props.HEAT)
+            if (heat <= 0) return 0
+            val hotState = string(Props.HEAT_STATE)
+            return if (hotState == null || hotState == state) heat else 0
+        }
 }

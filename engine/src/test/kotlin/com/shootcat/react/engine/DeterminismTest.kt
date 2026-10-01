@@ -39,4 +39,14 @@ class DeterminismTest {
             }
         }
     }
+
+    @Test
+    fun `undoing and replaying a move in live mode gives the same world`() {
+        val level = Levels.level("level_04")
+        val live = Levels.live(level)
+        val start = live.start()
+        val first = live.play(start, "fire_1", com.shootcat.react.engine.model.Position(6, 4))!!
+        val again = live.play(start, "fire_1", com.shootcat.react.engine.model.Position(6, 4))!!
+        assertEquals(first, again)
+    }
 }

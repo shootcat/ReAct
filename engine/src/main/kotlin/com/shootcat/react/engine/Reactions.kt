@@ -2,12 +2,13 @@ package com.shootcat.react.engine
 
 import com.shootcat.react.engine.model.LoadDirection
 import com.shootcat.react.engine.model.Phase
+import com.shootcat.react.engine.model.Props
 import com.shootcat.react.engine.model.Rule
 import com.shootcat.react.engine.model.Trigger
 import com.shootcat.react.engine.model.TypeCatalog
 
 /** Abstract inputs that are not objects. */
-enum class ReactionSymbol { WEIGHT, PRESSURE, SIGNAL }
+enum class ReactionSymbol { WEIGHT, PRESSURE, SIGNAL, HEAT }
 
 /**
  * One piece of a reaction, e.g. "Eis". [typeId] and [state] let the UI draw a matching icon;
@@ -57,11 +58,13 @@ object Reactions {
                 if (c.source == null) ReactionToken("Signal", symbol = ReactionSymbol.SIGNAL) else sourceToken(rule, types),
                 ReactionToken(targetName, c.target),
             )
+            Trigger.HEAT -> listOf(ReactionToken("Hitze", symbol = ReactionSymbol.HEAT), ReactionToken(targetName, c.target))
         }
         return Reaction(rule.id, rule.name, rule.phase, inputs, output)
     }
 
     private fun sourceToken(rule: Rule, types: TypeCatalog): ReactionToken {
+        if (rule.conditions.sourceHot && rule.conditions.source == null) return ReactionToken("Hitze", symbol = ReactionSymbol.HEAT)
         val source = rule.conditions.source ?: return ReactionToken("?")
         return ReactionToken(types.name(source), source, rule.conditions.sourceState)
     }
@@ -90,14 +93,20 @@ object Reactions {
     }
 
     /** Types that react with [type] on touch (either way round). Used for the subtle reaction preview. */
-    fun touchPartners(type: String, rules: List<Rule>): Set<String> =
-        rules.filter { it.trigger == Trigger.TOUCH }.flatMap { rule ->
-            val source = rule.conditions.source
-            val target = rule.conditions.target
+    fun touchPartners(type: String, rules: List<Rule>, types: TypeCatalog): Set<String> {
+        fun canBeHot(t: String) = (types[t]?.properties?.get(Props.HEAT)?.toIntOrNull() ?: 0) > 0
+        return rules.filter { it.trigger == Trigger.TOUCH }.flatMap { rule ->
+            val c = rule.conditions
+            val sources = when {
+                c.source != null -> listOf(c.source)
+                c.sourceHot -> types.all.map { it.id }.filter(::canBeHot)
+                else -> emptyList()
+            }
             when (type) {
-                source -> listOf(target)
-                target -> listOfNotNull(source)
+                in sources -> listOf(c.target)
+                c.target -> sources
                 else -> emptyList()
             }
         }.toSet()
+    }
 }

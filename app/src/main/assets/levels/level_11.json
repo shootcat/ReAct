@@ -1,16 +1,16 @@
 {
-  "id": "level_08",
-  "title": "Auftrieb",
+  "id": "level_11",
+  "title": "Brandschneise",
   "world": 1,
-  "intro": "Holz liegt auf dem Schalter.",
+  "intro": "Holz brennt.",
   "map": [
     "##########",
     "#........D",
-    "#.F..I.J.#",
-    "####.#####",
-    "####:#####",
-    "####i#####",
-    "####B#####",
+    "#F...I...#",
+    "###M##S###",
+    "###MMMW###",
+    "######:###",
+    "######P###",
     "##########"
   ],
   "legend": {
@@ -24,18 +24,26 @@
       "id": "ice_block_1",
       "movable": true
     },
-    "J": {
-      "type": "ICE",
-      "id": "ice_block_2",
-      "movable": true
+    "M": {
+      "type": "METAL",
+      "properties": {
+        "gravity": false
+      }
     },
-    "i": {
+    "S": {
+      "type": "STONE",
+      "id": "stone_1"
+    },
+    "W": {
       "type": "WOOD",
-      "id": "wood_plug"
+      "id": "wood_beam",
+      "properties": {
+        "gravity": false
+      }
     },
-    "B": {
-      "type": "BUTTON",
-      "id": "button_1",
+    "P": {
+      "type": "PLATE",
+      "id": "plate_1",
       "properties": {
         "channel": "A"
       }
@@ -60,7 +68,11 @@
       "kind": "STANDARD",
       "requires": [
         {
-          "rule": "water_triggers_button"
+          "rule": "heat_ignites_wood"
+        },
+        {
+          "rule": "weight_presses_plate",
+          "source": "STONE"
         }
       ]
     },
@@ -69,7 +81,7 @@
       "kind": "MINIMAL",
       "requires": [
         {
-          "rule": "water_triggers_button"
+          "rule": "weight_presses_plate"
         }
       ],
       "max_moved": 1

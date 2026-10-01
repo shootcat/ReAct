@@ -68,7 +68,7 @@
         "fire_2"
       ],
       "forbids": [
-        "fire_melts_ice"
+        "heat_melts_ice"
       ]
     },
     {
@@ -89,7 +89,7 @@
           "rule": "steam_lifts_piston"
         },
         {
-          "rule": "fire_melts_ice"
+          "rule": "heat_melts_ice"
         }
       ]
     }

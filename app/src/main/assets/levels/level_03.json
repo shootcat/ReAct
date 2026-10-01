@@ -75,7 +75,7 @@
         "stone_1"
       ],
       "forbids": [
-        "fire_melts_ice"
+        "heat_melts_ice"
       ]
     }
   ]

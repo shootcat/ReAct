@@ -36,8 +36,8 @@ data class StepResult(
 /**
  * Deterministic, data-driven rule engine. A step runs three fixed phases:
  *
- * 1. [Phase.STATE]   – TOUCH and LOAD rules, evaluated once against the state at the start of the phase.
- * 2. [Phase.PHYSICS] – falling, rising and flowing.
+ * 1. [Phase.STATE]   – TOUCH, LOAD and HEAT rules, evaluated once against the state at the start of the phase.
+ * 2. [Phase.PHYSICS] – falling, floating, flowing, pressure and heat conduction.
  * 3. [Phase.SIGNAL]  – SIGNAL rules, propagated until nothing changes any more.
  *
  * Per target and phase only one effect applies: the first matching rule (in rule order) wins,
@@ -143,6 +143,15 @@ class RuleEngine(
                     .orEmpty()
             }
 
+            Trigger.HEAT -> if (target.temp < c.minLoad) {
+                emptyList()
+            } else {
+                // Whatever passes the heat on: hot neighbours or warm conductors (else the target's own heat).
+                target.position.neighbours().mapNotNull { state.objectAt(it) }
+                    .filter { if (it.conducts) it.temp > 0 else it.heatOutput > 0 }
+                    .ifEmpty { listOf(target) }
+            }
+
             Trigger.SIGNAL -> {
                 val channel = target.string(Props.CHANNEL)
                 if (channel == null) {
@@ -156,7 +165,9 @@ class RuleEngine(
         }
 
     private fun matchesSource(o: GameObject, c: RuleConditions): Boolean =
-        (c.source == null || o.type == c.source) && (c.sourceState == null || o.state == c.sourceState)
+        (c.source == null || o.type == c.source) &&
+            (c.sourceState == null || o.state == c.sourceState) &&
+            (!c.sourceHot || o.heatOutput > 0)
 
     /** Without an explicit source, any object in one of its type's signal states sends a signal. */
     private fun isSignalling(o: GameObject, c: RuleConditions): Boolean =
@@ -179,10 +190,13 @@ class RuleEngine(
         if (!budget.consume()) return false
 
         if (changesState) setState(world, target, effect.targetState!!)
+        if (effect.targetConsume > 0 && target.isFluid) {
+            world.setAmount(target.id, target.amount - effect.targetConsume)
+        }
         var spawned: GameObject? = null
         if (spawns) spawned = spawn(world, effect.spawnObject!!, effect.spawnAmount, target.position)
         if (source != null) {
-            if (effect.sourceConsume > 0 && source.isLiquid) {
+            if (effect.sourceConsume > 0 && source.isFluid) {
                 world.setAmount(source.id, source.amount - effect.sourceConsume)
             }
             if (effect.sourceState != null && world.byId(source.id) != null) setState(world, source, effect.sourceState)
@@ -209,23 +223,39 @@ class RuleEngine(
 
     /**
      * Spawns at [origin] if free, otherwise next to it (up first: steam rises off a fire).
-     * Liquids merge into neighbouring liquid. Gases bubble up through liquid to the nearest free cell.
+     * Liquids and gases merge into neighbouring cells of the same kind and spill over into further
+     * free cells. Gas that finds no room squeezes past liquid and loose objects to the nearest free cell.
      */
     private fun spawn(world: MutableWorld, type: String, amount: Int?, origin: Position): GameObject? {
         val t = types.require(type)
-        val liquid = t.properties[Props.LIQUID]?.toBooleanStrictOrNull() == true
-        val gas = t.properties[Props.RISES]?.toBooleanStrictOrNull() == true
-        for (cell in listOf(origin) + origin.neighbours()) {
-            if (world.isFree(cell)) return world.spawn(type, cell, types, amount)
+        val fluid = t.properties[Props.LIQUID]?.toBooleanStrictOrNull() == true ||
+            t.properties[Props.GAS]?.toBooleanStrictOrNull() == true
+        val gas = t.properties[Props.GAS]?.toBooleanStrictOrNull() == true
+        if (!fluid) {
+            val cell = (listOf(origin) + origin.neighbours()).firstOrNull { world.isFree(it) } ?: return null
+            return world.spawn(type, cell, types)
+        }
+        val capacity = world.fluidCapacity(type, types)
+        var remaining = amount ?: capacity
+        var first: GameObject? = null
+        fun pour(cell: Position) {
+            if (remaining <= 0) return
             val existing = world.at(cell)
-            if (liquid && existing != null && existing.type == type && existing.amount < existing.capacity) {
-                val add = amount ?: existing.capacity
-                world.setAmount(existing.id, minOf(existing.capacity, existing.amount + add))
-                return world.byId(existing.id)
+            if (existing == null && world.isFree(cell)) {
+                val portion = minOf(remaining, capacity)
+                val o = world.spawn(type, cell, types, portion)
+                remaining -= portion
+                if (first == null) first = o
+            } else if (existing != null && existing.type == type && existing.amount < existing.capacity) {
+                val portion = minOf(remaining, existing.capacity - existing.amount)
+                world.setAmount(existing.id, existing.amount + portion)
+                remaining -= portion
+                if (first == null) first = world.byId(existing.id)
             }
         }
-        if (!gas) return null
-        // Bubbles squeeze past liquid and loose objects (never through walls) to the nearest free cell.
+        for (cell in listOf(origin) + origin.neighbours()) pour(cell)
+        if (remaining <= 0 || !gas) return first
+        // Bubbles squeeze past liquid and loose objects (never through walls) to the nearest free cells.
         fun passable(p: Position) = world.inBounds(p) && !world.isWall(p) && world.at(p) != null
         val seen = hashSetOf(origin)
         var frontier = origin.neighbours().filter { passable(it) }
@@ -235,13 +265,14 @@ class RuleEngine(
                 if (!seen.add(cell)) continue
                 for (n in cell.neighbours()) {
                     if (n in seen) continue
-                    if (world.isFree(n)) return world.spawn(type, n, types, amount)
+                    pour(n)
+                    if (remaining <= 0) return first
                     if (passable(n)) next += n
                 }
             }
             frontier = next
         }
-        return null
+        return first
     }
 
     companion object {

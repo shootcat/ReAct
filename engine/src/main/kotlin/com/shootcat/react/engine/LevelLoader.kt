@@ -181,7 +181,7 @@ object LevelLoader {
         val c = rule.conditions
         val referenced = listOfNotNull(c.source, c.target, rule.effect.spawnObject, rule.elseEffect?.spawnObject)
         referenced.forEach { if (it !in types) fail("$where: rule '${rule.id}' uses unknown type '$it'") }
-        if (rule.trigger == Trigger.TOUCH && c.source == null) fail("$where: rule '${rule.id}' needs a source")
+        if (rule.trigger == Trigger.TOUCH && c.source == null && !c.sourceHot) fail("$where: rule '${rule.id}' needs a source")
     }
 
     private fun <T> requireUnique(values: List<T>, what: String) {
@@ -228,6 +228,7 @@ object LevelLoader {
             targetState = conditions.targetState,
             minLoad = conditions.minLoad,
             direction = enumValue<LoadDirection>(conditions.direction, "rule '$id' direction"),
+            sourceHot = conditions.sourceHot,
         ),
         effect = effect.toModel(),
         elseEffect = elseEffect?.toModel(),
@@ -239,6 +240,7 @@ object LevelLoader {
         spawnAmount = spawnAmount,
         sourceState = sourceState,
         sourceConsume = sourceConsume,
+        targetConsume = targetConsume,
     )
 
     @Serializable
@@ -284,6 +286,7 @@ object LevelLoader {
         @SerialName("target_state") val targetState: String? = null,
         @SerialName("min_load") val minLoad: Int = 1,
         val direction: String = "DOWN",
+        @SerialName("source_hot") val sourceHot: Boolean = false,
     )
 
     @Serializable
@@ -293,6 +296,7 @@ object LevelLoader {
         @SerialName("spawn_amount") val spawnAmount: Int? = null,
         @SerialName("source_state") val sourceState: String? = null,
         @SerialName("source_consume") val sourceConsume: Int = 0,
+        @SerialName("target_consume") val targetConsume: Int = 0,
     )
 
     @Serializable

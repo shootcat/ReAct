@@ -39,6 +39,6 @@ class TypeCatalog(types: List<ObjectType>) {
     ): GameObject {
         val t = require(type)
         val o = GameObject(id, type, state ?: t.defaultState, position, t.properties + properties, movable)
-        return if (o.isLiquid) o.copy(amount = (amount ?: o.capacity).coerceIn(1, o.capacity)) else o
+        return if (o.isFluid) o.copy(amount = (amount ?: o.capacity).coerceIn(1, o.capacity)) else o
     }
 }

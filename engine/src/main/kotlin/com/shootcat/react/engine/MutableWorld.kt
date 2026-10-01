@@ -40,7 +40,17 @@ internal class MutableWorld(private val base: GameState) {
         objects[id] = o.copy(state = state)
     }
 
-    /** Sets a liquid's amount; an empty cell disappears. */
+    fun setTemp(id: String, temp: Int) {
+        val o = objects.getValue(id)
+        objects[id] = o.copy(temp = temp)
+    }
+
+    fun setBurnt(id: String, burnt: Int) {
+        val o = objects.getValue(id)
+        objects[id] = o.copy(burnt = burnt)
+    }
+
+    /** Sets a liquid's or gas's amount; an empty cell disappears. */
     fun setAmount(id: String, amount: Int) {
         val o = objects.getValue(id)
         if (amount <= 0) remove(id) else objects[id] = o.copy(amount = amount)
@@ -65,7 +75,7 @@ internal class MutableWorld(private val base: GameState) {
         put(ob.copy(position = oa.position))
     }
 
-    fun liquidCapacity(type: String, types: TypeCatalog): Int =
+    fun fluidCapacity(type: String, types: TypeCatalog): Int =
         types.require(type).properties["capacity"]?.toIntOrNull() ?: 8
 
     fun spawn(type: String, at: Position, types: TypeCatalog, amount: Int? = null): GameObject {

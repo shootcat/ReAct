@@ -25,7 +25,7 @@ data class SolutionSpec(
     val kind: SolutionKind,
     val label: String,
     val requires: List<EventRequirement> = emptyList(),
-    /** Maximum number of objects the player may have moved. */
+    /** Maximum number of moves the player may have made. */
     val maxMoved: Int? = null,
     /** Objects that must still be at their starting position. */
     val unmoved: List<String> = emptyList(),

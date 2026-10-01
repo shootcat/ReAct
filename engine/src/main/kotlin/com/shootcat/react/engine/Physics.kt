@@ -9,16 +9,20 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Phase 2: forces and movement, in a fixed order. Solids and gases move at most one cell per step.
+ * Phase 2: forces, movement and heat, in a fixed order. Solids move at most one cell per step.
  *
  * 1. Solids ([Props.GRAVITY]) fall. Into a liquid they sink if they are denser, otherwise they rest
  *    on its surface. Gas below them is pushed aside.
- * 2. Solids lighter than the liquid float up through it.
- * 3. Gases ([Props.RISES]) rise, bubble up through liquids, slide diagonally around obstacles and
- *    drift under ceilings towards the nearest opening.
- * 4. Liquids ([Props.LIQUID]) are volumes: each cell holds an amount. They fall and fill the cell below,
- *    run off towards nearby edges and pits, and otherwise spread sideways until neighbouring levels are
- *    (almost) even. Spreading is computed from one snapshot so it is symmetric; ties go left.
+ * 2. Solids lighter than the liquid float up through it (buoyancy).
+ * 3. Gases ([Props.GAS]) are volumes that behave like an upside-down liquid: they rise, bubble up
+ *    through liquids, run along ceilings towards openings and fill closed chambers from the top.
+ * 4. Liquids ([Props.LIQUID]) fall, run off towards nearby edges and pits and otherwise level out.
+ * 5. Gas pressure pushes barriers ([Props.PUSHABLE]): every connected body of air has a pressure
+ *    (gas per cell), and a barrier between two bodies moves away from the higher one.
+ * 6. Heat flows through conductors ([Props.CONDUCTS]), losing one degree per cell.
+ * 7. Burning things use up their fuel ([Props.FUEL]).
+ *
+ * Flows are computed from one snapshot so left and right are treated alike; ties go left.
  */
 internal object Physics {
 
@@ -30,12 +34,15 @@ internal object Physics {
         val moved = HashSet<String>()
         solids(world, moved)
         floaters(world, moved)
-        gases(world, moved)
-        liquids(world, types)
+        fluids(world, types, gas = true)
+        fluids(world, types, gas = false)
+        pressure(world)
+        heat(world)
+        combustion(world, types)
     }
 
     private fun solids(world: MutableWorld, moved: MutableSet<String>) {
-        for (candidate in world.all().filter { it.falls && !it.isLiquid }.sortedWith(bottomUp)) {
+        for (candidate in world.all().filter { it.falls && !it.isFluid }.sortedWith(bottomUp)) {
             val o = world.byId(candidate.id) ?: continue
             val below = o.position.down()
             if (world.isFree(below)) {
@@ -45,7 +52,7 @@ internal object Physics {
             }
             val b = world.at(below) ?: continue
             val sinks = b.isLiquid && o.density > b.density
-            if (sinks || b.rises) {
+            if (sinks || b.isGas) {
                 world.swap(o.id, b.id)
                 moved += o.id
                 moved += b.id
@@ -54,7 +61,7 @@ internal object Physics {
     }
 
     private fun floaters(world: MutableWorld, moved: MutableSet<String>) {
-        val light = world.all().filter { it.falls && !it.isLiquid && it.density < LIQUID_DENSITY }
+        val light = world.all().filter { it.falls && !it.isFluid && it.density < LIQUID_DENSITY }
         for (candidate in light.sortedWith(topDown)) {
             if (candidate.id in moved) continue
             val o = world.byId(candidate.id) ?: continue
@@ -66,83 +73,41 @@ internal object Physics {
         }
     }
 
-    private fun gases(world: MutableWorld, moved: MutableSet<String>) {
-        for (candidate in world.all().filter { it.rises }.sortedWith(topDown)) {
-            if (candidate.id in moved) continue
-            val o = world.byId(candidate.id) ?: continue
-            val p = o.position
-            val up = p.up()
-            if (world.isFree(up)) {
-                world.move(o.id, up)
-                continue
-            }
-            val above = world.at(up)
-            if (above != null && above.isLiquid) {
-                world.swap(o.id, above.id)
-                continue
-            }
-            if (!o.flag(Props.FLOWS)) continue
-            val diagonal = DIRECTIONS.firstOrNull { dx ->
-                world.isFree(Position(p.x + dx, p.y)) && world.isFree(Position(p.x + dx, p.y - 1))
-            }
-            if (diagonal != null) {
-                world.move(o.id, Position(p.x + diagonal, p.y - 1))
-                continue
-            }
-            val dx = driftDirection(world, p)
-            if (dx != 0) world.move(o.id, Position(p.x + dx, p.y))
-        }
-    }
+    // ---------------------------------------------------------------- liquids and gases
 
     /**
-     * Gas under a ceiling drifts towards the nearest cell it can rise from – or where gas has already
-     * collected above, so trapped steam gathers in one pocket and builds pressure. Ties go left.
+     * Moves all liquids ([gas] = false, they fall) or all gases ([gas] = true, they rise).
+     * Both are volumes: each cell holds an amount up to its capacity and the total never changes.
      */
-    private fun driftDirection(world: MutableWorld, p: Position): Int {
-        fun distance(dx: Int): Int? {
-            var d = 1
-            while (true) {
-                val cell = Position(p.x + dx * d, p.y)
-                if (!world.isFree(cell)) return null
-                val above = cell.up()
-                if (world.isFree(above) || world.at(above)?.rises == true) return d
-                d++
-            }
-        }
-        val left = distance(-1)
-        val right = distance(1)
-        return when {
-            left == null && right == null -> 0
-            right == null -> -1
-            left == null -> 1
-            left <= right -> -1
-            else -> 1
-        }
-    }
+    private fun fluids(world: MutableWorld, types: TypeCatalog, gas: Boolean) {
+        val dy = if (gas) -1 else 1
+        fun isKind(o: GameObject) = if (gas) o.isGas else o.isLiquid
 
-    private fun liquids(world: MutableWorld, types: TypeCatalog) {
-        // Falling: move down, or top up the cell below.
-        for (candidate in world.all().filter { it.isLiquid }.sortedWith(bottomUp)) {
+        // Falling (rising): move on, or top up the next cell.
+        for (candidate in world.all().filter(::isKind).sortedWith(if (gas) topDown else bottomUp)) {
             val o = world.byId(candidate.id) ?: continue
-            val below = o.position.down()
-            if (world.isFree(below)) {
-                world.move(o.id, below)
+            val next = Position(o.position.x, o.position.y + dy)
+            if (world.isFree(next)) {
+                world.move(o.id, next)
                 continue
             }
-            val b = world.at(below) ?: continue
-            if (b.type == o.type && b.amount < b.capacity) {
-                val transfer = min(o.amount, b.capacity - b.amount)
-                world.setAmount(b.id, b.amount + transfer)
+            val n = world.at(next) ?: continue
+            if (n.type == o.type && n.amount < n.capacity) {
+                val transfer = min(o.amount, n.capacity - n.amount)
+                world.setAmount(n.id, n.amount + transfer)
                 world.setAmount(o.id, o.amount - transfer)
+            } else if (gas && n.isLiquid) {
+                // Bubbles rise through water.
+                world.swap(o.id, n.id)
             }
         }
 
         // Spreading, computed from one snapshot so left and right are treated alike.
         data class Flow(val from: Position, val to: Position, val amount: Int, val type: String)
         val flows = mutableListOf<Flow>()
-        for (o in world.all().filter { it.isLiquid }.sortedWith(topDown)) {
-            if (!isSupported(world, o)) continue
-            val (left, right) = spreadFlows(world, o)
+        for (o in world.all().filter(::isKind).sortedWith(topDown)) {
+            if (!isSupported(world, o, dy)) continue
+            val (left, right) = spreadFlows(world, o, dy)
             if (left > 0) flows += Flow(o.position, o.position.left(), left, o.type)
             if (right > 0) flows += Flow(o.position, o.position.right(), right, o.type)
         }
@@ -153,7 +118,7 @@ internal object Physics {
         for (f in flows) {
             val free = room.getOrPut(f.to) {
                 val t = world.at(f.to)
-                if (t == null) world.liquidCapacity(f.type, types) else t.capacity - t.amount
+                if (t == null) world.fluidCapacity(f.type, types) else t.capacity - t.amount
             }
             val amount = min(f.amount, free)
             if (amount <= 0) continue
@@ -175,14 +140,14 @@ internal object Physics {
     }
 
     /**
-     * How much a resting liquid cell gives to its left and right neighbour this step.
-     * If an edge or pit is close on its row, the water runs off towards it (drainage).
-     * Otherwise it levels out with its neighbours, leaving thin puddles on wide flat floors.
+     * How much a resting cell gives to its left and right neighbour this step.
+     * If an edge (for gas: an opening above) is close on its row, the fluid runs off towards it.
+     * Otherwise it levels out with its neighbours, leaving thin films on wide flat floors and ceilings.
      */
-    private fun spreadFlows(world: MutableWorld, o: GameObject): Pair<Int, Int> {
+    private fun spreadFlows(world: MutableWorld, o: GameObject, dy: Int): Pair<Int, Int> {
         val a = o.amount
-        val toLeft = drainDistance(world, o, -1)
-        val toRight = drainDistance(world, o, 1)
+        val toLeft = drainDistance(world, o, -1, dy)
+        val toRight = drainDistance(world, o, 1, dy)
         if (toLeft != null || toRight != null) {
             val runoff = max(1, a / 2)
             return when {
@@ -203,16 +168,16 @@ internal object Physics {
         return left to right
     }
 
-    /** Distance to the nearest cell on this row the liquid could drop from, if close enough. */
-    private fun drainDistance(world: MutableWorld, o: GameObject, dx: Int): Int? {
+    /** Distance to the nearest cell on this row the fluid could fall (rise) from, if close enough. */
+    private fun drainDistance(world: MutableWorld, o: GameObject, dx: Int, dy: Int): Int? {
         for (d in 1..DRAIN_RANGE) {
             val cell = Position(o.position.x + dx * d, o.position.y)
             if (!world.inBounds(cell) || world.isWall(cell)) return null
             val occupant = world.at(cell)
             if (occupant != null && occupant.type != o.type) return null
-            val below = cell.down()
-            val b = world.at(below)
-            if (world.isFree(below) || (b != null && b.type == o.type && b.amount < b.capacity)) return d
+            val beyond = Position(cell.x, cell.y + dy)
+            val b = world.at(beyond)
+            if (world.isFree(beyond) || (b != null && b.type == o.type && b.amount < b.capacity)) return d
         }
         return null
     }
@@ -226,16 +191,161 @@ internal object Physics {
         return if (diff >= 2) max(1, diff / 4) else 0
     }
 
-    /** A liquid cell spreads only when it cannot fall any further. */
-    private fun isSupported(world: MutableWorld, o: GameObject): Boolean {
-        val below = o.position.down()
-        if (!world.inBounds(below) || world.isWall(below)) return true
-        val b = world.at(below) ?: return false
-        return if (b.type == o.type) b.amount >= b.capacity else true
+    /** A cell spreads sideways only when it cannot fall (rise) any further. */
+    private fun isSupported(world: MutableWorld, o: GameObject, dy: Int): Boolean {
+        val next = Position(o.position.x, o.position.y + dy)
+        if (!world.inBounds(next) || world.isWall(next)) return true
+        val n = world.at(next) ?: return false
+        return when {
+            n.type == o.type -> n.amount >= n.capacity
+            o.isGas && n.isLiquid -> false
+            else -> true
+        }
     }
 
-    private val DIRECTIONS = intArrayOf(-1, 1)
+    // ---------------------------------------------------------------- pressure
 
-    /** How far along a row water notices an edge it can run off. */
+    /**
+     * Every connected body of air (empty cells and gas) has a pressure: its gas divided by its cells.
+     * A small closed chamber full of steam has a high pressure, the open room around it almost none.
+     * A pushable barrier moves one cell away from the side with the higher pressure if that side
+     * exceeds the other by at least its [Props.RESIST] and the cell in front of it is free (or gas).
+     */
+    private fun pressure(world: MutableWorld) {
+        val barriers = world.all().filter { it.flag(Props.PUSHABLE) }.sortedWith(topDown)
+        if (barriers.isEmpty()) return
+        val air = AirRegions(world)
+        for (barrier in barriers) {
+            val p = barrier.position
+            val resist = barrier.int(Props.RESIST, 1).toLong()
+            var best: Position? = null
+            var bestForce: Pressure? = null
+            for ((dx, dy) in PUSH_DIRECTIONS) {
+                val front = Position(p.x + dx, p.y + dy)
+                if (!world.isFree(front) && world.at(front)?.isGas != true) continue
+                val behind = Position(p.x - dx, p.y - dy)
+                val net = air.pressure(behind) - air.pressure(front)
+                if (net.atLeast(resist) && (bestForce == null || net > bestForce)) {
+                    best = front
+                    bestForce = net
+                }
+            }
+            if (best == null) continue
+            val gasInFront = world.at(best)
+            if (gasInFront != null) world.swap(barrier.id, gasInFront.id) else world.move(barrier.id, best)
+        }
+    }
+
+    /** Exact pressure as a fraction gas / cells. */
+    private data class Pressure(val gas: Long, val cells: Long) : Comparable<Pressure> {
+        operator fun minus(o: Pressure) = Pressure(gas * o.cells - o.gas * cells, cells * o.cells)
+        fun atLeast(value: Long) = gas >= value * cells
+        override fun compareTo(other: Pressure) = (gas * other.cells).compareTo(other.gas * cells)
+    }
+
+    private class AirRegions(private val world: MutableWorld) {
+        private val regionOf = HashMap<Position, Int>()
+        private val pressures = mutableListOf<Pressure>()
+
+        private fun isAir(p: Position): Boolean {
+            if (!world.inBounds(p) || world.isWall(p)) return false
+            val o = world.at(p)
+            return o == null || o.isGas
+        }
+
+        fun pressure(p: Position): Pressure {
+            if (!isAir(p)) return NONE
+            val known = regionOf[p]
+            if (known != null) return pressures[known]
+            val index = pressures.size
+            var gas = 0L
+            var cells = 0L
+            val queue = ArrayDeque(listOf(p))
+            regionOf[p] = index
+            while (queue.isNotEmpty()) {
+                val cell = queue.removeFirst()
+                cells++
+                gas += world.at(cell)?.amount ?: 0
+                for (n in cell.neighbours()) {
+                    if (n !in regionOf && isAir(n)) {
+                        regionOf[n] = index
+                        queue += n
+                    }
+                }
+            }
+            pressures += Pressure(gas, cells)
+            return pressures[index]
+        }
+
+        companion object {
+            val NONE = Pressure(0, 1)
+        }
+    }
+
+    // ---------------------------------------------------------------- heat
+
+    /**
+     * Conductors take the heat of hot neighbours (fire, burning wood) and pass it on to touching
+     * conductors, one degree less per cell and one cell per step. A conductor never gets hotter than
+     * the steady state its current sources allow; without a source it cools by one degree per step.
+     */
+    private fun heat(world: MutableWorld) {
+        val conductors = world.all().filter { it.conducts }
+        if (conductors.isEmpty()) return
+        fun sourceHeat(c: GameObject) = c.position.neighbours().maxOfOrNull { n ->
+            world.at(n)?.takeIf { !it.conducts }?.heatOutput ?: 0
+        } ?: 0
+
+        // Steady state: how warm each conductor would get from the sources there are right now.
+        val limit = HashMap<String, Int>()
+        for (c in conductors) limit[c.id] = sourceHeat(c)
+        var changed = true
+        while (changed) {
+            changed = false
+            for (c in conductors) {
+                val fromNeighbours = c.position.neighbours().maxOfOrNull { n ->
+                    world.at(n)?.takeIf { it.conducts }?.let { limit.getValue(it.id) - 1 } ?: 0
+                } ?: 0
+                if (fromNeighbours > limit.getValue(c.id)) {
+                    limit[c.id] = fromNeighbours
+                    changed = true
+                }
+            }
+        }
+
+        // Heat spreads one cell per step towards that state; cooling is gradual.
+        val temps = conductors.associate { c ->
+            val spread = c.position.neighbours().maxOfOrNull { n ->
+                val o = world.at(n)
+                when {
+                    o == null -> 0
+                    o.conducts -> o.temp - 1
+                    else -> o.heatOutput
+                }
+            } ?: 0
+            c.id to maxOf(minOf(limit.getValue(c.id), spread), c.temp - 1, 0)
+        }
+        for ((id, temp) in temps) {
+            if (world.byId(id)?.temp != temp) world.setTemp(id, temp)
+        }
+    }
+
+    /** Burning things with limited [Props.FUEL] burn down and end up in their [Props.BURNT_STATE]. */
+    private fun combustion(world: MutableWorld, types: TypeCatalog) {
+        for (o in world.all().filter { it.int(Props.FUEL) > 0 && it.heatOutput > 0 }) {
+            val burnt = o.burnt + 1
+            val end = o.string(Props.BURNT_STATE)
+            if (burnt >= o.int(Props.FUEL) && end != null) {
+                world.setState(o.id, end)
+                if (end in types.require(o.type).vanishStates) world.remove(o.id)
+            } else {
+                world.setBurnt(o.id, burnt)
+            }
+        }
+    }
+
+    private val PUSH_DIRECTIONS = listOf(1 to 0, -1 to 0, 0 to -1, 0 to 1)
+
+    /** How far along a row a fluid notices an edge (an opening) it can run off to. */
     private const val DRAIN_RANGE = 8
 }

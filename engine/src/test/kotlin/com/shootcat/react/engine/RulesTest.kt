@@ -4,6 +4,7 @@ import com.shootcat.react.engine.TestWorld.after
 import com.shootcat.react.engine.TestWorld.amountAt
 import com.shootcat.react.engine.TestWorld.count
 import com.shootcat.react.engine.TestWorld.stateOf
+import com.shootcat.react.engine.TestWorld.totalSteam
 import com.shootcat.react.engine.TestWorld.typeAt
 import com.shootcat.react.engine.model.Phase
 import kotlin.test.Test
@@ -41,7 +42,7 @@ class RulesTest {
         )
         val result = engine.step(start)
         assertEquals("OUT", result.state.stateOf("fire_2_2"))
-        assertEquals(1, result.state.count("STEAM"))
+        assertEquals(6, result.state.totalSteam(), "three units of water expand into six of steam")
         assertEquals(5, result.state.objects.filter { it.isLiquid }.sumOf { it.amount })
     }
 
@@ -56,7 +57,7 @@ class RulesTest {
     }
 
     @Test
-    fun `steam melts ice and condenses`() {
+    fun `steam melts ice and partly condenses`() {
         val start = TestWorld.state(
             "#####",
             "#.I.#",
@@ -65,7 +66,7 @@ class RulesTest {
         )
         val result = engine.step(start)
         assertEquals(0, result.state.count("ICE"))
-        assertEquals(0, result.state.count("STEAM"))
+        assertEquals(4, result.state.totalSteam())
         assertEquals("thaw", result.events.single().ruleId)
     }
 
@@ -119,7 +120,7 @@ class RulesTest {
     @Test
     fun `steam pressure needs enough gas under the piston`() {
         val one = TestWorld.state("#K#", "#V#", "###")
-        assertEquals("IDLE", engine.step(one).state.stateOf("piston_1_0"))
+        assertEquals("IDLE", engine.step(one).state.stateOf("piston_1_0"), "one cell of steam pushes with 8")
         val two = TestWorld.state("##K##", "#.V.#", "#.V.#", "#####")
         assertEquals("PUSHED", engine.step(two).state.stateOf("piston_2_0"))
     }

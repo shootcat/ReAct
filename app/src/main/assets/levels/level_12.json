@@ -1,0 +1,101 @@
+{
+  "id": "level_12",
+  "title": "Überdruck",
+  "world": 1,
+  "intro": "Dampf drückt.",
+  "map": [
+    "##########",
+    "#........D",
+    "#.F....m.#",
+    "###M##S###",
+    "###M::G::#",
+    "###MW#P###",
+    "##########"
+  ],
+  "legend": {
+    "F": {
+      "type": "FIRE",
+      "id": "fire_1",
+      "movable": true
+    },
+    "m": {
+      "type": "METAL",
+      "id": "metal_1",
+      "movable": true
+    },
+    "M": {
+      "type": "METAL",
+      "properties": {
+        "gravity": false
+      }
+    },
+    "S": {
+      "type": "STONE",
+      "id": "stone_1"
+    },
+    "G": {
+      "type": "GATE",
+      "id": "gate_1"
+    },
+    "W": {
+      "type": "WATER"
+    },
+    "P": {
+      "type": "PLATE",
+      "id": "plate_1",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "D": {
+      "type": "DOOR",
+      "id": "door_1",
+      "properties": {
+        "channel": "A"
+      }
+    }
+  },
+  "goals": [
+    {
+      "object_id": "door_1",
+      "required_state": "UNLOCKED"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "standard",
+      "kind": "STANDARD",
+      "requires": [
+        {
+          "rule": "metal_boils_water"
+        },
+        {
+          "rule": "weight_presses_plate",
+          "source": "STONE"
+        }
+      ]
+    },
+    {
+      "id": "minimal",
+      "kind": "MINIMAL",
+      "requires": [
+        {
+          "rule": "weight_presses_plate"
+        }
+      ],
+      "max_moved": 1
+    },
+    {
+      "id": "override",
+      "kind": "OVERRIDE",
+      "requires": [
+        {
+          "rule": "weight_presses_plate"
+        }
+      ],
+      "unmoved": [
+        "fire_1"
+      ]
+    }
+  ]
+}

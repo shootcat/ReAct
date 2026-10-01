@@ -1,16 +1,16 @@
 {
-  "id": "level_08",
-  "title": "Auftrieb",
+  "id": "level_10",
+  "title": "Wärmeleiter",
   "world": 1,
-  "intro": "Holz liegt auf dem Schalter.",
+  "intro": "Metall leitet Hitze.",
   "map": [
     "##########",
     "#........D",
-    "#.F..I.J.#",
-    "####.#####",
-    "####:#####",
-    "####i#####",
-    "####B#####",
+    "#.F....mn#",
+    "####M#####",
+    "####MI:###",
+    "######:###",
+    "######B###",
     "##########"
   ],
   "legend": {
@@ -19,19 +19,25 @@
       "id": "fire_1",
       "movable": true
     },
+    "m": {
+      "type": "METAL",
+      "id": "metal_1",
+      "movable": true
+    },
+    "n": {
+      "type": "METAL",
+      "id": "metal_2",
+      "movable": true
+    },
+    "M": {
+      "type": "METAL",
+      "properties": {
+        "gravity": false
+      }
+    },
     "I": {
       "type": "ICE",
-      "id": "ice_block_1",
-      "movable": true
-    },
-    "J": {
-      "type": "ICE",
-      "id": "ice_block_2",
-      "movable": true
-    },
-    "i": {
-      "type": "WOOD",
-      "id": "wood_plug"
+      "id": "ice_block_1"
     },
     "B": {
       "type": "BUTTON",
@@ -60,6 +66,10 @@
       "kind": "STANDARD",
       "requires": [
         {
+          "rule": "heat_melts_ice",
+          "source": "METAL"
+        },
+        {
           "rule": "water_triggers_button"
         }
       ]
@@ -73,6 +83,18 @@
         }
       ],
       "max_moved": 1
+    },
+    {
+      "id": "override",
+      "kind": "OVERRIDE",
+      "requires": [
+        {
+          "rule": "water_triggers_button"
+        }
+      ],
+      "unmoved": [
+        "fire_1"
+      ]
     }
   ]
 }

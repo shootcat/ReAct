@@ -1,29 +1,19 @@
 package com.shootcat.react.engine
 
 import com.shootcat.react.engine.model.EventRequirement
-import com.shootcat.react.engine.model.GameState
 import com.shootcat.react.engine.model.LevelData
 import com.shootcat.react.engine.model.SolutionSpec
 
 /** Decides which of a level's solution classes (Standard / Minimal / System-Override) a run satisfies. */
 object SolutionClassifier {
 
-    /** Ids of objects the player moved away from their starting position. */
-    fun movedObjects(level: LevelData, setup: GameState): Set<String> {
-        val start = level.initialState()
-        return setup.objects
-            .filter { start.objectById(it.id)?.position != it.position }
-            .map { it.id }
-            .toSet()
-    }
-
-    fun classify(level: LevelData, setup: GameState, result: SimulationResult): List<SolutionSpec> {
-        if (result.outcome != Outcome.SUCCESS) return emptyList()
-        val events = result.allEvents.filter { it.positive }
-        val moved = movedObjects(level, setup)
+    fun classify(level: LevelData, run: Run): List<SolutionSpec> {
+        if (run.outcome != Outcome.SUCCESS) return emptyList()
+        val events = run.events.filter { it.positive }
+        val moved = run.movedObjects
         return level.solutions.filter { spec ->
             spec.requires.all { req -> events.any { it.satisfies(req) } } &&
-                (spec.maxMoved == null || moved.size <= spec.maxMoved) &&
+                (spec.maxMoved == null || run.moves.size <= spec.maxMoved) &&
                 spec.unmoved.none { it in moved } &&
                 spec.moved.all { it in moved } &&
                 spec.forbids.none { rule -> events.any { it.ruleId == rule } }
