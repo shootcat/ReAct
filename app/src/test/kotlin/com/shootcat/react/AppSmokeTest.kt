@@ -1,6 +1,5 @@
 package com.shootcat.react
 
-import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.os.Looper
@@ -18,8 +17,12 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
+import androidx.lifecycle.ViewModelProvider
 import androidx.test.core.app.ActivityScenario
+import com.shootcat.react.data.Progress
 import com.shootcat.react.engine.LevelLoader
+import com.shootcat.react.ui.GameUiState
+import com.shootcat.react.ui.GameViewModel
 import com.shootcat.react.ui.level.Viewport
 import org.junit.Rule
 import org.junit.Test
@@ -30,6 +33,8 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
 import java.time.Duration
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 
 /**
  * Starts the real app on the JVM and plays levels through the UI like a player would: in live mode
@@ -44,20 +49,21 @@ class AppSmokeTest {
     @get:Rule
     val compose = createEmptyComposeRule()
 
-    /**
-     * Starts the app with a defined progress: nothing done, or (with [unlockAll]) every level open.
-     * The progress is written through the running app's own preferences, then the app is started
-     * again so a fresh view model reads it.
-     */
+    /** Starts the app; with [unlockAll] every level is open (set directly in the view model's state). */
     private fun launch(unlockAll: Boolean = false): ActivityScenario<MainActivity> {
-        val completed = if (unlockAll) (0 until 12).map { "level_%02d".format(it) }.toSet() else emptySet()
-        ActivityScenario.launch(MainActivity::class.java).use { first ->
-            first.onActivity { activity ->
-                activity.getSharedPreferences("react_progress", Context.MODE_PRIVATE)
-                    .edit().clear().putStringSet("completed", completed).commit()
+        val scenario = ActivityScenario.launch(MainActivity::class.java)
+        if (unlockAll) {
+            scenario.onActivity { activity ->
+                val viewModel = ViewModelProvider(activity)[GameViewModel::class.java]
+                val field = GameViewModel::class.java.getDeclaredField("_state").apply { isAccessible = true }
+                @Suppress("UNCHECKED_CAST")
+                val state = field.get(viewModel) as MutableStateFlow<GameUiState>
+                val levels = (0 until 12).map { "level_%02d".format(it) }.toSet()
+                state.update { it.copy(progress = Progress(completed = levels)) }
             }
         }
-        return ActivityScenario.launch(MainActivity::class.java).also { compose.waitForIdle() }
+        compose.waitForIdle()
+        return scenario
     }
 
     @Test
