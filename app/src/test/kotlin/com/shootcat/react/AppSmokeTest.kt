@@ -1,11 +1,11 @@
 package com.shootcat.react
 
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.os.Looper
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.test.SemanticsNodeInteraction
-import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -92,9 +92,12 @@ class AppSmokeTest {
         }
     }
 
+    /** Draws the window that holds [node] (screen or dialog) into a PNG. */
     private fun shot(name: String, node: SemanticsNodeInteraction = compose.onRoot()) {
         compose.waitForIdle()
-        val bitmap = node.captureToImage().asAndroidBitmap()
+        val view = (node.fetchSemanticsNode().root as ViewRootForTest).view.rootView
+        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        view.draw(Canvas(bitmap))
         val dir = File("build/screenshots").apply { mkdirs() }
         File(dir, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
