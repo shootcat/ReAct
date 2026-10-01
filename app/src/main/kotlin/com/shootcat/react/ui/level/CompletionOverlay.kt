@@ -86,7 +86,7 @@ fun CompletionOverlay(
                 for (spec in completion.level.solutions) {
                     SolutionSlot(
                         kind = spec.kind,
-                        label = spec.label,
+                        label = shortLabel(spec.kind),
                         found = spec.id in found,
                         new = spec.id in completion.newlyFound,
                     )
@@ -107,6 +107,12 @@ fun CompletionOverlay(
     }
 }
 
+private fun shortLabel(kind: SolutionKind): String = when (kind) {
+    SolutionKind.STANDARD -> "Standard"
+    SolutionKind.MINIMAL -> "Minimal"
+    SolutionKind.OVERRIDE -> "Override"
+}
+
 @Composable
 private fun SolutionSlot(kind: SolutionKind, label: String, found: Boolean, new: Boolean) {
     val glyph = when (kind) {
@@ -115,7 +121,7 @@ private fun SolutionSlot(kind: SolutionKind, label: String, found: Boolean, new:
         SolutionKind.OVERRIDE -> Glyph.BOLT
     }
     val color = if (found) Palette.accent else Palette.outline
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(76.dp)) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(80.dp)) {
         Box(
             Modifier
                 .size(56.dp)
@@ -145,7 +151,7 @@ private fun SolutionSlot(kind: SolutionKind, label: String, found: Boolean, new:
             style = MaterialTheme.typography.labelSmall,
             color = if (found) Palette.text else Palette.textDim,
             textAlign = TextAlign.Center,
-            maxLines = 2,
+            maxLines = 1,
         )
     }
 }

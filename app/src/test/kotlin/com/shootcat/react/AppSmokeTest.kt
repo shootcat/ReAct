@@ -55,7 +55,7 @@ class AppSmokeTest {
         shot("04_level0_simulation")
         advance(millis = 3000)
         compose.onNodeWithText("Geschafft").assertExists()
-        compose.onNodeWithText("Standard-Weg").assertExists()
+        compose.onNodeWithText("Standard").assertExists()
         shot("05_geschafft")
 
         compose.onNodeWithText("Nochmal").performClick()
@@ -97,7 +97,7 @@ class AppSmokeTest {
         shot("11_level2_simulation")
         advance(millis = 7000)
         compose.onNodeWithText("Geschafft").assertExists()
-        compose.onNodeWithText("System-Override").assertExists()
+        compose.onNodeWithText("Override").assertExists()
         shot("12_level2_geloest")
 
         compose.onNodeWithText("Karte").performClick()

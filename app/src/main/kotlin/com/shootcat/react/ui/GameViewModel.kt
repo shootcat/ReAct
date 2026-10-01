@@ -127,11 +127,11 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
             is GameEvent.OpenLevel -> openLevel(event.levelId)
             GameEvent.OpenTitle -> {
                 stopPlayback()
-                _state.update { it.copy(screen = Screen.TITLE, session = null, completion = null) }
+                _state.update { it.copy(screen = Screen.TITLE, session = null, completion = null, toast = null) }
             }
             GameEvent.OpenMap -> {
                 stopPlayback()
-                _state.update { it.copy(screen = Screen.MAP, session = null, completion = null) }
+                _state.update { it.copy(screen = Screen.MAP, session = null, completion = null, toast = null) }
             }
             GameEvent.OpenDiscoveries -> openOverlay(Screen.DISCOVERIES)
             GameEvent.OpenSettings -> openOverlay(Screen.SETTINGS)
@@ -196,7 +196,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         pause()
         _state.update {
             val from = if (it.screen == Screen.DISCOVERIES || it.screen == Screen.SETTINGS) it.returnScreen else it.screen
-            it.copy(screen = screen, returnScreen = from)
+            it.copy(screen = screen, returnScreen = from, toast = null)
         }
     }
 
