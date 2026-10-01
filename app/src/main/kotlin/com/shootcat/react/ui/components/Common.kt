@@ -34,7 +34,7 @@ fun ScreenHeader(
         modifier.fillMaxWidth().padding(top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(onClick = onBack) { GlyphIcon(Glyph.BACK, color = Palette.text) }
+        IconButton(onClick = onBack, modifier = Modifier.testTag("back")) { GlyphIcon(Glyph.BACK, color = Palette.text) }
         Column(Modifier.weight(1f)) {
             Text(overline, style = MaterialTheme.typography.labelMedium, color = Palette.textDim)
             Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Palette.text)

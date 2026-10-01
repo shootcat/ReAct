@@ -206,8 +206,11 @@ private fun DrawScope.drawLandscape(time: Float) {
     drawRect(Brush.verticalGradient(listOf(Color(0xFF1B2433), Color(0xFF111821), Color(0xFF0F1A16))))
 
     // Unknown regions further up, hidden in fog.
-    drawCircle(Color.White, w * 0.5f, Offset(w * 0.5f, -h * 0.12f), alpha = 0.035f)
-    drawCircle(Color.White, w * 0.35f, Offset(w * 0.85f, h * 0.02f), alpha = 0.03f)
+    drawCircle(
+        brush = Brush.radialGradient(listOf(Color.White.copy(alpha = 0.06f), Color.Transparent), Offset(w * 0.6f, 0f), w * 0.7f),
+        radius = w * 0.7f,
+        center = Offset(w * 0.6f, 0f),
+    )
 
     val peaks = Path().apply {
         moveTo(0f, h * 0.36f)

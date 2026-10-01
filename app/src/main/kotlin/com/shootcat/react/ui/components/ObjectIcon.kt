@@ -52,11 +52,13 @@ fun ObjectIcon(
                 .fillMaxSize()
                 .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen },
         ) {
+            val w = this.size.width
             if (type == null) {
-                drawWeight(this.size.width)
+                drawWeight(w)
             } else {
+                // Slightly smaller and lower than a board cell, so raised parts (button caps) stay visible.
                 val obj = types.create("icon", type.id, Position(0, 0), state = state ?: type.defaultState)
-                drawGameObject(obj, Offset.Zero, this.size.width, info = ObjectInfo(0, 0))
+                drawGameObject(obj, Offset(w * 0.14f, w * 0.2f), w * 0.72f, info = ObjectInfo(0, 0))
             }
             if (silhouette) drawRect(Color(0xFF07090C), blendMode = BlendMode.SrcAtop)
         }

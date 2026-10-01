@@ -9,6 +9,7 @@ import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -26,8 +27,8 @@ import java.io.File
 import java.time.Duration
 
 /**
- * Starts the real app on the JVM, plays level 0 like a player would and stores screenshots
- * of every screen in app/build/screenshots.
+ * Starts the real app on the JVM and plays all beta levels through the UI like a player would.
+ * Screenshots of every screen end up in app/build/screenshots (and in each CI release).
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -38,47 +39,80 @@ class AppSmokeTest {
     val compose = createAndroidComposeRule<MainActivity>()
 
     @Test
-    fun playLevelZeroThroughTheUi() {
+    fun playAllBetaLevelsThroughTheUi() {
         compose.onNodeWithText("REACT").assertExists()
-        compose.onNodeWithText("Schmelzpunkt").assertExists()
-        shot("1_weltkarte")
+        shot("01_weltkarte")
 
+        // Level 0: fire next to the ice on the button.
         compose.onNodeWithTag("level_level_00").performClick()
         compose.onNodeWithText("Ziel: Tür offen").assertExists()
-        shot("2_level0_aufbau")
-
-        // Tap the fire, then the free cell left of the ice block (level 0 is 8 cells wide).
-        compose.onNodeWithTag("board").performTouchInput {
-            val cell = width / 8f
-            click(Offset(cell * 2.5f, cell * 4.5f))
-        }
-        compose.waitForIdle()
-        compose.onNodeWithTag("board").performTouchInput {
-            val cell = width / 8f
-            click(Offset(cell * 5.5f, cell * 4.5f))
-        }
-        compose.waitForIdle()
+        shot("02_level0_aufbau")
+        moveOnBoard(columns = 8, from = 2 to 4, to = 5 to 4)
         compose.onNodeWithText("Verschoben: 1 Objekt").assertExists()
-        shot("3_level0_feuer_verschoben")
 
         compose.onNodeWithText("Start").performClick()
         advance(millis = 500)
-        shot("4_level0_simulation")
-
-        advance(millis = 4000)
+        shot("03_level0_simulation")
+        advance(millis = 3000)
         compose.onNodeWithText("Level geschafft!").assertExists()
         compose.onNodeWithText("Standard-Weg").assertExists()
-        shot("5_level_geschafft", compose.onAllNodes(isRoot()).onLast())
+        shot("04_level_geschafft", compose.onAllNodes(isRoot()).onLast())
 
         compose.onNodeWithText("Weiter experimentieren").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("Schritt 2 / 2").assertExists()
-        shot("6_level0_zeitleiste")
+        shot("05_level0_zeitleiste")
 
         compose.onNodeWithTag("discoveries").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("Feuer + Eis → Wasser").assertExists()
-        shot("7_entdeckungen")
+        shot("06_entdeckungen")
+
+        // Back to the level, then to the map and into level 1.
+        compose.onNodeWithTag("back").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("back").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("level_level_01").performClick()
+        compose.waitForIdle()
+        shot("07_level1_aufbau")
+
+        // Level 1: melt the ice on the ledge from the left, the water finds the button.
+        moveOnBoard(columns = 10, from = 4 to 5, to = 1 to 2)
+        compose.onNodeWithText("Start").performClick()
+        advance(millis = 6000)
+        compose.onNodeWithText("Level geschafft!").assertExists()
+        shot("08_level1_geloest", compose.onAllNodes(isRoot()).onFirst())
+
+        compose.onNodeWithText("Nächstes Level").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Gewicht").assertExists()
+        shot("09_level2_aufbau")
+
+        // Level 2: melt the dam – the water alone is heavy enough (System-Override).
+        moveOnBoard(columns = 13, from = 3 to 2, to = 8 to 2)
+        compose.onNodeWithText("Start").performClick()
+        advance(millis = 2500)
+        shot("10_level2_simulation")
+        advance(millis = 6000)
+        compose.onNodeWithText("Level geschafft!").assertExists()
+        compose.onNodeWithText("System-Override").assertExists()
+        shot("11_level2_geloest", compose.onAllNodes(isRoot()).onFirst())
+
+        compose.onNodeWithText("Zur Weltkarte").performClick()
+        compose.waitForIdle()
+        shot("12_weltkarte_fortschritt")
+    }
+
+    /** Tap-to-select an object, then tap the target cell. */
+    private fun moveOnBoard(columns: Int, from: Pair<Int, Int>, to: Pair<Int, Int>) {
+        for ((x, y) in listOf(from, to)) {
+            compose.onNodeWithTag("board").performTouchInput {
+                val cell = width / columns.toFloat()
+                click(Offset(cell * (x + 0.5f), cell * (y + 0.5f)))
+            }
+            compose.waitForIdle()
+        }
     }
 
     /** Lets coroutine delays (playback, toasts) and animations run for [millis] of virtual time. */
