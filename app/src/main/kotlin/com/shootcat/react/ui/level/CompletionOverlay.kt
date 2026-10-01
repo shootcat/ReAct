@@ -45,7 +45,7 @@ fun CompletionOverlay(
     found: Set<String>,
     types: TypeCatalog,
     onNext: () -> Unit,
-    onStay: () -> Unit,
+    onReplay: () -> Unit,
 ) {
     Box(
         Modifier
@@ -94,7 +94,7 @@ fun CompletionOverlay(
             }
             Spacer(Modifier.height(24.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                PillButton(Glyph.RESET, "Nochmal", onStay, Modifier.weight(1f))
+                PillButton(Glyph.RESET, "Nochmal", onReplay, Modifier.weight(1f))
                 PillButton(
                     if (completion.nextLevelId != null) Glyph.NEXT else Glyph.TARGET,
                     if (completion.nextLevelId != null) "Weiter" else "Karte",

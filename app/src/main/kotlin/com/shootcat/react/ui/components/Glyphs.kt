@@ -22,8 +22,7 @@ import kotlin.math.sin
 
 /** Small vector glyphs drawn by hand, so the app needs no icon library and no emoji fonts. */
 enum class Glyph {
-    PLAY, PAUSE, STEP_FORWARD, STEP_BACK, TO_START, TO_END, RESET, BACK, NEXT, LOG, EDIT, CHECK, LOCK,
-    GEAR, SPARK, BOLT, MINIMAL, TARGET, PLUS, ARROW,
+    PLAY, UNDO, REDO, RESET, BACK, NEXT, LOG, CHECK, LOCK, GEAR, SPARK, BOLT, MINIMAL, TARGET, PLUS, ARROW,
 }
 
 @Composable
@@ -52,36 +51,33 @@ private fun DrawScope.triangle(left: Float, right: Float, pointsRight: Boolean):
     }
 }
 
+/** A curved arrow that turns back on itself: undo points left, redo right. */
+private fun DrawScope.drawTurnArrow(color: Color, stroke: Stroke, towardsLeft: Boolean) {
+    val w = size.width
+    val h = size.height
+    fun x(f: Float) = if (towardsLeft) w * f else w * (1f - f)
+    val curve = Path().apply {
+        moveTo(x(0.78f), h * 0.78f)
+        cubicTo(x(0.86f), h * 0.42f, x(0.64f), h * 0.3f, x(0.34f), h * 0.36f)
+    }
+    drawPath(curve, color, style = stroke)
+    val head = Path().apply {
+        moveTo(x(0.14f), h * 0.37f)
+        lineTo(x(0.4f), h * 0.16f)
+        lineTo(x(0.42f), h * 0.56f)
+        close()
+    }
+    drawPath(head, color)
+}
+
 fun DrawScope.drawGlyph(glyph: Glyph, color: Color) {
     val w = size.width
     val h = size.height
     val stroke = Stroke(width = w * 0.11f, cap = StrokeCap.Round, join = StrokeJoin.Round)
-    val bar = Size(w * 0.13f, h * 0.6f)
-    val radius = CornerRadius(w * 0.04f)
     when (glyph) {
         Glyph.PLAY -> drawPath(triangle(w * 0.28f, w * 0.82f, true), color)
-        Glyph.PAUSE -> {
-            drawRoundRect(color, Offset(w * 0.26f, h * 0.2f), Size(w * 0.16f, h * 0.6f), radius)
-            drawRoundRect(color, Offset(w * 0.58f, h * 0.2f), Size(w * 0.16f, h * 0.6f), radius)
-        }
-        Glyph.STEP_FORWARD -> {
-            drawPath(triangle(w * 0.2f, w * 0.64f, true), color)
-            drawRoundRect(color, Offset(w * 0.67f, h * 0.2f), bar, radius)
-        }
-        Glyph.STEP_BACK -> {
-            drawPath(triangle(w * 0.36f, w * 0.8f, false), color)
-            drawRoundRect(color, Offset(w * 0.2f, h * 0.2f), bar, radius)
-        }
-        Glyph.TO_START -> {
-            drawRoundRect(color, Offset(w * 0.12f, h * 0.2f), bar, radius)
-            drawPath(triangle(w * 0.27f, w * 0.57f, false), color)
-            drawPath(triangle(w * 0.55f, w * 0.85f, false), color)
-        }
-        Glyph.TO_END -> {
-            drawPath(triangle(w * 0.15f, w * 0.45f, true), color)
-            drawPath(triangle(w * 0.43f, w * 0.73f, true), color)
-            drawRoundRect(color, Offset(w * 0.75f, h * 0.2f), bar, radius)
-        }
+        Glyph.UNDO -> drawTurnArrow(color, stroke, towardsLeft = true)
+        Glyph.REDO -> drawTurnArrow(color, stroke, towardsLeft = false)
         Glyph.RESET -> {
             drawArc(
                 color = color,
@@ -189,10 +185,6 @@ fun DrawScope.drawGlyph(glyph: Glyph, color: Color) {
                 val y = h * (0.36f + i * 0.15f)
                 drawLine(color, Offset(w * 0.34f, y), Offset(w * 0.66f, y), strokeWidth = w * 0.08f, cap = StrokeCap.Round)
             }
-        }
-        Glyph.EDIT -> {
-            drawLine(color, Offset(w * 0.24f, h * 0.76f), Offset(w * 0.72f, h * 0.28f), strokeWidth = w * 0.18f, cap = StrokeCap.Round)
-            drawLine(color, Offset(w * 0.18f, h * 0.84f), Offset(w * 0.3f, h * 0.84f), strokeWidth = w * 0.08f, cap = StrokeCap.Round)
         }
         Glyph.CHECK -> {
             val check = Path().apply {

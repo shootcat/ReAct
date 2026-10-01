@@ -65,7 +65,6 @@ fun SettingsScreen(
             Card {
                 ToggleRow("Reaktions-Vorschau", settings.reactionPreview) { onChange(settings.copy(reactionPreview = it)) }
                 ToggleRow("Markierungen", settings.markers) { onChange(settings.copy(markers = it)) }
-                ToggleRow("Schritt-Symbole", settings.stepDetails) { onChange(settings.copy(stepDetails = it)) }
                 ToggleRow("Level-Texte", settings.levelTexts) { onChange(settings.copy(levelTexts = it)) }
             }
 

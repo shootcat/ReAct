@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import com.shootcat.react.engine.model.GameObject
+import com.shootcat.react.engine.model.Props
 import com.shootcat.react.ui.theme.Palette
 import kotlin.math.PI
 import kotlin.math.cos
@@ -46,8 +47,11 @@ fun DrawScope.drawGameObject(
         "FIRE" -> if (obj.state == "OUT") drawFireOut(topLeft, cell, alpha, time) else drawFire(topLeft, cell, alpha, time)
         "ICE" -> drawIce(topLeft, cell, alpha)
         "WATER" -> drawWater(topLeft, cell, alpha, time, info)
-        "STEAM" -> drawSteam(topLeft, cell, alpha, time)
+        "STEAM" -> drawSteam(topLeft, cell, alpha, time, obj.amount, obj.capacity)
         "STONE" -> drawStone(topLeft, cell, alpha)
+        "WOOD" -> drawWood(topLeft, cell, alpha, time, obj)
+        "METAL" -> drawMetal(topLeft, cell, alpha, time, obj, info)
+        "GATE" -> drawGate(topLeft, cell, alpha)
         "BUTTON" -> drawButton(topLeft, cell, alpha, obj.state == "PRESSED")
         "PLATE" -> drawPlate(topLeft, cell, alpha, obj.state == "PRESSED", info)
         "DOOR" -> drawDoor(topLeft, cell, alpha, obj.state == "UNLOCKED")
@@ -200,15 +204,22 @@ private fun DrawScope.drawWater(tl: Offset, c: Float, alpha: Float, time: Float,
     )
 }
 
-/** Soft, slowly drifting puffs. */
-private fun DrawScope.drawSteam(tl: Offset, c: Float, alpha: Float, time: Float) {
+/** Soft, slowly drifting puffs; the more steam a cell holds, the denser it looks. */
+private fun DrawScope.drawSteam(tl: Offset, c: Float, alpha: Float, time: Float, amount: Int, capacity: Int) {
     val t = time * TAU
+    val fill = if (amount <= 0) 1f else (amount.toFloat() / capacity.coerceAtLeast(1)).coerceIn(0f, 1f)
+    val density = 0.3f + 0.7f * fill
     val puffs = listOf(
         Triple(0.34f, 0.6f, 0.27f),
         Triple(0.64f, 0.52f, 0.3f),
         Triple(0.48f, 0.32f, 0.25f),
+        Triple(0.22f, 0.3f, 0.2f),
+        Triple(0.76f, 0.26f, 0.22f),
     )
-    puffs.forEachIndexed { i, (x, y, r) ->
+    val count = if (fill > 0.6f) puffs.size else 3
+    for (i in 0 until count) {
+        val (x, y, r) = puffs[i]
+        val radius = c * r * (0.75f + 0.35f * fill)
         val center = tl + Offset(
             c * (x + 0.05f * sin(t + i * 2.1f)),
             c * (y + 0.04f * cos(t * 2f + i)),
@@ -217,14 +228,170 @@ private fun DrawScope.drawSteam(tl: Offset, c: Float, alpha: Float, time: Float)
             brush = Brush.radialGradient(
                 listOf(Palette.steam.copy(alpha = 0.75f), Palette.steam.copy(alpha = 0f)),
                 center,
-                c * r,
+                radius,
             ),
-            radius = c * r,
+            radius = radius,
+            center = center,
+            alpha = alpha * density,
+        )
+    }
+}
+
+/** A wooden block: planks with grain. It burns down (darker, flames on top) or ends up charred. */
+private fun DrawScope.drawWood(tl: Offset, c: Float, alpha: Float, time: Float, obj: GameObject) {
+    val burning = obj.state == "BURNING"
+    val charred = obj.state == "CHARRED"
+    val fuel = obj.int(Props.FUEL, 1).coerceAtLeast(1)
+    val burnt = if (burning) (obj.burnt.toFloat() / fuel).coerceIn(0f, 1f) else 0f
+    // Burning wood slowly shrinks into its embers.
+    val shrink = c * 0.12f * burnt
+    val inset = c * 0.08f
+    val origin = tl + Offset(inset + shrink * 0.5f, inset + shrink)
+    val s = Size(c - 2 * inset - shrink, c - 2 * inset - shrink)
+    val r = CornerRadius(c * 0.1f)
+    val (light, dark) = when {
+        charred -> Palette.charcoal to Color(0xFF151110)
+        burning -> lerp(Palette.wood, Palette.charcoal, burnt) to lerp(Palette.woodDark, Color(0xFF151110), burnt)
+        else -> Palette.woodLight to Palette.woodDark
+    }
+    drawRoundRect(
+        brush = Brush.verticalGradient(listOf(light, dark), origin.y, origin.y + s.height),
+        topLeft = origin,
+        size = s,
+        cornerRadius = r,
+        alpha = alpha,
+    )
+    // Planks and grain.
+    for (i in 1..2) {
+        val y = origin.y + s.height * i / 3
+        drawLine(dark, Offset(origin.x, y), Offset(origin.x + s.width, y), strokeWidth = c * 0.035f, alpha = alpha)
+    }
+    drawLine(
+        if (charred) Palette.glow.copy(alpha = 0.25f) else light,
+        origin + Offset(s.width * 0.2f, s.height * 0.16f),
+        origin + Offset(s.width * 0.62f, s.height * 0.16f),
+        strokeWidth = c * 0.025f,
+        cap = StrokeCap.Round,
+        alpha = alpha * 0.7f,
+    )
+    drawRoundRect(dark, origin, s, r, style = Stroke(width = c * 0.035f), alpha = alpha)
+    if (charred) {
+        // Cracks with a last faint glow.
+        val crack = Path().apply {
+            moveTo(origin.x + s.width * 0.3f, origin.y + s.height * 0.4f)
+            lineTo(origin.x + s.width * 0.45f, origin.y + s.height * 0.55f)
+            lineTo(origin.x + s.width * 0.38f, origin.y + s.height * 0.75f)
+        }
+        drawPath(crack, Palette.glow, alpha = alpha * 0.35f, style = Stroke(width = c * 0.025f, cap = StrokeCap.Round))
+    }
+    if (burning) {
+        val glowCenter = origin + Offset(s.width / 2, s.height * 0.3f)
+        drawCircle(
+            brush = Brush.radialGradient(listOf(Palette.fire.copy(alpha = 0.5f), Color.Transparent), glowCenter, c * 0.8f),
+            radius = c * 0.8f,
+            center = glowCenter,
+            alpha = alpha,
+        )
+        // Small tongues of flame along the top edge.
+        for (i in 0..2) {
+            val fx = origin.x + s.width * (0.22f + 0.28f * i)
+            val flicker = 0.8f + 0.25f * sin(time * TAU * 3f + i * 1.7f)
+            val h = c * 0.32f * flicker * (1f - burnt * 0.4f)
+            val flame = Path().apply {
+                moveTo(fx, origin.y - h)
+                cubicTo(fx + c * 0.1f, origin.y - h * 0.4f, fx + c * 0.1f, origin.y + c * 0.04f, fx, origin.y + c * 0.06f)
+                cubicTo(fx - c * 0.1f, origin.y + c * 0.04f, fx - c * 0.1f, origin.y - h * 0.4f, fx, origin.y - h)
+                close()
+            }
+            drawPath(flame, Palette.fire, alpha = alpha)
+            drawCircle(Palette.fireCore, c * 0.035f, Offset(fx, origin.y - h * 0.15f), alpha = alpha)
+        }
+    }
+}
+
+/** A metal block or rod. Heat makes it glow from dull red to bright orange. */
+private fun DrawScope.drawMetal(tl: Offset, c: Float, alpha: Float, time: Float, obj: GameObject, info: ObjectInfo) {
+    // Icons have no temperature, only the state.
+    val heat = when {
+        obj.temp > 0 -> (obj.temp / 6f).coerceIn(0.25f, 1f)
+        obj.state == "HOT" -> 0.7f
+        else -> 0f
+    }
+    val hot = heat > 0f
+    val fixed = !obj.falls
+    // Fixed rods run through walls: they reach the cell edges to join their neighbours.
+    val inset = if (fixed) 0f else c * 0.06f
+    val origin = tl + Offset(inset, inset + if (fixed) 0f else c * 0.04f)
+    val s = Size(c - 2 * inset, c - 2 * inset - if (fixed) 0f else c * 0.04f)
+    val base = lerp(Palette.metal, Palette.glow, heat * 0.85f)
+    val shade = lerp(Palette.metalDark, Color(0xFF8A2A0C), heat)
+    if (hot) {
+        val center = tl + Offset(c / 2, c / 2)
+        val pulse = 0.85f + 0.15f * sin(time * TAU * 2f)
+        drawCircle(
+            brush = Brush.radialGradient(listOf(Palette.glow.copy(alpha = 0.45f * heat * pulse), Color.Transparent), center, c * 0.85f),
+            radius = c * 0.85f,
             center = center,
             alpha = alpha,
         )
     }
+    if (fixed) {
+        drawRect(Brush.verticalGradient(listOf(base, shade), origin.y, origin.y + s.height), origin, s, alpha = alpha)
+        // Rivets and seams show the rod's direction of travel.
+        val seam = Color.Black.copy(alpha = 0.25f)
+        if (!info.joinLeft) drawLine(seam, origin, origin + Offset(0f, s.height), strokeWidth = c * 0.04f, alpha = alpha)
+        if (!info.joinRight) drawLine(seam, origin + Offset(s.width, 0f), origin + Offset(s.width, s.height), strokeWidth = c * 0.04f, alpha = alpha)
+        if (!info.joinAbove) drawLine(seam, origin, origin + Offset(s.width, 0f), strokeWidth = c * 0.04f, alpha = alpha)
+        if (!info.joinBelow) drawLine(seam, origin + Offset(0f, s.height), origin + Offset(s.width, s.height), strokeWidth = c * 0.04f, alpha = alpha)
+        drawCircle(Color.White, c * 0.045f, tl + Offset(c * 0.5f, c * 0.5f), alpha = alpha * 0.3f)
+    } else {
+        val r = CornerRadius(c * 0.08f)
+        drawRoundRect(Brush.verticalGradient(listOf(base, shade), origin.y, origin.y + s.height), origin, s, r, alpha = alpha)
+        // Bevel: a bright top edge and a dark bottom edge, like a steel ingot.
+        drawLine(Color.White, origin + Offset(s.width * 0.12f, s.height * 0.12f), origin + Offset(s.width * 0.88f, s.height * 0.12f), strokeWidth = c * 0.04f, cap = StrokeCap.Round, alpha = alpha * (0.55f - 0.3f * heat))
+        drawRoundRect(Color.Black, origin, s, r, style = Stroke(width = c * 0.03f), alpha = alpha * 0.35f)
+        for (x in listOf(0.22f, 0.78f)) {
+            drawCircle(shade, c * 0.045f, origin + Offset(s.width * x, s.height * 0.7f), alpha = alpha)
+        }
+    }
 }
+
+/** A heavy steel slide: hazard stripes along the edge, it moves when steam pressure pushes it. */
+private fun DrawScope.drawGate(tl: Offset, c: Float, alpha: Float) {
+    val inset = c * 0.04f
+    val origin = tl + Offset(inset, inset)
+    val s = Size(c - 2 * inset, c - 2 * inset)
+    drawRoundRect(
+        Brush.linearGradient(listOf(Palette.metal, Palette.metalDark), origin, origin + Offset(s.width, s.height)),
+        origin,
+        s,
+        CornerRadius(c * 0.06f),
+        alpha = alpha,
+    )
+    // Diagonal hazard stripes in the middle band.
+    val band = Offset(origin.x, origin.y + s.height * 0.36f)
+    val bandSize = Size(s.width, s.height * 0.28f)
+    drawRect(Palette.accent, band, bandSize, alpha = alpha * 0.9f)
+    val stripe = c * 0.12f
+    var x = band.x - bandSize.height
+    while (x < band.x + bandSize.width) {
+        val path = Path().apply {
+            moveTo(maxOf(x, band.x), band.y + bandSize.height)
+            lineTo(minOf(x + stripe, band.x + bandSize.width), band.y + bandSize.height)
+            lineTo(minOf(x + stripe + bandSize.height, band.x + bandSize.width), band.y)
+            lineTo(minOf(x + bandSize.height, band.x + bandSize.width), band.y)
+            close()
+        }
+        drawPath(path, Color(0xFF1A1206), alpha = alpha * 0.85f)
+        x += stripe * 2
+    }
+    for (cx in listOf(0.18f, 0.82f)) for (cy in listOf(0.18f, 0.82f)) {
+        drawCircle(Palette.metalDark, c * 0.05f, origin + Offset(s.width * cx, s.height * cy), alpha = alpha)
+        drawCircle(Color.White, c * 0.02f, origin + Offset(s.width * cx - c * 0.01f, s.height * cy - c * 0.01f), alpha = alpha * 0.4f)
+    }
+}
+
+private fun lerp(a: Color, b: Color, t: Float): Color = androidx.compose.ui.graphics.lerp(a, b, t.coerceIn(0f, 1f))
 
 private fun DrawScope.drawStone(tl: Offset, c: Float, alpha: Float) {
     val center = tl + Offset(c / 2, c * 0.54f)

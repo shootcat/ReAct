@@ -60,6 +60,7 @@ fun ObjectIcon(
                 when (symbol) {
                     ReactionSymbol.PRESSURE -> drawPressure(w)
                     ReactionSymbol.SIGNAL -> drawSignal(w)
+                    ReactionSymbol.HEAT -> drawHeat(w)
                     else -> drawWeight(w)
                 }
             } else {
@@ -117,4 +118,21 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSignal(c: Float
         close()
     }
     drawPath(bolt, Palette.signal)
+}
+
+/** Heat: three wavy lines rising. */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawHeat(c: Float) {
+    for (i in 0..2) {
+        val x = c * (0.3f + 0.2f * i)
+        val wave = Path().apply {
+            moveTo(x, c * 0.82f)
+            cubicTo(x - c * 0.12f, c * 0.66f, x + c * 0.12f, c * 0.5f, x, c * 0.36f)
+            cubicTo(x - c * 0.08f, c * 0.28f, x + c * 0.04f, c * 0.2f, x, c * 0.16f)
+        }
+        drawPath(
+            wave,
+            if (i == 1) Palette.glow else Palette.fire,
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = c * 0.08f, cap = androidx.compose.ui.graphics.StrokeCap.Round),
+        )
+    }
 }

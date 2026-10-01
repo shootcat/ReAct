@@ -116,25 +116,6 @@ fun RoundIconButton(
     }
 }
 
-/** The big round start button with a warm gradient. */
-@Composable
-fun PlayButton(onClick: () -> Unit, modifier: Modifier = Modifier, size: Dp = 76.dp) {
-    Box(
-        modifier
-            .size(size)
-            .clip(CircleShape)
-            .background(Brush.verticalGradient(listOf(Palette.accent, Palette.accentDeep)))
-            .clickable(onClick = onClick)
-            .semantics {
-                contentDescription = "Start"
-                role = Role.Button
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        GlyphIcon(Glyph.PLAY, color = Color(0xFF1A1206), size = size * 0.42f)
-    }
-}
-
 /** Pill button with icon and a short, never wrapping label. */
 @Composable
 fun PillButton(

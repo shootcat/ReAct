@@ -9,12 +9,12 @@ import com.shootcat.react.data.Progress
 import com.shootcat.react.data.ProgressStore
 import com.shootcat.react.data.Settings
 import com.shootcat.react.data.SettingsStore
-import com.shootcat.react.engine.Reaction
+import com.shootcat.react.engine.LiveSimulation
 import com.shootcat.react.engine.Outcome
+import com.shootcat.react.engine.Reaction
 import com.shootcat.react.engine.Reactions
 import com.shootcat.react.engine.RuleEngine
-import com.shootcat.react.engine.SimulationResult
-import com.shootcat.react.engine.Simulator
+import com.shootcat.react.engine.Run
 import com.shootcat.react.engine.SolutionClassifier
 import com.shootcat.react.engine.model.GameState
 import com.shootcat.react.engine.model.LevelData
@@ -29,28 +29,25 @@ import kotlinx.coroutines.launch
 
 enum class Screen { TITLE, MAP, LEVEL, DISCOVERIES, SETTINGS }
 
-enum class Mode {
-    /** The player arranges movable objects. */
-    SETUP,
-    /** The simulation ran; the timeline can be played and scrubbed. */
-    SIMULATION,
-}
+/** One undoable player action: the world right before it and right after it. */
+data class HistoryEntry(val before: Run, val after: Run)
 
 data class LevelSession(
     val level: LevelData,
-    val setup: GameState,
-    val mode: Mode = Mode.SETUP,
-    val simulation: SimulationResult? = null,
-    val frameIndex: Int = 0,
-    val playing: Boolean = false,
-    /** Highest frame the player has seen; discoveries are only made once a frame was watched. */
-    val seenFrame: Int = 0,
-    val finished: Boolean = false,
+    val run: Run,
+    /** The world before the last simulation step, to animate it; null when the board should snap. */
+    val previous: GameState? = null,
+    /** Increases with every shown change so the board knows when to (re)start an animation. */
+    val tick: Int = 0,
+    val undo: List<HistoryEntry> = emptyList(),
+    val redo: List<HistoryEntry> = emptyList(),
 ) {
-    val shownState: GameState
-        get() = simulation?.takeIf { mode == Mode.SIMULATION }?.frames?.getOrNull(frameIndex)?.state ?: setup
-
-    val movedCount: Int get() = SolutionClassifier.movedObjects(level, setup).size
+    val state: GameState get() = run.state
+    val canUndo: Boolean get() = undo.isNotEmpty()
+    val canRedo: Boolean get() = redo.isNotEmpty()
+    /** Once the door is open (or the cascade protection fired) only undo, redo and reset are left. */
+    val canMove: Boolean get() = run.outcome == null
+    val atStart: Boolean get() = run.moves.isEmpty() && !run.active
 }
 
 data class Completion(
@@ -90,20 +87,23 @@ sealed interface GameEvent {
     data class UpdateSettings(val settings: Settings) : GameEvent
     data object ResetProgress : GameEvent
     data class Move(val objectId: String, val to: Position) : GameEvent
-    data object Start : GameEvent
-    data object Edit : GameEvent
+    data object Undo : GameEvent
+    data object Redo : GameEvent
     data object Reset : GameEvent
-    data object TogglePlay : GameEvent
-    data class Seek(val frame: Int) : GameEvent
-    data object StepForward : GameEvent
-    data object StepBack : GameEvent
+    data object Replay : GameEvent
     data object DismissCompletion : GameEvent
     data object NextLevel : GameEvent
     data object DismissToast : GameEvent
     data object Back : GameEvent
 }
 
-/** Single source of truth for the UI (unidirectional data flow: events in, state out). */
+/**
+ * Single source of truth for the UI (unidirectional data flow: events in, state out).
+ *
+ * Live mode: every move immediately sets the world in motion; it then advances one simulation step per
+ * tick until it is at rest again. Each player action is kept on an undo stack as a pair of immutable
+ * worlds (before/after), so undo and redo are exact.
+ */
 class GameViewModel(app: Application) : AndroidViewModel(app) {
 
     private val store = ProgressStore(app)
@@ -111,7 +111,9 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     private val _state = MutableStateFlow(load(app))
     val state: StateFlow<GameUiState> = _state.asStateFlow()
 
-    private var playJob: Job? = null
+    private var live: LiveSimulation? = null
+    private var simJob: Job? = null
+    private var completionJob: Job? = null
     private var toastJob: Job? = null
     private var toastCounter = 0L
 
@@ -125,17 +127,14 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     fun onEvent(event: GameEvent) {
         when (event) {
             is GameEvent.OpenLevel -> openLevel(event.levelId)
-            GameEvent.OpenTitle -> {
-                stopPlayback()
-                _state.update { it.copy(screen = Screen.TITLE, session = null, completion = null, toast = null) }
-            }
-            GameEvent.OpenMap -> {
-                stopPlayback()
-                _state.update { it.copy(screen = Screen.MAP, session = null, completion = null, toast = null) }
-            }
+            GameEvent.OpenTitle -> leaveLevel(Screen.TITLE)
+            GameEvent.OpenMap -> leaveLevel(Screen.MAP)
             GameEvent.OpenDiscoveries -> openOverlay(Screen.DISCOVERIES)
             GameEvent.OpenSettings -> openOverlay(Screen.SETTINGS)
-            GameEvent.CloseOverlay -> _state.update { it.copy(screen = it.returnScreen) }
+            GameEvent.CloseOverlay -> {
+                _state.update { it.copy(screen = it.returnScreen) }
+                if (_state.value.screen == Screen.LEVEL) simulate(initialDelay = stepMillis())
+            }
             is GameEvent.UpdateSettings -> {
                 settingsStore.save(event.settings)
                 _state.update { it.copy(settings = event.settings) }
@@ -144,30 +143,13 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
                 store.clear()
                 _state.update { it.copy(progress = Progress()) }
             }
-            is GameEvent.Move -> updateSession { s ->
-                if (s.mode != Mode.SETUP) s else s.setup.withObjectMoved(event.objectId, event.to)?.let { s.copy(setup = it) } ?: s
-            }
-            GameEvent.Start -> start()
-            GameEvent.Edit -> {
-                stopPlayback()
-                updateSession { LevelSession(it.level, it.setup) }
-            }
-            GameEvent.Reset -> {
-                stopPlayback()
-                updateSession { LevelSession(it.level, it.level.initialState()) }
-            }
-            GameEvent.TogglePlay -> togglePlay()
-            is GameEvent.Seek -> {
-                pause()
-                goTo(event.frame)
-            }
-            GameEvent.StepForward -> {
-                pause()
-                session()?.let { goTo(it.frameIndex + 1) }
-            }
-            GameEvent.StepBack -> {
-                pause()
-                session()?.let { goTo(it.frameIndex - 1) }
+            is GameEvent.Move -> move(event.objectId, event.to)
+            GameEvent.Undo -> undo()
+            GameEvent.Redo -> redo()
+            GameEvent.Reset -> reset()
+            GameEvent.Replay -> {
+                _state.update { it.copy(completion = null) }
+                reset()
             }
             GameEvent.DismissCompletion -> _state.update { it.copy(completion = null) }
             GameEvent.NextLevel -> {
@@ -185,15 +167,22 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         when {
             st.completion != null -> onEvent(GameEvent.DismissCompletion)
             st.screen == Screen.DISCOVERIES || st.screen == Screen.SETTINGS -> onEvent(GameEvent.CloseOverlay)
-            st.screen == Screen.LEVEL && st.session?.mode == Mode.SIMULATION -> onEvent(GameEvent.Edit)
             st.screen == Screen.LEVEL -> onEvent(GameEvent.OpenMap)
             st.screen == Screen.MAP -> onEvent(GameEvent.OpenTitle)
             else -> Unit
         }
     }
 
+    private fun leaveLevel(screen: Screen) {
+        stopSimulation()
+        completionJob?.cancel()
+        live = null
+        _state.update { it.copy(screen = screen, session = null, completion = null, toast = null) }
+    }
+
     private fun openOverlay(screen: Screen) {
-        pause()
+        // The world holds still while the player looks at something else.
+        stopSimulation()
         _state.update {
             val from = if (it.screen == Screen.DISCOVERIES || it.screen == Screen.SETTINGS) it.returnScreen else it.screen
             it.copy(screen = screen, returnScreen = from, toast = null)
@@ -202,105 +191,122 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun openLevel(levelId: String) {
         val st = _state.value
-        val level = st.content?.level(levelId) ?: return
+        val content = st.content ?: return
+        val level = content.level(levelId) ?: return
         if (!st.isUnlocked(levelId)) return
-        stopPlayback()
+        stopSimulation()
+        completionJob?.cancel()
+        val sim = LiveSimulation(level, RuleEngine(content.world.types, level.rules))
+        live = sim
         _state.update {
-            it.copy(screen = Screen.LEVEL, session = LevelSession(level, level.initialState()), completion = null)
+            it.copy(screen = Screen.LEVEL, session = LevelSession(level, sim.start()), completion = null)
         }
     }
 
-    private fun start() {
+    // ------------------------------------------------------------------ player actions
+
+    private fun move(objectId: String, to: Position) {
         val s = session() ?: return
-        val content = _state.value.content ?: return
-        if (s.mode != Mode.SETUP) return
-        val engine = RuleEngine(content.world.types, s.level.rules)
-        val result = Simulator(s.level, engine).run(s.setup)
-        _state.update {
-            it.copy(session = s.copy(mode = Mode.SIMULATION, simulation = result, frameIndex = 0, playing = true))
-        }
-        if (result.lastIndex == 0) finish() else startPlayback()
-    }
-
-    private fun togglePlay() {
-        val s = session() ?: return
-        val sim = s.simulation ?: return
-        if (s.playing) {
-            pause()
-            return
-        }
-        val from = if (s.frameIndex >= sim.lastIndex) 0 else s.frameIndex
-        _state.update { it.copy(session = s.copy(playing = true, frameIndex = from)) }
-        startPlayback()
-    }
-
-    private fun startPlayback() {
-        playJob?.cancel()
-        playJob = viewModelScope.launch {
-            while (true) {
-                delay(_state.value.settings.speed.stepMillis)
-                val s = session() ?: break
-                val sim = s.simulation ?: break
-                if (!s.playing || s.frameIndex >= sim.lastIndex) break
-                goTo(s.frameIndex + 1)
-            }
-        }
-    }
-
-    private fun pause() {
-        stopPlayback()
-        updateSession { it.copy(playing = false) }
-    }
-
-    private fun stopPlayback() {
-        playJob?.cancel()
-        playJob = null
-    }
-
-    private fun goTo(frame: Int) {
-        val s = session() ?: return
-        val sim = s.simulation ?: return
-        val target = frame.coerceIn(0, sim.lastIndex)
-
-        var progress = _state.value.progress
-        val discovered = mutableListOf<String>()
-        for (i in s.seenFrame + 1..target) {
-            for (event in sim.frames[i].events) {
-                if (event.positive && event.ruleId !in progress.discoveries) {
-                    progress = progress.copy(discoveries = progress.discoveries + event.ruleId)
-                    discovered += event.ruleId
-                }
-            }
-        }
-        val reachedEnd = target == sim.lastIndex
+        val sim = live ?: return
+        val after = sim.move(s.run, objectId, to) ?: return
         _state.update {
             it.copy(
-                progress = progress,
                 session = s.copy(
-                    frameIndex = target,
-                    seenFrame = maxOf(s.seenFrame, target),
-                    playing = s.playing && !reachedEnd,
+                    run = after,
+                    previous = null,
+                    tick = s.tick + 1,
+                    undo = (s.undo + HistoryEntry(s.run, after)).takeLast(MAX_UNDO),
+                    redo = emptyList(),
                 ),
             )
         }
-        if (discovered.isNotEmpty()) {
-            store.save(progress)
-            showDiscoveries(discovered)
-        }
-        if (reachedEnd) finish()
+        // React right away: the first step follows the drop almost immediately.
+        simulate(initialDelay = FIRST_STEP_MILLIS)
     }
 
-    /** Called once the end of the timeline was reached for the first time. */
-    private fun finish() {
+    private fun undo() {
         val s = session() ?: return
-        if (s.finished) return
-        val sim = s.simulation ?: return
-        val content = _state.value.content ?: return
-        _state.update { it.copy(session = s.copy(finished = true, playing = false)) }
-        stopPlayback()
-        if (sim.outcome != Outcome.SUCCESS) return
+        val entry = s.undo.lastOrNull() ?: return
+        show(s.copy(run = entry.before, undo = s.undo.dropLast(1), redo = s.redo + entry))
+    }
 
-        val found = SolutionClassifier.classify(s.level, s.setup, sim).map { it.id }.toSet()
+    private fun redo() {
+        val s = session() ?: return
+        val entry = s.redo.lastOrNull() ?: return
+        show(s.copy(run = entry.after, undo = s.undo + entry, redo = s.redo.dropLast(1)))
+    }
+
+    /** Back to the level's start. Undoable like any other action. */
+    private fun reset() {
+        val s = session() ?: return
+        val sim = live ?: return
+        if (s.atStart) return
+        val start = sim.start()
+        show(s.copy(run = start, undo = (s.undo + HistoryEntry(s.run, start)).takeLast(MAX_UNDO), redo = emptyList()))
+    }
+
+    /** Jumps to another point in history: the board snaps, and the world carries on if it was still moving. */
+    private fun show(session: LevelSession) {
+        stopSimulation()
+        completionJob?.cancel()
+        _state.update { it.copy(session = session.copy(previous = null, tick = session.tick + 1), completion = null) }
+        simulate(initialDelay = stepMillis())
+    }
+
+    // ------------------------------------------------------------------ the running world
+
+    private fun stepMillis(): Long = _state.value.settings.speed.stepMillis
+
+    /** Advances the world step by step while it is reacting. Safe to call while it is already running. */
+    private fun simulate(initialDelay: Long) {
+        if (simJob?.isActive == true) return
+        if (session()?.run?.active != true) return
+        simJob = viewModelScope.launch {
+            delay(initialDelay)
+            while (true) {
+                val s = session() ?: break
+                val sim = live ?: break
+                if (!s.run.active || _state.value.screen != Screen.LEVEL) break
+                val tick = sim.step(s.run)
+                val next = tick.run
+                val changed = next.state != s.run.state
+                _state.update { st ->
+                    st.copy(
+                        session = s.copy(
+                            run = next,
+                            previous = if (changed) s.run.state else s.previous,
+                            tick = if (changed) s.tick + 1 else s.tick,
+                        ),
+                    )
+                }
+                discover(tick.events.filter { it.positive }.map { it.ruleId })
+                if (next.outcome == Outcome.SUCCESS) complete(next)
+                if (!next.active) break
+                delay(stepMillis())
+            }
+        }
+    }
+
+    private fun stopSimulation() {
+        simJob?.cancel()
+        simJob = null
+    }
+
+    private fun discover(ruleIds: List<String>) {
+        var progress = _state.value.progress
+        val found = ruleIds.distinct().filter { it !in progress.discoveries }
+        if (found.isEmpty()) return
+        progress = progress.copy(discoveries = progress.discoveries + found)
+        store.save(progress)
+        _state.update { it.copy(progress = progress) }
+        showDiscoveries(found)
+    }
+
+    /** The goals were reached: record the solution classes and show the result after a short pause. */
+    private fun complete(run: Run) {
+        val s = session() ?: return
+        val content = _state.value.content ?: return
+        val found = SolutionClassifier.classify(s.level, run).map { it.id }.toSet()
         val before = _state.value.progress
         val known = before.solutionsFor(s.level.id)
         val progress = before.copy(
@@ -308,15 +314,16 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
             solutions = before.solutions + found.map { "${s.level.id}/$it" },
         )
         store.save(progress)
+        _state.update { it.copy(progress = progress) }
         val next = content.levels.getOrNull(content.indexOf(s.level.id) + 1)?.id
         val completion = Completion(s.level, found - known, next)
-        _state.update { it.copy(progress = progress) }
+        completionJob?.cancel()
         // Give the player a moment to see the door open before the dialog appears.
-        viewModelScope.launch {
+        completionJob = viewModelScope.launch {
             delay(COMPLETION_DELAY_MILLIS)
             _state.update { st ->
                 val current = st.session
-                if (current != null && current.level.id == s.level.id && current.mode == Mode.SIMULATION) {
+                if (current != null && current.level.id == s.level.id && current.run.outcome == Outcome.SUCCESS) {
                     st.copy(completion = completion)
                 } else {
                     st
@@ -340,12 +347,10 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun session(): LevelSession? = _state.value.session
 
-    private fun updateSession(transform: (LevelSession) -> LevelSession) {
-        _state.update { st -> st.session?.let { st.copy(session = transform(it)) } ?: st }
-    }
-
     private companion object {
         const val TOAST_MILLIS = 3500L
         const val COMPLETION_DELAY_MILLIS = 900L
+        const val FIRST_STEP_MILLIS = 120L
+        const val MAX_UNDO = 200
     }
 }

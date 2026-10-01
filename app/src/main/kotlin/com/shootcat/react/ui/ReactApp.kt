@@ -103,7 +103,7 @@ fun ReactApp(viewModel: GameViewModel) {
                         found = state.progress.solutionsFor(completion.level.id),
                         types = content.world.types,
                         onNext = { onEvent(GameEvent.NextLevel) },
-                        onStay = { onEvent(GameEvent.DismissCompletion) },
+                        onReplay = { onEvent(GameEvent.Replay) },
                     )
                 }
 
