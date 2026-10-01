@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -97,6 +98,7 @@ fun WorldMapScreen(
                 .clip(RoundedCornerShape(28.dp)),
         ) {
             Canvas(Modifier.fillMaxSize()) {
+                if (size.minDimension <= 0f) return@Canvas
                 drawLandscape(time)
                 drawRoute(nodes, progress, content)
             }
@@ -165,7 +167,8 @@ private fun MapNodeView(
                 .clip(CircleShape)
                 .background(if (unlocked) Palette.surfaceHigh else Palette.surface)
                 .border(3.dp, ring, CircleShape)
-                .clickable(enabled = unlocked, onClick = onClick),
+                .clickable(enabled = unlocked, onClick = onClick)
+                .testTag("level_${level.id}"),
             contentAlignment = Alignment.Center,
         ) {
             when {

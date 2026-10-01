@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.shootcat.react.ui.theme.Palette
@@ -50,6 +51,7 @@ fun DiscoveryBadge(found: Int, total: Int, onClick: () -> Unit) {
             .clip(RoundedCornerShape(50))
             .background(Palette.surfaceHigh)
             .clickable(onClick = onClick)
+            .testTag("discoveries")
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

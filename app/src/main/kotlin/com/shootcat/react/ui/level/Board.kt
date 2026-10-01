@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.testTag
 import com.shootcat.react.engine.Reactions
 import com.shootcat.react.engine.model.GameObject
 import com.shootcat.react.engine.model.GameState
@@ -91,6 +92,7 @@ fun Board(
         Canvas(
             Modifier
                 .size(cellDp * state.width, cellDp * state.height)
+                .testTag("board")
                 .pointerInput(editable) {
                     if (!editable) return@pointerInput
                     detectDragGestures(
@@ -144,6 +146,7 @@ fun Board(
                 },
         ) {
             val cell = size.width / state.width
+            if (cell <= 0f) return@Canvas
             drawBackground(state, cell)
             drawWires(state, signalRules, cell, time)
 
