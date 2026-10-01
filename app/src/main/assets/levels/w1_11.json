@@ -1,0 +1,86 @@
+{
+  "id": "w1_11",
+  "title": "Zwei Türen",
+  "world": 1,
+  "intro": "",
+  "map": [
+    "#############",
+    "#...........#",
+    "#.i...F.....D",
+    "####B####sx##",
+    "####:####xx##",
+    "####:####:###",
+    "#########:##E",
+    "#########p###",
+    "#############"
+  ],
+  "legend": {
+    "B": {
+      "type": "BUTTON",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "D": {
+      "type": "DOOR",
+      "id": "door_1",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "E": {
+      "type": "DOOR",
+      "id": "door_2",
+      "properties": {
+        "channel": "B"
+      }
+    },
+    "F": {
+      "type": "FIRE",
+      "movable": true
+    },
+    "i": {
+      "type": "ICE"
+    },
+    "p": {
+      "type": "PLATE",
+      "properties": {
+        "channel": "B"
+      }
+    },
+    "s": {
+      "type": "STONE"
+    },
+    "x": {
+      "type": "WOOD",
+      "properties": {
+        "gravity": false
+      }
+    }
+  },
+  "goals": [
+    {
+      "object_id": "door_1",
+      "required_state": "UNLOCKED"
+    },
+    {
+      "object_id": "door_2",
+      "required_state": "UNLOCKED"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "standard",
+      "kind": "STANDARD",
+      "requires": [
+        {
+          "rule": "water_triggers_button"
+        },
+        {
+          "rule": "weight_presses_plate",
+          "source": "STONE"
+        }
+      ]
+    }
+  ]
+}

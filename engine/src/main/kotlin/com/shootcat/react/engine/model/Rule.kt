@@ -9,6 +9,8 @@ enum class Trigger {
     SIGNAL,
     /** Heat conducted into the target (its temperature) reaches a threshold. */
     HEAT,
+    /** Electric current reaches the target: it carries current itself or touches something that does. */
+    POWER,
 }
 
 enum class LoadDirection { DOWN, UP }
@@ -53,6 +55,8 @@ data class Rule(
     val effect: RuleEffect,
     /** Applied while the condition does not hold (e.g. a plate springs back up). */
     val elseEffect: RuleEffect? = null,
+    /** The world that introduces this reaction (Discovery Log grouping). */
+    val world: Int = 1,
 ) {
     val phase: Phase get() = if (trigger == Trigger.SIGNAL) Phase.SIGNAL else Phase.STATE
 }

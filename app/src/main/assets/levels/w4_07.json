@@ -1,0 +1,67 @@
+{
+  "id": "w4_07",
+  "title": "Nasser Draht",
+  "world": 4,
+  "intro": "",
+  "map": [
+    "##############",
+    "#............#",
+    "#.S..F.i.....#",
+    "####.#########",
+    "#=--,---L#####",
+    "#########D####",
+    "##############"
+  ],
+  "legend": {
+    ",": {
+      "type": "SAND"
+    },
+    "-": {
+      "type": "CABLE"
+    },
+    "=": {
+      "type": "BATTERY"
+    },
+    "D": {
+      "type": "DOOR",
+      "id": "door_1",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "F": {
+      "type": "FIRE",
+      "movable": true
+    },
+    "L": {
+      "type": "LAMP",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "S": {
+      "type": "STONE",
+      "movable": true
+    },
+    "i": {
+      "type": "ICE"
+    }
+  },
+  "goals": [
+    {
+      "object_id": "door_1",
+      "required_state": "UNLOCKED"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "standard",
+      "kind": "STANDARD",
+      "requires": [
+        {
+          "rule": "power_lights_lamp"
+        }
+      ]
+    }
+  ]
+}

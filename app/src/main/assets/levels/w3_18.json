@@ -1,0 +1,115 @@
+{
+  "id": "w3_18",
+  "title": "Heizwerk",
+  "world": 3,
+  "intro": "",
+  "map": [
+    "##############",
+    "#............#",
+    "#.+..Z.......#",
+    "####----.m####",
+    "#########mI:##",
+    "###########:##",
+    "###########B##",
+    "#############D",
+    "#........#####",
+    "#.....S..#####",
+    "####.#########",
+    "####p#########",
+    "#=--r-y#######",
+    "######Y#######",
+    "##############"
+  ],
+  "legend": {
+    "+": {
+      "type": "BATTERY",
+      "movable": true
+    },
+    "-": {
+      "type": "CABLE"
+    },
+    "=": {
+      "type": "BATTERY"
+    },
+    "B": {
+      "type": "BUTTON",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "D": {
+      "type": "DOOR",
+      "id": "door_1",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "I": {
+      "type": "ICE",
+      "movable": true
+    },
+    "S": {
+      "type": "STONE",
+      "movable": true
+    },
+    "Y": {
+      "type": "DOOR",
+      "id": "door_3",
+      "properties": {
+        "channel": "C"
+      }
+    },
+    "Z": {
+      "type": "COIL",
+      "movable": true
+    },
+    "m": {
+      "type": "METAL",
+      "properties": {
+        "gravity": false
+      }
+    },
+    "p": {
+      "type": "PLATE",
+      "properties": {
+        "channel": "B"
+      }
+    },
+    "r": {
+      "type": "RELAY",
+      "properties": {
+        "channel": "B"
+      }
+    },
+    "y": {
+      "type": "LAMP",
+      "properties": {
+        "channel": "C"
+      }
+    }
+  },
+  "goals": [
+    {
+      "object_id": "door_1",
+      "required_state": "UNLOCKED"
+    },
+    {
+      "object_id": "door_3",
+      "required_state": "UNLOCKED"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "standard",
+      "kind": "STANDARD",
+      "requires": [
+        {
+          "rule": "water_triggers_button"
+        },
+        {
+          "rule": "signal_closes_relay"
+        }
+      ]
+    }
+  ]
+}

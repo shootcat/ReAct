@@ -56,6 +56,7 @@ import com.shootcat.react.data.Progress
 import com.shootcat.react.engine.model.LevelData
 import com.shootcat.react.engine.model.MapNode
 import com.shootcat.react.engine.model.TypeCatalog
+import com.shootcat.react.engine.model.WorldData
 import com.shootcat.react.ui.components.DiscoveryBadge
 import com.shootcat.react.ui.components.Glyph
 import com.shootcat.react.ui.components.GlyphIcon
@@ -74,6 +75,7 @@ private const val TAU = (2 * PI).toFloat()
 @Composable
 fun WorldMapScreen(
     content: GameContent,
+    world: WorldData,
     progress: Progress,
     isUnlocked: (String) -> Boolean,
     onOpenLevel: (String) -> Unit,
@@ -81,7 +83,6 @@ fun WorldMapScreen(
     onOpenSettings: () -> Unit,
     onBack: () -> Unit,
 ) {
-    val world = content.world
     val transition = rememberInfiniteTransition(label = "map")
     val time by transition.animateFloat(
         initialValue = 0f,
@@ -120,13 +121,14 @@ fun WorldMapScreen(
                 Box(Modifier.fillMaxWidth().height(contentHeight)) {
                     Canvas(Modifier.fillMaxSize()) {
                         if (size.minDimension <= 0f) return@Canvas
-                        drawLandscape(time)
-                        drawRoute(nodes, progress, content)
+                        drawLandscape(world.world, time)
+                        drawRoute(nodes, progress, world.bonusLevelId)
                     }
-                    for ((i, node) in nodes.withIndex()) {
+                    for (node in nodes) {
                         val level = content.level(node.levelId) ?: continue
                         MapNodeView(
-                            index = i,
+                            label = content.label(level.id),
+                            bonus = level.id == world.bonusLevelId,
                             node = node,
                             level = level,
                             types = world.types,
@@ -149,7 +151,8 @@ fun WorldMapScreen(
 
 @Composable
 private fun MapNodeView(
-    index: Int,
+    label: String,
+    bonus: Boolean,
     node: MapNode,
     level: LevelData,
     types: TypeCatalog,
@@ -163,7 +166,9 @@ private fun MapNodeView(
     val glow = 0.5f + 0.5f * sin(pulse * TAU * 3f)
     val ring = when {
         completed -> Palette.success
+        bonus && unlocked -> Palette.signal.copy(alpha = 0.6f + 0.4f * glow)
         unlocked -> Palette.accent.copy(alpha = 0.55f + 0.45f * glow)
+        bonus -> Palette.signal.copy(alpha = 0.35f)
         else -> Palette.outline
     }
     Column(modifier.width(NodeLabelWidth), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -180,13 +185,13 @@ private fun MapNodeView(
                     .border(3.dp, ring, CircleShape)
                     .clickable(enabled = unlocked, onClick = onClick)
                     .testTag("level_${level.id}")
-                    .semantics { contentDescription = "Level $index ${level.title}" },
+                    .semantics { contentDescription = "Level $label ${level.title}" },
                 contentAlignment = Alignment.Center,
             ) {
-                if (unlocked) {
-                    ObjectIcon(node.icon, types, size = 42.dp, background = Color.Transparent)
-                } else {
-                    GlyphIcon(Glyph.LOCK, color = Palette.textDim, size = 22.dp)
+                when {
+                    unlocked -> ObjectIcon(node.icon, types, size = 42.dp, background = Color.Transparent)
+                    bonus -> GlyphIcon(Glyph.SPARK, color = Palette.signal.copy(alpha = 0.6f), size = 26.dp)
+                    else -> GlyphIcon(Glyph.LOCK, color = Palette.textDim, size = 22.dp)
                 }
             }
             if (completed) {
@@ -203,7 +208,11 @@ private fun MapNodeView(
             }
         }
         Text(
-            if (unlocked) level.title else "· · ·",
+            when {
+                unlocked -> level.title
+                bonus -> "Bonus"
+                else -> "· · ·"
+            },
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.sp,
@@ -226,11 +235,41 @@ private fun MapNodeView(
     }
 }
 
-/** A small, slightly mysterious diorama: ice peaks, a lake, drifting embers and fog above. */
-private fun DrawScope.drawLandscape(time: Float) {
+/** Colours and features of a world's backdrop. */
+private class Scenery(
+    val sky: List<Color>,
+    val peaksTop: Color,
+    val peaksBottom: Color,
+    val caps: Color,
+    val pool: Color,
+    val particles: Color,
+)
+
+private fun scenery(world: Int): Scenery = when (world) {
+    2 -> Scenery(
+        listOf(Color(0xFF232027), Color(0xFF17161B), Color(0xFF121214)),
+        Color(0xFF3A3540), Color(0xFF1E1C23), Palette.steam, Palette.metal, Palette.steam,
+    )
+    3 -> Scenery(
+        listOf(Color(0xFF141A2E), Color(0xFF0E1324), Color(0xFF0A0F1A)),
+        Color(0xFF26304E), Color(0xFF141B30), Palette.signal, Palette.power, Palette.power,
+    )
+    4 -> Scenery(
+        listOf(Color(0xFF2A1612), Color(0xFF1B0F0D), Color(0xFF140B09)),
+        Color(0xFF3E2219), Color(0xFF22120E), Palette.lava, Palette.lava, Palette.fire,
+    )
+    else -> Scenery(
+        listOf(Color(0xFF1A2232), Color(0xFF111821), Color(0xFF0E1814)),
+        Color(0xFF2A3850), Color(0xFF172030), Palette.ice, Palette.water, Palette.fire,
+    )
+}
+
+/** A small, slightly mysterious diorama per world: peaks, a glowing pool, drifting particles and fog. */
+private fun DrawScope.drawLandscape(world: Int, time: Float) {
     val w = size.width
     val h = size.height
-    drawRect(Brush.verticalGradient(listOf(Color(0xFF1A2232), Color(0xFF111821), Color(0xFF0E1814))))
+    val look = scenery(world)
+    drawRect(Brush.verticalGradient(look.sky))
 
     val peaks = Path().apply {
         moveTo(0f, h * 0.24f)
@@ -244,7 +283,7 @@ private fun DrawScope.drawLandscape(time: Float) {
         lineTo(0f, h * 0.32f)
         close()
     }
-    drawPath(peaks, Brush.verticalGradient(listOf(Color(0xFF2A3850), Color(0xFF172030)), h * 0.06f, h * 0.32f))
+    drawPath(peaks, Brush.verticalGradient(listOf(look.peaksTop, look.peaksBottom), h * 0.06f, h * 0.32f))
     val caps = Path().apply {
         moveTo(w * 0.41f, h * 0.1f)
         lineTo(w * 0.46f, h * 0.07f)
@@ -259,15 +298,24 @@ private fun DrawScope.drawLandscape(time: Float) {
         lineTo(w * 0.18f, h * 0.145f)
         close()
     }
-    drawPath(caps, Palette.ice, alpha = 0.75f)
+    drawPath(caps, look.caps, alpha = 0.75f)
+    if (world == 4) {
+        // A smoking crater on the highest peak.
+        val crater = Offset(w * 0.46f, h * 0.07f)
+        drawCircle(
+            Brush.radialGradient(listOf(Palette.lava.copy(alpha = 0.6f), Color.Transparent), crater, w * 0.12f),
+            w * 0.12f,
+            crater,
+        )
+    }
 
     // Fog over the unexplored regions.
     drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.07f), Color.Transparent), 0f, h * 0.12f))
 
-    // Lake with a slow shimmer.
-    val lakeCenter = Offset(w * 0.8f, h * 0.86f)
+    // A pool (lake, molten metal, light, lava) with a slow shimmer.
+    val poolCenter = Offset(w * 0.8f, h * 0.86f)
     drawOval(
-        brush = Brush.radialGradient(listOf(Palette.water.copy(alpha = 0.55f), Color.Transparent), lakeCenter, w * 0.32f),
+        brush = Brush.radialGradient(listOf(look.pool.copy(alpha = 0.5f), Color.Transparent), poolCenter, w * 0.32f),
         topLeft = Offset(w * 0.5f, h * 0.78f),
         size = Size(w * 0.6f, h * 0.16f),
     )
@@ -276,47 +324,44 @@ private fun DrawScope.drawLandscape(time: Float) {
         drawLine(Color.White, Offset(x, h * (0.84f + 0.02f * i)), Offset(x + w * 0.05f, h * (0.84f + 0.02f * i)), strokeWidth = 2f, alpha = 0.25f)
     }
 
-    // Drifting embers.
+    // Drifting particles: embers, steam puffs, sparks, ash.
     for (i in 0 until 9) {
         val phase = (time + i / 9f) % 1f
         val x = w * (0.06f + 0.11f * i) + w * 0.02f * sin(phase * TAU * 2f + i)
         val y = h * (0.98f - 0.5f * phase)
-        drawCircle(Palette.fire, w * 0.006f, Offset(x, y), alpha = 0.55f * (1f - phase))
+        val r = if (world == 2) w * 0.014f else w * 0.006f
+        drawCircle(look.particles, r, Offset(x, y), alpha = (if (world == 2) 0.25f else 0.55f) * (1f - phase))
     }
 }
 
-private fun DrawScope.drawRoute(nodes: List<MapNode>, progress: Progress, content: GameContent) {
+private fun DrawScope.drawRoute(nodes: List<MapNode>, progress: Progress, bonusId: String?) {
     if (nodes.size < 2) return
     val w = size.width
     val h = size.height
-    for (i in 0 until nodes.size - 1) {
-        val a = Offset(nodes[i].x * w, nodes[i].y * h)
-        val b = Offset(nodes[i + 1].x * w, nodes[i + 1].y * h)
-        val done = nodes[i].levelId in progress.completed
-        val path = Path().apply {
-            moveTo(a.x, a.y)
-            val mid = Offset((a.x + b.x) / 2, (a.y + b.y) / 2)
-            cubicTo(mid.x, a.y, mid.x, b.y, b.x, b.y)
-        }
-        drawPath(
-            path,
-            color = if (done) Palette.accent else Palette.textDim,
-            alpha = if (done) 0.8f else 0.3f,
-            style = Stroke(width = 6f, cap = StrokeCap.Round, pathEffect = PathEffect.dashPathEffect(floatArrayOf(18f, 16f))),
-        )
+    val main = nodes.filter { it.levelId != bonusId }
+    for (i in 0 until main.size - 1) {
+        segment(main[i], main[i + 1], main[i].levelId in progress.completed, Palette.accent, w, h)
     }
-    // A faint path leading off the map: more is coming.
-    val lastNode = nodes.last()
-    if (content.levels.lastOrNull()?.id == lastNode.levelId) {
-        val a = Offset(lastNode.x * w, lastNode.y * h)
-        drawLine(
-            Palette.textDim,
-            a,
-            Offset(a.x + w * 0.25f, a.y - h * 0.22f),
-            strokeWidth = 4f,
-            cap = StrokeCap.Round,
-            pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 18f)),
-            alpha = 0.2f,
-        )
+    // The bonus level branches off the last main level, golden and dotted.
+    val bonus = nodes.firstOrNull { it.levelId == bonusId }
+    val last = main.lastOrNull()
+    if (bonus != null && last != null) {
+        segment(last, bonus, main.all { it.levelId in progress.completed }, Palette.signal, w, h)
     }
+}
+
+private fun DrawScope.segment(from: MapNode, to: MapNode, done: Boolean, color: Color, w: Float, h: Float) {
+    val a = Offset(from.x * w, from.y * h)
+    val b = Offset(to.x * w, to.y * h)
+    val path = Path().apply {
+        moveTo(a.x, a.y)
+        val mid = Offset((a.x + b.x) / 2, (a.y + b.y) / 2)
+        cubicTo(mid.x, a.y, mid.x, b.y, b.x, b.y)
+    }
+    drawPath(
+        path,
+        color = if (done) color else Palette.textDim,
+        alpha = if (done) 0.8f else 0.3f,
+        style = Stroke(width = 6f, cap = StrokeCap.Round, pathEffect = PathEffect.dashPathEffect(floatArrayOf(18f, 16f))),
+    )
 }

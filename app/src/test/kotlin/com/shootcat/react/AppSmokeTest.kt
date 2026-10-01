@@ -9,6 +9,7 @@ import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -16,6 +17,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.core.app.ActivityScenario
@@ -37,8 +39,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 
 /**
- * Starts the real app on the JVM and plays levels through the UI like a player would: in live mode
- * every move sets the world in motion right away, undo and redo step through the history.
+ * Starts the real app on the JVM and plays levels of all four worlds through the UI like a player
+ * would: in live mode every move sets the world in motion right away, undo and redo step through
+ * the history.
  * Screenshots of every screen end up in app/build/screenshots (and in each CI release).
  */
 @RunWith(RobolectricTestRunner::class)
@@ -49,22 +52,24 @@ class AppSmokeTest {
     @get:Rule
     val compose = createEmptyComposeRule()
 
-    /** Starts the app; with [unlockAll] every level is open (set directly in the view model's state). */
-    private fun launch(unlockAll: Boolean = false): ActivityScenario<MainActivity> {
+    /** Starts the app; [completed] levels are set directly in the view model's state. */
+    private fun launch(completed: Set<String> = emptySet()): ActivityScenario<MainActivity> {
         val scenario = ActivityScenario.launch(MainActivity::class.java)
-        if (unlockAll) {
+        if (completed.isNotEmpty()) {
             scenario.onActivity { activity ->
                 val viewModel = ViewModelProvider(activity)[GameViewModel::class.java]
                 val field = GameViewModel::class.java.getDeclaredField("_state").apply { isAccessible = true }
                 @Suppress("UNCHECKED_CAST")
                 val state = field.get(viewModel) as MutableStateFlow<GameUiState>
-                val levels = (0 until 12).map { "level_%02d".format(it) }.toSet()
-                state.update { it.copy(progress = Progress(completed = levels)) }
+                state.update { it.copy(progress = Progress(completed = completed)) }
             }
         }
         compose.waitForIdle()
         return scenario
     }
+
+    /** The main levels 1..[upTo] of [world]. */
+    private fun mains(world: Int, upTo: Int = 20) = (1..upTo).map { "w${world}_%02d".format(it) }
 
     @Test
     fun playFirstLevelsLive(): Unit = launch().use {
@@ -72,17 +77,22 @@ class AppSmokeTest {
         shot("01_titel")
         compose.onNodeWithText("Spielen").performClick()
         compose.waitForIdle()
-        shot("02_weltkarte")
+        // Only the first world is open at the start.
+        compose.onNodeWithTag("world_1").assertIsEnabled()
+        compose.onNodeWithTag("world_2").assertIsNotEnabled()
+        shot("02_welten")
+        openWorld(1)
+        shot("03_weltkarte")
 
-        // Level 0: no start button – every move counts immediately.
-        openLevel("level_00")
+        // Level 1: no start button – every move counts immediately.
+        openLevel("w1_01")
         compose.onNodeWithContentDescription("Ziel").assertExists()
         compose.onNodeWithContentDescription("Start").assertDoesNotExist()
         compose.onNodeWithContentDescription("Rückgängig").assertIsNotEnabled()
-        shot("03_level0_start")
+        shot("04_level1_start")
 
         // A harmless move, undone and redone.
-        moveOnBoard("level_00", from = 2 to 4, to = 3 to 4)
+        moveOnBoard("w1_01", from = 2 to 3, to = 3 to 3)
         advance(millis = 600)
         compose.onNodeWithContentDescription("Rückgängig").assertIsEnabled().performClick()
         advance(millis = 300)
@@ -90,21 +100,20 @@ class AppSmokeTest {
         advance(millis = 300)
         compose.onNodeWithContentDescription("Wiederholen").assertIsNotEnabled()
 
-        // Next to the ice: it melts at once, the water runs onto the button.
-        moveOnBoard("level_00", from = 3 to 4, to = 5 to 4)
-        advance(millis = 400)
-        shot("04_level0_live")
-        advance(millis = 3000)
+        // Next to the ice: it melts at once, the water douses the fire and presses the button.
+        moveOnBoard("w1_01", from = 3 to 3, to = 5 to 3)
+        advance(millis = 300)
+        shot("05_level1_live")
+        advance(millis = 2500)
         compose.onNodeWithText("Geschafft").assertExists()
         compose.onNodeWithText("Standard").assertExists()
-        shot("05_geschafft")
+        shot("06_geschafft")
 
         compose.onNodeWithText("Nochmal").performClick()
         advance(millis = 300)
         compose.onNodeWithText("Geschafft").assertDoesNotExist()
         // The reset itself can be undone.
         compose.onNodeWithContentDescription("Rückgängig").assertIsEnabled()
-        shot("06_level0_reset")
 
         compose.onNodeWithTag("discoveries").performClick()
         compose.waitForIdle()
@@ -112,92 +121,147 @@ class AppSmokeTest {
         compose.onNodeWithText("Wasser + Feuer → Dampf").assertExists()
         shot("07_entdeckungen")
 
-        // Back to the level, then to the map and into level 1.
+        // Back to the level, then to the map and into level 2.
         compose.onNodeWithTag("back").performClick()
         compose.waitForIdle()
         compose.onNodeWithTag("back").performClick()
         compose.waitForIdle()
-        openLevel("level_01")
-        shot("08_level1_start")
+        openLevel("w1_02")
+        shot("08_level2_start")
 
-        // Level 1: melt the ice on the ledge from the left, the water finds the button.
-        moveOnBoard("level_01", from = 4 to 5, to = 1 to 2)
-        advance(millis = 6000)
+        // Level 2: the fire falls down the slope into the ice, the water runs down to the button.
+        moveOnBoard("w1_02", from = 6 to 3, to = 11 to 2)
+        advance(millis = 1000)
+        shot("09_level2_live")
+        advance(millis = 4000)
         compose.onNodeWithText("Geschafft").assertExists()
-        shot("09_level1_geloest")
 
         compose.onNodeWithText("Weiter").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("Gewicht").assertExists()
-        shot("10_level2_start")
+        shot("10_level3_start")
 
-        // Level 2: drop the fire into the shaft – it melts the dam on its way down (System-Override).
-        moveOnBoard("level_02", from = 4 to 2, to = 5 to 2)
-        advance(millis = 1500)
-        shot("11_level2_live")
-        advance(millis = 6000)
+        // Level 3: the stone falls through the hole onto the plate.
+        moveOnBoard("w1_03", from = 2 to 2, to = 4 to 2)
+        advance(millis = 3000)
         compose.onNodeWithText("Geschafft").assertExists()
-        compose.onNodeWithText("Override").assertExists()
-        shot("12_level2_geloest")
+        shot("11_level3_geloest")
 
-        compose.onNodeWithText("Nochmal").performClick()
+        compose.onNodeWithText("Karte").performClick()
         compose.waitForIdle()
-        compose.onNodeWithTag("back").performClick()
-        compose.waitForIdle()
-        shot("13_weltkarte_fortschritt")
+        shot("12_weltkarte_fortschritt")
 
         compose.onNodeWithContentDescription("Einstellungen").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("Tempo").assertExists()
-        shot("14_einstellungen")
+        shot("13_einstellungen")
     }
 
     @Test
-    fun newMaterials(): Unit = launch(unlockAll = true).use {
+    fun allWorlds(): Unit = launch(completed = (mains(1) + mains(2) + mains(3) + mains(4, upTo = 6)).toSet()).use {
         compose.onNodeWithText("Spielen").performClick()
         compose.waitForIdle()
-        compose.onNodeWithTag("level_level_12").assertIsEnabled()
+        for (world in 1..4) compose.onNodeWithTag("world_$world").assertIsEnabled()
+        shot("20_welten_offen")
 
-        // Heat conduction: the fire on the metal rod melts the ice in the closed chamber.
-        shot("19_weltkarte_alles_offen")
-        openLevel("level_10")
-        shot("20_level10_waermeleiter")
-        moveOnBoard("level_10", from = 2 to 2, to = 4 to 2)
-        advance(millis = 1500)
-        shot("21_level10_heiss")
-        advance(millis = 4000)
+        // World 1 with the bonus level unlocked.
+        openWorld(1)
+        compose.onNodeWithTag("level_w1_bonus").assertIsEnabled()
+        shot("21_welt1_bonus")
+        backToWorlds()
+
+        // World 2 – pressure: the metal rod carries the heat into the boiler, the steam lifts the piston.
+        openWorld(2)
+        shot("22_welt2_karte")
+        openLevel("w2_01")
+        shot("23_w2_kessel")
+        moveOnBoard("w2_01", from = 1 to 5, to = 4 to 5)
+        advance(millis = 1200)
+        shot("24_w2_kessel_dampf")
+        advance(millis = 2500)
         compose.onNodeWithText("Geschafft").assertExists()
-        compose.onNodeWithText("Weiter").performClick()
-        compose.waitForIdle()
-
-        // Burning wood: the beam burns away and the stone drops onto the plate.
-        compose.onNodeWithText("Brandschneise").assertExists()
-        shot("22_level11_brandschneise")
-        moveOnBoard("level_11", from = 1 to 2, to = 3 to 2)
-        advance(millis = 2800)
-        shot("23_level11_brennt")
-        advance(millis = 6000)
-        compose.onNodeWithText("Geschafft").assertExists()
-        compose.onNodeWithText("Weiter").performClick()
-        compose.waitForIdle()
-
-        // Steam pressure: boiling water in the closed chamber pushes the gate away.
-        compose.onNodeWithText("Überdruck").assertExists()
-        shot("24_level12_ueberdruck")
-        moveOnBoard("level_12", from = 2 to 2, to = 3 to 2)
-        advance(millis = 2000)
-        shot("25_level12_dampf")
-        advance(millis = 4000)
-        compose.onNodeWithText("Geschafft").assertExists()
-        shot("26_level12_geloest")
-
-        // Back on the map, the floating wood level.
         compose.onNodeWithText("Karte").performClick()
         compose.waitForIdle()
-        openLevel("level_08")
-        moveOnBoard("level_08", from = 2 to 2, to = 6 to 2)
-        advance(millis = 1000)
-        shot("27_level08_holz_schwimmt")
+        backToWorlds()
+
+        // World 3 – electricity: the battery powers the cable, the lamp lights up.
+        openWorld(3)
+        shot("25_welt3_karte")
+        openLevel("w3_01")
+        moveOnBoard("w3_01", from = 2 to 2, to = 6 to 2)
+        advance(millis = 1500)
+        compose.onNodeWithText("Geschafft").assertExists()
+        compose.onNodeWithText("Karte").performClick()
+        compose.waitForIdle()
+
+        // The steam turbine: fire under the metal, the steam spins the turbine and powers the lamp.
+        openLevel("w3_08")
+        moveOnBoard("w3_08", from = 1 to 6, to = 4 to 6)
+        advance(millis = 1200)
+        shot("26_w3_turbine")
+        advance(millis = 2500)
+        compose.onNodeWithText("Geschafft").assertExists()
+        shot("27_w3_turbine_geloest")
+        compose.onNodeWithText("Karte").performClick()
+        compose.waitForIdle()
+        backToWorlds()
+
+        // World 4 – volcano: lava, oil and sand.
+        openWorld(4)
+        shot("28_welt4_karte")
+        openLevel("w4_01")
+        shot("29_w4_lava")
+        moveOnBoard("w4_01", from = 3 to 2, to = 9 to 1)
+        advance(millis = 2500)
+        compose.onNodeWithText("Geschafft").assertExists()
+        compose.onNodeWithText("Karte").performClick()
+        compose.waitForIdle()
+
+        openLevel("w4_03")
+        moveOnBoard("w4_03", from = 2 to 2, to = 1 to 3)
+        advance(millis = 2000)
+        shot("30_w4_oel_brennt")
+        advance(millis = 6000)
+        compose.onNodeWithText("Geschafft").assertExists()
+        compose.onNodeWithText("Karte").performClick()
+        compose.waitForIdle()
+
+        openLevel("w4_04")
+        moveOnBoard("w4_04", from = 7 to 3, to = 5 to 3)
+        advance(millis = 1500)
+        shot("31_w4_sand_rutscht")
+        advance(millis = 4000)
+        compose.onNodeWithText("Geschafft").assertExists()
+        compose.onNodeWithText("Karte").performClick()
+        compose.waitForIdle()
+
+        // Later levels: just a look at the boards.
+        for (id in listOf("w4_06", "w4_07")) {
+            openLevel(id)
+            shot("32_${id}_start")
+            compose.onNodeWithTag("back").performClick()
+            compose.waitForIdle()
+        }
+        backToWorlds()
+
+        compose.onNodeWithContentDescription("Entdeckungen").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("discovery_list").performScrollToNode(hasText("Strom + Lampe → Lampe an"))
+        compose.onNodeWithText("Strom + Lampe → Lampe an").assertExists()
+        shot("33_entdeckungen_welten")
+    }
+
+    private fun openWorld(number: Int) {
+        compose.onNodeWithTag("world_$number").performScrollTo()
+        compose.onNodeWithTag("world_$number").assertIsEnabled().performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("level_w${number}_01").assertExists("world $number did not open")
+    }
+
+    private fun backToWorlds() {
+        compose.onNodeWithTag("back").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("world_1").assertExists()
     }
 
     private fun openLevel(id: String) {
@@ -223,7 +287,9 @@ class AppSmokeTest {
 
     private fun viewport(levelId: String): Viewport {
         val dir = File("src/main/assets/levels")
-        val world = LevelLoader.parseWorld(File(dir, "world_01.json").readText())
+        val catalog = LevelLoader.parseCatalog(File(dir, "elements.json").readText())
+        val number = levelId.removePrefix("w").substringBefore('_').toInt()
+        val world = LevelLoader.parseWorld(File(dir, "world_%02d.json".format(number)).readText(), catalog)
         val level = LevelLoader.parseLevel(File(dir, "$levelId.json").readText(), world)
         return Viewport.of(level.initialState())
     }

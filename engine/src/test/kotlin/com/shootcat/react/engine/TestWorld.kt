@@ -17,7 +17,7 @@ object TestWorld {
         listOf(
             ObjectType("FIRE", "Feuer", "ACTIVE", mapOf("gravity" to "true", "density" to "15", "weight" to "10", "heat" to "6", "heat_state" to "ACTIVE")),
             ObjectType("ICE", "Eis", "SOLID", mapOf("gravity" to "true", "density" to "9", "weight" to "14"), vanishStates = setOf("MELTED")),
-            ObjectType("WATER", "Wasser", "LIQUID", mapOf("liquid" to "true", "capacity" to "8", "density" to "10", "weight" to "2")),
+            ObjectType("WATER", "Wasser", "LIQUID", mapOf("liquid" to "true", "capacity" to "8", "density" to "10", "weight" to "2", "wire" to "true")),
             ObjectType("STEAM", "Dampf", "GAS", mapOf("gas" to "true", "capacity" to "8", "lift" to "1")),
             ObjectType("STONE", "Stein", "SOLID", mapOf("gravity" to "true", "density" to "25", "weight" to "40")),
             ObjectType(
@@ -30,7 +30,10 @@ object TestWorld {
             ),
             ObjectType(
                 "METAL", "Metall", "COLD",
-                mapOf("gravity" to "true", "density" to "30", "weight" to "30", "conducts" to "true", "heat" to "3", "heat_state" to "HOT"),
+                mapOf(
+                    "gravity" to "true", "density" to "30", "weight" to "30", "conducts" to "true", "heat" to "3", "heat_state" to "HOT",
+                    "wire" to "true",
+                ),
             ),
             ObjectType("GATE", "Schieber", "IDLE", mapOf("pushable" to "true", "resist" to "2")),
             ObjectType("BUTTON", "Schalter", "UP", signalStates = setOf("PRESSED")),
@@ -38,7 +41,32 @@ object TestWorld {
             ObjectType("PISTON", "Kolben", "IDLE", signalStates = setOf("PUSHED")),
             ObjectType("HATCH", "Klappe", "CLOSED", vanishStates = setOf("OPEN")),
             ObjectType("DOOR", "Tür", "LOCKED"),
-            ObjectType("LAMP", "Lampe", "OFF"),
+            ObjectType("LAMP", "Lampe", "OFF", signalStates = setOf("ON")),
+            ObjectType("BATTERY", "Batterie", "CHARGED", mapOf("gravity" to "true", "density" to "20", "weight" to "20", "power" to "true")),
+            ObjectType("CABLE", "Kabel", "IDLE", mapOf("wire" to "true")),
+            ObjectType("COIL", "Heizstab", "COLD", mapOf("gravity" to "true", "density" to "30", "weight" to "20", "heat" to "6", "heat_state" to "HOT")),
+            ObjectType("RELAY", "Relais", "OPEN", mapOf("wire" to "true", "wire_state" to "CLOSED")),
+            ObjectType("TURBINE", "Turbine", "IDLE", mapOf("power" to "true", "power_state" to "SPINNING")),
+            ObjectType(
+                "LAVA", "Lava", "MOLTEN",
+                mapOf("liquid" to "true", "capacity" to "8", "density" to "30", "weight" to "6", "heat" to "6", "heat_state" to "MOLTEN"),
+                vanishStates = setOf("COOLED"),
+            ),
+            ObjectType(
+                "OIL", "Öl", "LIQUID",
+                mapOf(
+                    "liquid" to "true", "capacity" to "8", "density" to "8", "weight" to "1", "heat" to "5",
+                    "heat_state" to "BURNING", "fuel" to "8", "burnt_state" to "BURNT",
+                ),
+                vanishStates = setOf("BURNT"),
+            ),
+            ObjectType(
+                "SAND", "Sand", "DRY",
+                mapOf(
+                    "gravity" to "true", "density" to "20", "weight" to "20", "granular" to "true", "granular_state" to "DRY",
+                    "wire" to "true", "wire_state" to "WET",
+                ),
+            ),
         ),
     )
 
@@ -107,7 +135,55 @@ object TestWorld {
         RuleEffect(targetState = "OPEN"),
     )
 
-    val rules = listOf(melt, douse, thaw, ignite, douseWood, conduct, boil, waterButton, plateLoad, pistonLift, doorSignal, hatchSignal)
+    val lampPower = Rule(
+        "lamp_power", "Licht", Trigger.POWER,
+        RuleConditions(target = "LAMP"),
+        RuleEffect(targetState = "ON"),
+        elseEffect = RuleEffect(targetState = "OFF"),
+    )
+    val coilPower = Rule(
+        "coil_power", "Glühen", Trigger.POWER,
+        RuleConditions(target = "COIL"),
+        RuleEffect(targetState = "HOT"),
+        elseEffect = RuleEffect(targetState = "COLD"),
+    )
+    val relaySignal = Rule(
+        "relay_signal", "Relais", Trigger.SIGNAL,
+        RuleConditions(target = "RELAY"),
+        RuleEffect(targetState = "CLOSED"),
+        elseEffect = RuleEffect(targetState = "OPEN"),
+    )
+    val turbineSteam = Rule(
+        "turbine_steam", "Turbine", Trigger.LOAD,
+        RuleConditions(target = "TURBINE", minLoad = 6, direction = LoadDirection.UP),
+        RuleEffect(targetState = "SPINNING"),
+        elseEffect = RuleEffect(targetState = "IDLE"),
+    )
+    val coolLava = Rule(
+        "cool_lava", "Erstarren", Trigger.TOUCH,
+        RuleConditions(source = "WATER", target = "LAVA", targetState = "MOLTEN"),
+        RuleEffect(targetState = "COOLED", spawnObject = "STONE", sourceConsume = 2),
+    )
+    val lavaBoil = Rule(
+        "lava_boil", "Verdampfen", Trigger.TOUCH,
+        RuleConditions(source = "LAVA", target = "WATER"),
+        RuleEffect(spawnObject = "STEAM", spawnAmount = 2, targetConsume = 1),
+    )
+    val igniteOil = Rule(
+        "ignite_oil", "Ölbrand", Trigger.TOUCH,
+        RuleConditions(sourceHot = true, target = "OIL", targetState = "LIQUID"),
+        RuleEffect(targetState = "BURNING"),
+    )
+    val soakSand = Rule(
+        "soak_sand", "Aufsaugen", Trigger.TOUCH,
+        RuleConditions(source = "WATER", target = "SAND", targetState = "DRY"),
+        RuleEffect(targetState = "WET", sourceConsume = 4),
+    )
+
+    val rules = listOf(
+        melt, douse, thaw, ignite, douseWood, conduct, boil, waterButton, plateLoad, pistonLift, doorSignal, hatchSignal,
+        lampPower, coilPower, relaySignal, turbineSteam, coolLava, lavaBoil, igniteOil, soakSand,
+    )
 
     fun engine(rules: List<Rule> = this.rules, max: Int = RuleEngine.DEFAULT_MAX_TRANSFORMATIONS) =
         RuleEngine(types, rules, max)
@@ -116,12 +192,15 @@ object TestWorld {
         'F' to "FIRE", 'I' to "ICE", 'W' to "WATER", 'S' to "STONE", 'V' to "STEAM", 'O' to "WOOD",
         'M' to "METAL", 'm' to "METAL", 'G' to "GATE",
         'B' to "BUTTON", 'P' to "PLATE", 'K' to "PISTON", 'H' to "HATCH", 'D' to "DOOR",
+        '+' to "BATTERY", '-' to "CABLE", 'L' to "LAMP", 'Z' to "COIL", 'R' to "RELAY", 'T' to "TURBINE",
+        'A' to "LAVA", 'Q' to "OIL", ',' to "SAND",
     )
 
     /**
      * Builds a state from ASCII rows: '#' wall, '.' empty, F fire, I ice, W full water, '1'-'7' partial
      * water, V full steam, 'a'-'g' partial steam (1-7), S stone, O wood, M fixed metal, m loose metal,
-     * G gate, B button, P plate, K piston, H hatch, D door. Sensors and actuators share channel "A".
+     * G gate, B button, P plate, K piston, H hatch, D door, + battery, - cable, L lamp, Z coil, R relay,
+     * T turbine, A lava, Q oil, ',' sand. Sensors and actuators share channel "A".
      * Ids are "<type>_<x>_<y>".
      */
     fun state(vararg rows: String): GameState {
@@ -138,7 +217,7 @@ object TestWorld {
                     else -> {
                         val type = symbols[c] ?: error("unknown symbol $c")
                         val props = when {
-                            type in setOf("BUTTON", "PLATE", "PISTON", "HATCH", "DOOR") -> mapOf("channel" to "A")
+                            type in setOf("BUTTON", "PLATE", "PISTON", "HATCH", "DOOR", "LAMP", "RELAY") -> mapOf("channel" to "A")
                             c == 'M' -> mapOf("gravity" to "false")
                             else -> emptyMap()
                         }

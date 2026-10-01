@@ -1,0 +1,67 @@
+{
+  "id": "w4_03",
+  "title": "Ölteppich",
+  "world": 4,
+  "intro": "",
+  "map": [
+    "############",
+    "#...###....#",
+    "#.F.:::s...#",
+    "#.##xxxx####",
+    "#QQQQ##:####",
+    "#WWWW##:####",
+    "#######P###D",
+    "############"
+  ],
+  "legend": {
+    "D": {
+      "type": "DOOR",
+      "id": "door_1",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "F": {
+      "type": "FIRE",
+      "movable": true
+    },
+    "P": {
+      "type": "PLATE",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "Q": {
+      "type": "OIL"
+    },
+    "W": {
+      "type": "WATER"
+    },
+    "s": {
+      "type": "STONE"
+    },
+    "x": {
+      "type": "WOOD",
+      "properties": {
+        "gravity": false
+      }
+    }
+  },
+  "goals": [
+    {
+      "object_id": "door_1",
+      "required_state": "UNLOCKED"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "standard",
+      "kind": "STANDARD",
+      "requires": [
+        {
+          "rule": "weight_presses_plate"
+        }
+      ]
+    }
+  ]
+}

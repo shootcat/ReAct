@@ -1,0 +1,81 @@
+{
+  "id": "w2_14",
+  "title": "Dampfnetz",
+  "world": 2,
+  "intro": "",
+  "map": [
+    "###############",
+    "####k###i######",
+    "###:::##h######",
+    "###323##::B####",
+    "###mmm##m######",
+    "#F......m######",
+    "########m######",
+    "##############D"
+  ],
+  "legend": {
+    "2": {
+      "type": "WATER",
+      "amount": 2
+    },
+    "3": {
+      "type": "WATER",
+      "amount": 3
+    },
+    "B": {
+      "type": "BUTTON",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "D": {
+      "type": "DOOR",
+      "id": "door_1",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "F": {
+      "type": "FIRE",
+      "movable": true
+    },
+    "h": {
+      "type": "HATCH",
+      "properties": {
+        "channel": "B"
+      }
+    },
+    "i": {
+      "type": "ICE"
+    },
+    "k": {
+      "type": "PISTON",
+      "properties": {
+        "channel": "B"
+      }
+    },
+    "m": {
+      "type": "METAL",
+      "properties": {
+        "gravity": false
+      }
+    }
+  },
+  "goals": [
+    {
+      "object_id": "door_1",
+      "required_state": "UNLOCKED"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "standard",
+      "kind": "STANDARD",
+      "requires": [
+        {
+          "rule": "water_triggers_button"
+        }
+      ]
+    }
+  ]
+}

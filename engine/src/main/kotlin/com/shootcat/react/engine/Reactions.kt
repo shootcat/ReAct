@@ -8,7 +8,7 @@ import com.shootcat.react.engine.model.Trigger
 import com.shootcat.react.engine.model.TypeCatalog
 
 /** Abstract inputs that are not objects. */
-enum class ReactionSymbol { WEIGHT, PRESSURE, SIGNAL, HEAT }
+enum class ReactionSymbol { WEIGHT, PRESSURE, SIGNAL, HEAT, POWER }
 
 /**
  * One piece of a reaction, e.g. "Eis". [typeId] and [state] let the UI draw a matching icon;
@@ -59,6 +59,7 @@ object Reactions {
                 ReactionToken(targetName, c.target),
             )
             Trigger.HEAT -> listOf(ReactionToken("Hitze", symbol = ReactionSymbol.HEAT), ReactionToken(targetName, c.target))
+            Trigger.POWER -> listOf(ReactionToken("Strom", symbol = ReactionSymbol.POWER), ReactionToken(targetName, c.target))
         }
         return Reaction(rule.id, rule.name, rule.phase, inputs, output)
     }

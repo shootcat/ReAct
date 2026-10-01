@@ -1,0 +1,62 @@
+{
+  "id": "w1_08",
+  "title": "Dampfwolke",
+  "world": 1,
+  "intro": "",
+  "map": [
+    "############",
+    "####.i######",
+    "####:#######",
+    "#...:......#",
+    "#.F.:......#",
+    "####B###4###",
+    "########W##D",
+    "############"
+  ],
+  "legend": {
+    "4": {
+      "type": "WATER",
+      "amount": 4
+    },
+    "B": {
+      "type": "BUTTON",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "D": {
+      "type": "DOOR",
+      "id": "door_1",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "F": {
+      "type": "FIRE",
+      "movable": true
+    },
+    "W": {
+      "type": "WATER"
+    },
+    "i": {
+      "type": "ICE"
+    }
+  },
+  "goals": [
+    {
+      "object_id": "door_1",
+      "required_state": "UNLOCKED"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "standard",
+      "kind": "STANDARD",
+      "requires": [
+        {
+          "rule": "water_triggers_button"
+        }
+      ]
+    }
+  ]
+}

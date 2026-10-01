@@ -32,6 +32,18 @@ object Props {
     const val PUSHABLE = "pushable"
     /** Pressure difference (gas units per cell) a pushable barrier withstands. */
     const val RESIST = "resist"
+    /** A source of electric current (battery, spinning turbine) … */
+    const val POWER = "power"
+    /** … only while in this state. */
+    const val POWER_STATE = "power_state"
+    /** Carries electric current to touching objects (cable, metal, water) … */
+    const val WIRE = "wire"
+    /** … only while in this state (e.g. a closed relay, wet sand). */
+    const val WIRE_STATE = "wire_state"
+    /** Loose material (sand) that slides off to the side when it cannot fall straight down … */
+    const val GRANULAR = "granular"
+    /** … only while in this state (wet sand sticks together). */
+    const val GRANULAR_STATE = "granular_state"
 }
 
 /** Liquid density everything else is compared with. */
@@ -84,8 +96,21 @@ data class GameObject(
     val heatOutput: Int
         get() {
             val heat = int(Props.HEAT)
-            if (heat <= 0) return 0
-            val hotState = string(Props.HEAT_STATE)
-            return if (hotState == null || hotState == state) heat else 0
+            return if (heat > 0 && inState(Props.HEAT_STATE)) heat else 0
         }
+
+    /** Emits electric current right now. */
+    val isPowerSource: Boolean get() = flag(Props.POWER) && inState(Props.POWER_STATE)
+
+    /** Carries electric current right now. */
+    val carriesPower: Boolean get() = flag(Props.WIRE) && inState(Props.WIRE_STATE)
+
+    /** Slides off to the side like sand right now. */
+    val isGranular: Boolean get() = flag(Props.GRANULAR) && inState(Props.GRANULAR_STATE)
+
+    /** True if the optional "<property>_state" condition [stateKey] is absent or met. */
+    private fun inState(stateKey: String): Boolean {
+        val required = string(stateKey) ?: return true
+        return required == state
+    }
 }

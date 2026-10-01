@@ -20,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -46,19 +47,30 @@ fun DiscoveryScreen(
     isUnlocked: (String) -> Boolean,
     onBack: () -> Unit,
 ) {
-    val types = content.world.types
-    val reactions = remember(content) { content.allRules.map { Reactions.describe(it, types) } }
+    val types = content.types
+    val rules = remember(content) { content.allRules }
+    val reactions = remember(content) { rules.map { Reactions.describe(it, types) } }
     val found = reactions.count { it.ruleId in progress.discoveries }
     val materials = remember(content, progress) { knownMaterials(content, progress, reactions, isUnlocked) }
+    val byWorld = remember(content) { rules.zip(reactions).groupBy({ it.first.world }, { it.second }).toSortedMap() }
 
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
-        TopBar(title = "Entdeckungen", overline = "Welt ${content.world.world}", onBack = onBack) {
+        TopBar(title = "Entdeckungen", onBack = onBack) {
             Text("$found/${reactions.size}", style = MaterialTheme.typography.titleMedium, color = Palette.accent)
             Spacer(Modifier.width(8.dp))
         }
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxSize()) {
-            items(reactions, key = { it.ruleId }) { reaction ->
-                ReactionCard(reaction, reaction.ruleId in progress.discoveries, types)
+        LazyColumn(
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.fillMaxSize().testTag("discovery_list"),
+        ) {
+            for ((world, list) in byWorld) {
+                item(key = "world_$world") {
+                    val title = content.world(world)?.title
+                    SectionTitle(if (title != null) "Welt $world · $title" else "Welt $world")
+                }
+                items(list, key = { it.ruleId }) { reaction ->
+                    ReactionCard(reaction, reaction.ruleId in progress.discoveries, types)
+                }
             }
             if (materials.isNotEmpty()) {
                 item { SectionTitle("Materialien") }
@@ -75,9 +87,10 @@ private fun knownMaterials(
     reactions: List<Reaction>,
     isUnlocked: (String) -> Boolean,
 ): List<ObjectType> {
-    val seen = content.levels.filter { isUnlocked(it.id) }.flatMap { level -> level.objects.map { it.type } }.toMutableSet()
+    val seen = content.worlds.flatMap { it.allLevelIds }.filter { isUnlocked(it) }
+        .flatMap { id -> content.level(id)?.objects.orEmpty().map { it.type } }.toMutableSet()
     reactions.filter { it.ruleId in progress.discoveries }.forEach { r -> r.output.typeId?.let { seen += it } }
-    return content.world.types.all.filter { it.id in seen }
+    return content.types.all.filter { it.id in seen }
 }
 
 @Composable

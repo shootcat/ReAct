@@ -1,5 +1,6 @@
 package com.shootcat.react.engine
 
+import com.shootcat.react.engine.model.Catalog
 import com.shootcat.react.engine.model.GameState
 import com.shootcat.react.engine.model.LevelData
 import com.shootcat.react.engine.model.Position
@@ -7,7 +8,7 @@ import com.shootcat.react.engine.model.SolutionKind
 import com.shootcat.react.engine.model.WorldData
 import java.io.File
 
-/** Access to the real level files shipped in app/src/main/assets/levels. */
+/** Access to the real game data shipped in app/src/main/assets/levels. */
 object Levels {
     private val dir = File(
         System.getProperty("react.levels.dir") ?: error("system property react.levels.dir is not set"),
@@ -15,14 +16,23 @@ object Levels {
 
     fun read(name: String): String = File(dir, "$name.json").readText()
 
-    val world: WorldData by lazy { LevelLoader.parseWorld(read("world_01")) }
+    val catalog: Catalog by lazy { LevelLoader.parseCatalog(read("elements")) }
 
-    fun level(id: String): LevelData = LevelLoader.parseLevel(read(id), world)
+    val worlds: List<WorldData> by lazy {
+        dir.listFiles()!!.map { it.name }.filter { it.startsWith("world_") }.sorted()
+            .map { LevelLoader.parseWorld(read(it.removeSuffix(".json")), catalog) }
+    }
+
+    val allLevelIds: List<String> by lazy { worlds.flatMap { it.allLevelIds } }
+
+    fun world(levelId: String): WorldData = worlds.first { levelId in it.allLevelIds }
+
+    fun level(id: String): LevelData = LevelLoader.parseLevel(read(id), world(id))
 
     fun simulate(level: LevelData, setup: GameState): SimulationResult =
-        Simulator(level, RuleEngine(world.types, level.rules)).run(setup)
+        Simulator(level, RuleEngine(catalog.types, level.rules)).run(setup)
 
-    fun live(level: LevelData): LiveSimulation = LiveSimulation(level, RuleEngine(world.types, level.rules))
+    fun live(level: LevelData): LiveSimulation = LiveSimulation(level, RuleEngine(catalog.types, level.rules))
 
     class Attempt(val run: Run, val steps: Int, val solutions: Set<SolutionKind>) {
         val solved: Boolean get() = run.outcome == Outcome.SUCCESS

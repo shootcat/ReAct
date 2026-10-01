@@ -36,6 +36,7 @@ import com.shootcat.react.ui.settings.SettingsScreen
 import com.shootcat.react.ui.theme.Palette
 import com.shootcat.react.ui.theme.ReactTheme
 import com.shootcat.react.ui.title.TitleScreen
+import com.shootcat.react.ui.worlds.WorldSelectScreen
 
 @Composable
 fun ReactApp(viewModel: GameViewModel) {
@@ -60,8 +61,8 @@ fun ReactApp(viewModel: GameViewModel) {
                 when {
                     content == null -> LoadError(state.loadError)
                     state.screen == Screen.TITLE -> TitleScreen(
-                        types = content.world.types,
-                        onPlay = { onEvent(GameEvent.OpenMap) },
+                        types = content.types,
+                        onPlay = { onEvent(GameEvent.OpenWorlds) },
                         onDiscoveries = { onEvent(GameEvent.OpenDiscoveries) },
                         onSettings = { onEvent(GameEvent.OpenSettings) },
                     )
@@ -84,14 +85,25 @@ fun ReactApp(viewModel: GameViewModel) {
                         settings = state.settings,
                         onEvent = onEvent,
                     )
+                    state.screen == Screen.WORLDS -> WorldSelectScreen(
+                        content = content,
+                        progress = state.progress,
+                        isWorldUnlocked = state::isWorldUnlocked,
+                        solvedIn = state::solvedIn,
+                        onOpenWorld = { onEvent(GameEvent.OpenWorld(it)) },
+                        onOpenLog = { onEvent(GameEvent.OpenDiscoveries) },
+                        onOpenSettings = { onEvent(GameEvent.OpenSettings) },
+                        onBack = { onEvent(GameEvent.OpenTitle) },
+                    )
                     else -> WorldMapScreen(
                         content = content,
+                        world = content.world(state.worldNumber) ?: content.worlds.first(),
                         progress = state.progress,
                         isUnlocked = state::isUnlocked,
                         onOpenLevel = { onEvent(GameEvent.OpenLevel(it)) },
                         onOpenLog = { onEvent(GameEvent.OpenDiscoveries) },
                         onOpenSettings = { onEvent(GameEvent.OpenSettings) },
-                        onBack = { onEvent(GameEvent.OpenTitle) },
+                        onBack = { onEvent(GameEvent.OpenWorlds) },
                     )
                 }
 
@@ -100,7 +112,7 @@ fun ReactApp(viewModel: GameViewModel) {
                     CompletionOverlay(
                         completion = completion,
                         found = state.progress.solutionsFor(completion.level.id),
-                        types = content.world.types,
+                        types = content.types,
                         onNext = { onEvent(GameEvent.NextLevel) },
                         onReplay = { onEvent(GameEvent.Replay) },
                     )
@@ -110,7 +122,7 @@ fun ReactApp(viewModel: GameViewModel) {
                 if (toast != null && content != null && state.screen == Screen.LEVEL && completion == null) {
                     DiscoveryToast(
                         toast = toast,
-                        types = content.world.types,
+                        types = content.types,
                         modifier = Modifier.align(Alignment.TopCenter).padding(top = 60.dp, start = 24.dp, end = 24.dp),
                     )
                 }

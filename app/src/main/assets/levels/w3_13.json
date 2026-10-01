@@ -1,0 +1,82 @@
+{
+  "id": "w3_13",
+  "title": "Dampfstrom",
+  "world": 3,
+  "intro": "",
+  "map": [
+    "###############",
+    "#...T----z.#..#",
+    "####:#####:#..#",
+    "###:::####:#..#",
+    "###323####B#..#",
+    "###mmm#######.#",
+    "#F..........I.D",
+    "###############"
+  ],
+  "legend": {
+    "-": {
+      "type": "CABLE"
+    },
+    "2": {
+      "type": "WATER",
+      "amount": 2
+    },
+    "3": {
+      "type": "WATER",
+      "amount": 3
+    },
+    "B": {
+      "type": "BUTTON",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "D": {
+      "type": "DOOR",
+      "id": "door_1",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "F": {
+      "type": "FIRE",
+      "movable": true
+    },
+    "I": {
+      "type": "ICE",
+      "movable": true
+    },
+    "T": {
+      "type": "TURBINE"
+    },
+    "m": {
+      "type": "METAL",
+      "properties": {
+        "gravity": false
+      }
+    },
+    "z": {
+      "type": "COIL",
+      "properties": {
+        "gravity": false
+      }
+    }
+  },
+  "goals": [
+    {
+      "object_id": "door_1",
+      "required_state": "UNLOCKED"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "standard",
+      "kind": "STANDARD",
+      "requires": [
+        {
+          "rule": "water_triggers_button"
+        }
+      ]
+    }
+  ]
+}

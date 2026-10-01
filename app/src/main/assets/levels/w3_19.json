@@ -1,0 +1,118 @@
+{
+  "id": "w3_19",
+  "title": "Kraftwerk",
+  "world": 3,
+  "intro": "",
+  "map": [
+    "##############",
+    "#...T---.-L..#",
+    "#.M#:#########",
+    "###...########",
+    "###...########",
+    "###mmm########",
+    "#F.....I....D#",
+    "##############",
+    "#........#####",
+    "#.....S..#####",
+    "####.#########",
+    "####p#########",
+    "#=--r-y#######",
+    "######Y#######",
+    "##############"
+  ],
+  "legend": {
+    "-": {
+      "type": "CABLE"
+    },
+    "=": {
+      "type": "BATTERY"
+    },
+    "D": {
+      "type": "DOOR",
+      "id": "door_1",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "F": {
+      "type": "FIRE",
+      "movable": true
+    },
+    "I": {
+      "type": "ICE",
+      "movable": true
+    },
+    "L": {
+      "type": "LAMP",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "M": {
+      "type": "METAL",
+      "movable": true
+    },
+    "S": {
+      "type": "STONE",
+      "movable": true
+    },
+    "T": {
+      "type": "TURBINE"
+    },
+    "Y": {
+      "type": "DOOR",
+      "id": "door_3",
+      "properties": {
+        "channel": "C"
+      }
+    },
+    "m": {
+      "type": "METAL",
+      "properties": {
+        "gravity": false
+      }
+    },
+    "p": {
+      "type": "PLATE",
+      "properties": {
+        "channel": "B"
+      }
+    },
+    "r": {
+      "type": "RELAY",
+      "properties": {
+        "channel": "B"
+      }
+    },
+    "y": {
+      "type": "LAMP",
+      "properties": {
+        "channel": "C"
+      }
+    }
+  },
+  "goals": [
+    {
+      "object_id": "door_1",
+      "required_state": "UNLOCKED"
+    },
+    {
+      "object_id": "door_3",
+      "required_state": "UNLOCKED"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "standard",
+      "kind": "STANDARD",
+      "requires": [
+        {
+          "rule": "steam_spins_turbine"
+        },
+        {
+          "rule": "signal_closes_relay"
+        }
+      ]
+    }
+  ]
+}

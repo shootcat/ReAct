@@ -1,5 +1,6 @@
 package com.shootcat.react.engine
 
+import com.shootcat.react.engine.model.Catalog
 import com.shootcat.react.engine.model.EventRequirement
 import com.shootcat.react.engine.model.GameObject
 import com.shootcat.react.engine.model.Goal
@@ -25,27 +26,41 @@ import kotlinx.serialization.json.JsonPrimitive
 class LevelFormatException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
 /**
- * Loads worlds and levels from JSON. A world file defines the object types and the rules that hold
- * everywhere in that world; level files define layout, objects, goals and optional extra rules.
+ * Loads the game data from JSON. The catalog defines every object type and every reaction; a world file
+ * lists its levels and map; level files define layout, objects, goals and optional extra rules.
  */
 object LevelLoader {
 
     private val json = Json { ignoreUnknownKeys = false }
 
-    fun parseWorld(text: String): WorldData {
-        val dto = decode<WorldDto>(text, "world")
+    /** The element catalog: every object type and every reaction, shared by all worlds. */
+    fun parseCatalog(text: String): Catalog {
+        val dto = decode<CatalogDto>(text, "catalog")
         val types = TypeCatalog(dto.types.map { it.toModel() })
-        dto.map.forEach { n -> n.icon?.let { if (it !in types) fail("world ${dto.world}: map icon '$it' is not a type") } }
+        requireUnique(dto.types.map { it.type }, "type id in catalog")
         val rules = dto.rules.map { it.toModel() }
-        rules.forEach { validateRule(it, types, "world ${dto.world}") }
-        requireUnique(rules.map { it.id }, "rule id in world ${dto.world}")
+        rules.forEach { validateRule(it, types, "catalog") }
+        requireUnique(rules.map { it.id }, "rule id in catalog")
+        return Catalog(types, rules)
+    }
+
+    fun parseWorld(text: String, catalog: Catalog): WorldData {
+        val dto = decode<WorldDto>(text, "world")
+        val types = catalog.types
+        dto.map.forEach { n -> n.icon?.let { if (it !in types) fail("world ${dto.world}: map icon '$it' is not a type") } }
+        dto.icon?.let { if (it !in types) fail("world ${dto.world}: icon '$it' is not a type") }
+        val all = dto.levels + listOfNotNull(dto.bonus)
+        requireUnique(all, "level id in world ${dto.world}")
+        dto.map.forEach { if (it.level !in all) fail("world ${dto.world}: map node for unknown level '${it.level}'") }
         return WorldData(
             world = dto.world,
             title = dto.title,
             levelIds = dto.levels,
             map = dto.map.map { MapNode(it.level, it.x, it.y, it.icon) },
             types = types,
-            rules = rules,
+            rules = catalog.rules,
+            bonusLevelId = dto.bonus,
+            icon = dto.icon,
         )
     }
 
@@ -182,6 +197,7 @@ object LevelLoader {
         val referenced = listOfNotNull(c.source, c.target, rule.effect.spawnObject, rule.elseEffect?.spawnObject)
         referenced.forEach { if (it !in types) fail("$where: rule '${rule.id}' uses unknown type '$it'") }
         if (rule.trigger == Trigger.TOUCH && c.source == null && !c.sourceHot) fail("$where: rule '${rule.id}' needs a source")
+        if (rule.trigger != Trigger.TOUCH && c.sourceHot) fail("$where: rule '${rule.id}': source_hot only works for TOUCH")
     }
 
     private fun <T> requireUnique(values: List<T>, what: String) {
@@ -215,6 +231,7 @@ object LevelLoader {
         signalStates = signalStates.toSet(),
         stateNames = stateNames,
         description = description,
+        world = world,
     )
 
     private fun RuleDto.toModel() = Rule(
@@ -232,6 +249,7 @@ object LevelLoader {
         ),
         effect = effect.toModel(),
         elseEffect = elseEffect?.toModel(),
+        world = world,
     )
 
     private fun EffectDto.toModel() = RuleEffect(
@@ -244,13 +262,19 @@ object LevelLoader {
     )
 
     @Serializable
+    private class CatalogDto(
+        val types: List<TypeDto>,
+        val rules: List<RuleDto> = emptyList(),
+    )
+
+    @Serializable
     private class WorldDto(
         val world: Int,
         val title: String,
+        val icon: String? = null,
         val levels: List<String>,
+        val bonus: String? = null,
         val map: List<MapNodeDto> = emptyList(),
-        val types: List<TypeDto>,
-        val rules: List<RuleDto> = emptyList(),
     )
 
     @Serializable
@@ -266,6 +290,7 @@ object LevelLoader {
         @SerialName("signal_states") val signalStates: List<String> = emptyList(),
         @SerialName("state_names") val stateNames: Map<String, String> = emptyMap(),
         val description: String = "",
+        val world: Int = 1,
     )
 
     @Serializable
@@ -276,6 +301,7 @@ object LevelLoader {
         val conditions: ConditionsDto,
         val effect: EffectDto,
         @SerialName("else_effect") val elseEffect: EffectDto? = null,
+        val world: Int = 1,
     )
 
     @Serializable

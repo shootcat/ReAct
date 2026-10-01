@@ -1,7 +1,6 @@
 package com.shootcat.react.engine
 
 import com.shootcat.react.engine.model.GameObject
-import com.shootcat.react.engine.model.LIQUID_DENSITY
 import com.shootcat.react.engine.model.Position
 import com.shootcat.react.engine.model.Props
 import com.shootcat.react.engine.model.TypeCatalog
@@ -12,11 +11,12 @@ import kotlin.math.min
  * Phase 2: forces, movement and heat, in a fixed order. Solids move at most one cell per step.
  *
  * 1. Solids ([Props.GRAVITY]) fall. Into a liquid they sink if they are denser, otherwise they rest
- *    on its surface. Gas below them is pushed aside.
+ *    on its surface. Gas below them is pushed aside. Loose material ([Props.GRANULAR]) slides off heaps.
  * 2. Solids lighter than the liquid float up through it (buoyancy).
  * 3. Gases ([Props.GAS]) are volumes that behave like an upside-down liquid: they rise, bubble up
  *    through liquids, run along ceilings towards openings and fill closed chambers from the top.
  * 4. Liquids ([Props.LIQUID]) fall, run off towards nearby edges and pits and otherwise level out.
+ *    Different liquids layer by density (oil floats on water, water sinks below it).
  * 5. Gas pressure pushes barriers ([Props.PUSHABLE]): every connected body of air has a pressure
  *    (gas per cell), and a barrier between two bodies moves away from the higher one.
  * 6. Heat flows through conductors ([Props.CONDUCTS]), losing one degree per cell.
@@ -50,19 +50,31 @@ internal object Physics {
                 moved += o.id
                 continue
             }
-            val b = world.at(below) ?: continue
-            val sinks = b.isLiquid && o.density > b.density
-            if (sinks || b.isGas) {
+            val b = world.at(below)
+            if (b != null && ((b.isLiquid && o.density > b.density) || b.isGas)) {
                 world.swap(o.id, b.id)
                 moved += o.id
                 moved += b.id
+                continue
+            }
+            // Sand slides off a heap: diagonally down if both the side and the cell below it are free.
+            if (o.isGranular) {
+                val dx = SIDES.firstOrNull { dx ->
+                    world.isFree(Position(o.position.x + dx, o.position.y)) &&
+                        world.isFree(Position(o.position.x + dx, o.position.y + 1))
+                }
+                if (dx != null) {
+                    world.move(o.id, Position(o.position.x + dx, o.position.y + 1))
+                    moved += o.id
+                }
             }
         }
     }
 
+    /** Buoyancy: a solid lighter than the liquid above it rises through it. */
     private fun floaters(world: MutableWorld, moved: MutableSet<String>) {
-        val light = world.all().filter { it.falls && !it.isFluid && it.density < LIQUID_DENSITY }
-        for (candidate in light.sortedWith(topDown)) {
+        val solids = world.all().filter { it.falls && !it.isFluid }
+        for (candidate in solids.sortedWith(topDown)) {
             if (candidate.id in moved) continue
             val o = world.byId(candidate.id) ?: continue
             val above = world.at(o.position.up()) ?: continue
@@ -99,6 +111,27 @@ internal object Physics {
             } else if (gas && n.isLiquid) {
                 // Bubbles rise through water.
                 world.swap(o.id, n.id)
+            } else if (!gas && n.isLiquid && o.density > n.density) {
+                // Layering: the denser liquid sinks below the lighter one (water under oil).
+                world.swap(o.id, n.id)
+            }
+        }
+
+        // Liquid next to a gas-filled drop pours into it and pushes the gas aside (it rises next step).
+        if (!gas) {
+            for (candidate in world.all().filter { it.isLiquid }.sortedWith(topDown)) {
+                val o = world.byId(candidate.id) ?: continue
+                if (!isSupported(world, o, dy)) continue
+                for (dx in SIDES) {
+                    val side = world.at(Position(o.position.x + dx, o.position.y))
+                    if (side == null || !side.isGas) continue
+                    val below = Position(side.position.x, side.position.y + 1)
+                    val b = world.at(below)
+                    if (world.isFree(below) || b?.isGas == true || (b != null && b.type == o.type && b.amount < b.capacity)) {
+                        world.swap(o.id, side.id)
+                        break
+                    }
+                }
             }
         }
 
@@ -345,6 +378,9 @@ internal object Physics {
     }
 
     private val PUSH_DIRECTIONS = listOf(1 to 0, -1 to 0, 0 to -1, 0 to 1)
+
+    /** Sliding order for loose material: left first, then right. */
+    private val SIDES = intArrayOf(-1, 1)
 
     /** How far along a row a fluid notices an edge (an opening) it can run off to. */
     private const val DRAIN_RANGE = 8

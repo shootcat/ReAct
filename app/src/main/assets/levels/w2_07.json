@@ -1,0 +1,64 @@
+{
+  "id": "w2_07",
+  "title": "Dampfstoß",
+  "world": 2,
+  "intro": "",
+  "map": [
+    "############",
+    "#..........#",
+    "#.F.....I..#",
+    "######s#####",
+    "####..G....#",
+    "####W#P####D",
+    "############"
+  ],
+  "legend": {
+    "D": {
+      "type": "DOOR",
+      "id": "door_1",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "F": {
+      "type": "FIRE",
+      "movable": true
+    },
+    "G": {
+      "type": "GATE"
+    },
+    "I": {
+      "type": "ICE",
+      "movable": true
+    },
+    "P": {
+      "type": "PLATE",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "W": {
+      "type": "WATER"
+    },
+    "s": {
+      "type": "STONE"
+    }
+  },
+  "goals": [
+    {
+      "object_id": "door_1",
+      "required_state": "UNLOCKED"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "standard",
+      "kind": "STANDARD",
+      "requires": [
+        {
+          "rule": "weight_presses_plate"
+        }
+      ]
+    }
+  ]
+}

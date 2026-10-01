@@ -1,0 +1,92 @@
+{
+  "id": "w2_17",
+  "title": "Kesselwerk",
+  "world": 2,
+  "intro": "",
+  "map": [
+    "################",
+    "####K###########",
+    "###...##########",
+    "###...#####s####",
+    "###mmm####.G...#",
+    "#F.........p####",
+    "##########W#####",
+    "#######I#######E",
+    "D###############"
+  ],
+  "legend": {
+    "D": {
+      "type": "DOOR",
+      "id": "door_1",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "E": {
+      "type": "DOOR",
+      "id": "door_2",
+      "properties": {
+        "channel": "B"
+      }
+    },
+    "F": {
+      "type": "FIRE",
+      "movable": true
+    },
+    "G": {
+      "type": "GATE"
+    },
+    "I": {
+      "type": "ICE",
+      "movable": true
+    },
+    "K": {
+      "type": "PISTON",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "W": {
+      "type": "WATER"
+    },
+    "m": {
+      "type": "METAL",
+      "properties": {
+        "gravity": false
+      }
+    },
+    "p": {
+      "type": "PLATE",
+      "properties": {
+        "channel": "B"
+      }
+    },
+    "s": {
+      "type": "STONE"
+    }
+  },
+  "goals": [
+    {
+      "object_id": "door_1",
+      "required_state": "UNLOCKED"
+    },
+    {
+      "object_id": "door_2",
+      "required_state": "UNLOCKED"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "standard",
+      "kind": "STANDARD",
+      "requires": [
+        {
+          "rule": "steam_lifts_piston"
+        },
+        {
+          "rule": "weight_presses_plate"
+        }
+      ]
+    }
+  ]
+}

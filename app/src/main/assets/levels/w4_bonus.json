@@ -1,0 +1,149 @@
+{
+  "id": "w4_bonus",
+  "title": "Vulkanherz",
+  "world": 4,
+  "intro": "",
+  "map": [
+    "################",
+    "#..............#",
+    "#.S.S.S...F....#",
+    "#########s######",
+    "##.......G.....#",
+    "##.......P######",
+    "##77############",
+    "##mm###########D",
+    "##..############",
+    "################",
+    "#..........#####",
+    "#.I..O.O...#####",
+    "####.###########",
+    "####:###########",
+    "####:###########",
+    "####p######E####",
+    "################",
+    "#...###....#####",
+    "#...:::s...#####",
+    "#.##xxxx########",
+    "#qqqq##:########",
+    "#WWWW##:########",
+    "#######Q###Y####",
+    "################"
+  ],
+  "legend": {
+    "7": {
+      "type": "WATER",
+      "amount": 7
+    },
+    "D": {
+      "type": "DOOR",
+      "id": "door_1",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "E": {
+      "type": "DOOR",
+      "id": "door_2",
+      "properties": {
+        "channel": "B"
+      }
+    },
+    "F": {
+      "type": "FIRE",
+      "movable": true
+    },
+    "G": {
+      "type": "GATE"
+    },
+    "I": {
+      "type": "ICE",
+      "movable": true
+    },
+    "O": {
+      "type": "WOOD",
+      "movable": true
+    },
+    "P": {
+      "type": "PLATE",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "Q": {
+      "type": "PLATE",
+      "properties": {
+        "channel": "C"
+      }
+    },
+    "S": {
+      "type": "STONE",
+      "movable": true
+    },
+    "W": {
+      "type": "WATER"
+    },
+    "Y": {
+      "type": "DOOR",
+      "id": "door_3",
+      "properties": {
+        "channel": "C"
+      }
+    },
+    "m": {
+      "type": "METAL",
+      "properties": {
+        "gravity": false
+      }
+    },
+    "p": {
+      "type": "PLATE",
+      "properties": {
+        "channel": "B"
+      }
+    },
+    "q": {
+      "type": "OIL"
+    },
+    "s": {
+      "type": "STONE"
+    },
+    "x": {
+      "type": "WOOD",
+      "properties": {
+        "gravity": false
+      }
+    }
+  },
+  "goals": [
+    {
+      "object_id": "door_1",
+      "required_state": "UNLOCKED"
+    },
+    {
+      "object_id": "door_2",
+      "required_state": "UNLOCKED"
+    },
+    {
+      "object_id": "door_3",
+      "required_state": "UNLOCKED"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "standard",
+      "kind": "STANDARD",
+      "requires": [
+        {
+          "rule": "metal_boils_water"
+        },
+        {
+          "rule": "heat_ignites_oil"
+        },
+        {
+          "rule": "weight_presses_plate",
+          "source": "FIRE"
+        }
+      ]
+    }
+  ]
+}

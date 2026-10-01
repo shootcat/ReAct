@@ -56,11 +56,21 @@ data class LevelData(
 /** A level's spot on the world map; [icon] is an object type that represents the level. */
 data class MapNode(val levelId: String, val x: Float, val y: Float, val icon: String? = null)
 
+/** All element types and reactions; every world uses the same physics and chemistry. */
+data class Catalog(val types: TypeCatalog, val rules: List<Rule>)
+
 data class WorldData(
     val world: Int,
     val title: String,
+    /** The main levels, in order. */
     val levelIds: List<String>,
     val map: List<MapNode>,
     val types: TypeCatalog,
     val rules: List<Rule>,
-)
+    /** Extra level that opens once every main level of the world is solved. */
+    val bonusLevelId: String? = null,
+    /** Element type that stands for the world (world selection). */
+    val icon: String? = null,
+) {
+    val allLevelIds: List<String> get() = levelIds + listOfNotNull(bonusLevelId)
+}

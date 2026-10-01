@@ -19,12 +19,34 @@ import kotlin.math.sin
 
 private const val TAU = (2 * PI).toFloat()
 
+/** How one kind of liquid looks. */
+private class LiquidLook(
+    val light: Color,
+    val deep: Color,
+    val crest: Color,
+    val crestAlpha: Float,
+    /** Glowing liquids (lava) light up their surroundings. */
+    val glow: Color?,
+    /** Thick liquids (lava, oil) move in slower, smaller waves. */
+    val waveScale: Float,
+)
+
+private val waterLook = LiquidLook(Palette.waterLight, Palette.water, Color.White, 0.55f, null, 1f)
+private val lavaLook = LiquidLook(Palette.lava, Palette.lavaDeep, Palette.fireCore, 0.8f, Palette.lava, 0.45f)
+private val oilLook = LiquidLook(Palette.oilLight, Palette.oil, Palette.oilLight, 0.7f, null, 0.6f)
+
+private fun lookOf(type: String): LiquidLook = when (type) {
+    "LAVA" -> lavaLook
+    "OIL" -> oilLook
+    else -> waterLook
+}
+
 /**
- * Draws all liquid as one continuous body instead of single tiles.
- *
- * Fill levels are interpolated between two simulation frames, so pools rise and drain smoothly.
- * Resting water gets a moving surface wave and streaks where it flows towards a lower neighbour;
- * water with nothing below it is drawn as a falling stream with droplets and splashes where it lands.
+ * Draws all liquid as continuous bodies instead of single tiles – water, lava and oil each in their own
+ * colours. Fill levels are interpolated between two simulation frames, so pools rise and drain smoothly.
+ * Resting liquid gets a moving surface wave and streaks where it flows towards a lower neighbour;
+ * liquid with nothing below it is drawn as a falling stream with droplets and splashes where it lands.
+ * Burning oil carries flames on its surface.
  */
 internal fun DrawScope.drawLiquids(
     state: GameState,
@@ -33,8 +55,21 @@ internal fun DrawScope.drawLiquids(
     cell: Float,
     time: Float,
 ) {
-    val now = levels(state)
-    val before = previous?.let { levels(it) }
+    val types = (state.objects + previous?.objects.orEmpty()).filter { it.isLiquid }.map { it.type }.distinct().sorted()
+    for (type in types) drawLiquid(type, state, previous, progress, cell, time)
+}
+
+private fun DrawScope.drawLiquid(
+    type: String,
+    state: GameState,
+    previous: GameState?,
+    progress: Float,
+    cell: Float,
+    time: Float,
+) {
+    val look = lookOf(type)
+    val now = levels(state, type)
+    val before = previous?.let { levels(it, type) }
     val positions = now.keys + (before?.keys ?: emptySet())
 
     fun level(p: Position): Float {
@@ -49,15 +84,26 @@ internal fun DrawScope.drawLiquids(
         return state.inBounds(below) && !state.isWall(below) && state.objectAt(below) == null && (now[p] ?: 0f) > 0f
     }
 
-    for (p in positions.sortedWith(compareBy({ it.y }, { it.x }))) {
+    val sorted = positions.sortedWith(compareBy({ it.y }, { it.x }))
+    if (look.glow != null) {
+        // Heat shimmer around glowing liquid.
+        for (p in sorted) {
+            if (level(p) <= 0.02f) continue
+            val center = Offset((p.x + 0.5f) * cell, (p.y + 0.6f) * cell)
+            val r = cell * (1.1f + 0.08f * sin(time * TAU * 2f + p.x))
+            drawCircle(Brush.radialGradient(listOf(look.glow.copy(alpha = 0.22f), Color.Transparent), center, r), r, center)
+        }
+    }
+    for (p in sorted) {
         val lv = level(p)
         if (lv <= 0.02f) continue
         val tl = Offset(p.x * cell, p.y * cell)
         if (isFalling(p)) {
-            drawStream(tl, cell, lv, time, capped = level(p.up()) <= 0.02f)
+            drawStream(look, tl, cell, lv, time, capped = level(p.up()) <= 0.02f)
         } else {
             val fedFromAbove = level(p.up()) > 0.02f
             drawPool(
+                look = look,
                 tl = tl,
                 c = cell,
                 lv = lv,
@@ -68,13 +114,54 @@ internal fun DrawScope.drawLiquids(
             )
             if (fedFromAbove && isFalling(p.up())) drawSplash(tl, cell, time)
         }
+        if (type == "LAVA") drawCrust(tl, cell, lv, time)
+        val o = state.objectAt(p)
+        if (o != null && o.type == type && o.state == "BURNING" && level(p.up()) <= 0.02f) {
+            drawSurfaceFlames(tl, cell, lv, time)
+        }
     }
 }
 
-private fun levels(state: GameState): Map<Position, Float> =
-    state.objects.filter { it.isLiquid }.associate { it.position to it.amount.toFloat() / it.capacity }
+private fun levels(state: GameState, type: String): Map<Position, Float> =
+    state.objects.filter { it.isLiquid && it.type == type }.associate { it.position to it.amount.toFloat() / it.capacity }
+
+/** Dark crust plates drifting on lava. */
+private fun DrawScope.drawCrust(tl: Offset, c: Float, lv: Float, time: Float) {
+    val top = tl.y + c * (1f - min(1f, lv))
+    for (k in 0 until 2) {
+        val phase = (time * 0.3f + k * 0.5f + tl.x / c * 0.21f) % 1f
+        val x = tl.x + c * (0.15f + 0.7f * phase)
+        drawOval(
+            Palette.lavaCrust,
+            topLeft = Offset(x - c * 0.12f, top + c * 0.06f + k * c * 0.18f),
+            size = Size(c * 0.24f, c * 0.08f),
+            alpha = 0.55f,
+        )
+    }
+}
+
+/** Flames dancing on a burning oil surface. */
+private fun DrawScope.drawSurfaceFlames(tl: Offset, c: Float, lv: Float, time: Float) {
+    val surface = tl.y + c * (1f - min(1f, lv))
+    val glowCenter = Offset(tl.x + c / 2, surface)
+    drawCircle(Brush.radialGradient(listOf(Palette.fire.copy(alpha = 0.45f), Color.Transparent), glowCenter, c * 0.9f), c * 0.9f, glowCenter)
+    for (i in 0..2) {
+        val fx = tl.x + c * (0.2f + 0.3f * i)
+        val flicker = 0.75f + 0.3f * sin(time * TAU * 3f + i * 1.9f + tl.x / c)
+        val h = c * 0.45f * flicker
+        val flame = Path().apply {
+            moveTo(fx, surface - h)
+            cubicTo(fx + c * 0.12f, surface - h * 0.4f, fx + c * 0.1f, surface, fx, surface + c * 0.02f)
+            cubicTo(fx - c * 0.1f, surface, fx - c * 0.12f, surface - h * 0.4f, fx, surface - h)
+            close()
+        }
+        drawPath(flame, Palette.fire, alpha = 0.9f)
+        drawCircle(Palette.fireCore, c * 0.04f, Offset(fx, surface - h * 0.2f), alpha = 0.9f)
+    }
+}
 
 private fun DrawScope.drawPool(
+    look: LiquidLook,
     tl: Offset,
     c: Float,
     lv: Float,
@@ -89,12 +176,13 @@ private fun DrawScope.drawPool(
     // Meet the neighbours halfway so the surface is one continuous line.
     val leftY = if (full) tl.y else leftLevel?.let { (own + surfaceY(it)) / 2f } ?: own
     val rightY = if (full) tl.y else rightLevel?.let { (own + surfaceY(it)) / 2f } ?: own
-    val amplitude = if (full) 0f else c * 0.04f * min(1f, lv * 2.5f)
+    val amplitude = if (full) 0f else c * 0.04f * min(1f, lv * 2.5f) * look.waveScale
 
     fun waveY(x: Float, baseY: Float): Float {
         val u = x / c
-        return baseY + amplitude * sin(u * TAU * 0.8f + time * TAU) +
-            amplitude * 0.45f * sin(u * TAU * 2.1f - time * TAU * 2f)
+        val t = time * look.waveScale
+        return baseY + amplitude * sin(u * TAU * 0.8f + t * TAU) +
+            amplitude * 0.45f * sin(u * TAU * 2.1f - t * TAU * 2f)
     }
 
     val steps = 10
@@ -113,15 +201,15 @@ private fun DrawScope.drawPool(
     val top = points.minOf { it.y }
     drawPath(
         body,
-        Brush.verticalGradient(listOf(Palette.waterLight, Palette.water), top - c * 0.2f, bottom + c * 0.8f),
-        alpha = 0.9f,
+        Brush.verticalGradient(listOf(look.light, look.deep), top - c * 0.2f, bottom + c * 0.8f),
+        alpha = if (look === waterLook) 0.9f else 0.97f,
     )
     if (!full) {
         val crest = Path().apply {
             moveTo(points.first().x, points.first().y)
             points.drop(1).forEach { lineTo(it.x, it.y) }
         }
-        drawPath(crest, Color.White, alpha = 0.55f, style = Stroke(width = c * 0.03f, cap = StrokeCap.Round))
+        drawPath(crest, look.crest, alpha = look.crestAlpha, style = Stroke(width = c * 0.03f, cap = StrokeCap.Round))
         // Flow streaks run downhill along a sloped surface.
         val slope = rightY - leftY
         if (abs(slope) > c * 0.04f) {
@@ -142,13 +230,13 @@ private fun DrawScope.drawPool(
     }
 }
 
-/** Water with nothing below it: a narrowing stream with droplets. */
-private fun DrawScope.drawStream(tl: Offset, c: Float, lv: Float, time: Float, capped: Boolean) {
+/** Liquid with nothing below it: a narrowing stream with droplets. */
+private fun DrawScope.drawStream(look: LiquidLook, tl: Offset, c: Float, lv: Float, time: Float, capped: Boolean) {
     val width = c * (0.22f + 0.5f * min(1f, lv))
     val cx = tl.x + c / 2 + c * 0.03f * sin(time * TAU * 3f + tl.y / c)
     val top = if (capped) tl.y + c * (1f - min(1f, lv)) * 0.6f else tl.y
     drawRoundRect(
-        brush = Brush.verticalGradient(listOf(Palette.waterLight, Palette.water), top, tl.y + c),
+        brush = Brush.verticalGradient(listOf(look.light, look.deep), top, tl.y + c),
         topLeft = Offset(cx - width / 2, top),
         size = Size(width, tl.y + c - top),
         cornerRadius = androidx.compose.ui.geometry.CornerRadius(width / 2),
@@ -159,7 +247,7 @@ private fun DrawScope.drawStream(tl: Offset, c: Float, lv: Float, time: Float, c
         val phase = (time * 3f + k / 3f) % 1f
         val x = cx + (k - 1) * width * 0.6f
         val y = tl.y + c * phase
-        drawCircle(Palette.waterLight, c * 0.045f, Offset(x, y), alpha = 0.7f * (1f - phase * 0.5f))
+        drawCircle(look.light, c * 0.045f, Offset(x, y), alpha = 0.7f * (1f - phase * 0.5f))
     }
 }
 

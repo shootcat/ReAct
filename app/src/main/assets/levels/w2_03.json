@@ -1,0 +1,77 @@
+{
+  "id": "w2_03",
+  "title": "Fernzündung",
+  "world": 2,
+  "intro": "",
+  "map": [
+    "##############",
+    "#............#",
+    "#.F....I.....#",
+    "#####.m#######",
+    "######m:s#####",
+    "######mxx#####",
+    "########:#####",
+    "########:#####",
+    "########P####D",
+    "##############"
+  ],
+  "legend": {
+    "D": {
+      "type": "DOOR",
+      "id": "door_1",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "F": {
+      "type": "FIRE",
+      "movable": true
+    },
+    "I": {
+      "type": "ICE",
+      "movable": true
+    },
+    "P": {
+      "type": "PLATE",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "m": {
+      "type": "METAL",
+      "properties": {
+        "gravity": false
+      }
+    },
+    "s": {
+      "type": "STONE"
+    },
+    "x": {
+      "type": "WOOD",
+      "properties": {
+        "gravity": false
+      }
+    }
+  },
+  "goals": [
+    {
+      "object_id": "door_1",
+      "required_state": "UNLOCKED"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "standard",
+      "kind": "STANDARD",
+      "requires": [
+        {
+          "rule": "heat_ignites_wood"
+        },
+        {
+          "rule": "weight_presses_plate",
+          "source": "STONE"
+        }
+      ]
+    }
+  ]
+}

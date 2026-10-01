@@ -1,0 +1,63 @@
+{
+  "id": "w3_07",
+  "title": "Tauchsieder",
+  "world": 3,
+  "intro": "",
+  "map": [
+    "############",
+    "#..........#",
+    "#.Z........#",
+    "####K#######",
+    "###...######",
+    "###323######",
+    "####=######D",
+    "############"
+  ],
+  "legend": {
+    "2": {
+      "type": "WATER",
+      "amount": 2
+    },
+    "3": {
+      "type": "WATER",
+      "amount": 3
+    },
+    "=": {
+      "type": "BATTERY"
+    },
+    "D": {
+      "type": "DOOR",
+      "id": "door_1",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "K": {
+      "type": "PISTON",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "Z": {
+      "type": "COIL",
+      "movable": true
+    }
+  },
+  "goals": [
+    {
+      "object_id": "door_1",
+      "required_state": "UNLOCKED"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "standard",
+      "kind": "STANDARD",
+      "requires": [
+        {
+          "rule": "steam_lifts_piston"
+        }
+      ]
+    }
+  ]
+}

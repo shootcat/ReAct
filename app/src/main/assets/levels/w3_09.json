@@ -1,0 +1,79 @@
+{
+  "id": "w3_09",
+  "title": "Abzweig",
+  "world": 3,
+  "intro": "",
+  "map": [
+    "##############",
+    "#.......#....#",
+    "#.+.....:I..F#",
+    "####----:---##",
+    "####L######l##",
+    "####D######E##",
+    "##############"
+  ],
+  "legend": {
+    "+": {
+      "type": "BATTERY",
+      "movable": true
+    },
+    "-": {
+      "type": "CABLE"
+    },
+    "D": {
+      "type": "DOOR",
+      "id": "door_1",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "E": {
+      "type": "DOOR",
+      "id": "door_2",
+      "properties": {
+        "channel": "B"
+      }
+    },
+    "F": {
+      "type": "FIRE",
+      "movable": true
+    },
+    "I": {
+      "type": "ICE",
+      "movable": true
+    },
+    "L": {
+      "type": "LAMP",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "l": {
+      "type": "LAMP",
+      "properties": {
+        "channel": "B"
+      }
+    }
+  },
+  "goals": [
+    {
+      "object_id": "door_1",
+      "required_state": "UNLOCKED"
+    },
+    {
+      "object_id": "door_2",
+      "required_state": "UNLOCKED"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "standard",
+      "kind": "STANDARD",
+      "requires": [
+        {
+          "rule": "power_lights_lamp"
+        }
+      ]
+    }
+  ]
+}

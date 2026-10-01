@@ -1,0 +1,115 @@
+{
+  "id": "w4_12",
+  "title": "Öl und Lava",
+  "world": 4,
+  "intro": "",
+  "map": [
+    "############",
+    "#...###....#",
+    "#.F.:::s...#",
+    "#.##xxxx####",
+    "#qqqq##:####",
+    "#WWWW##:####",
+    "#######P###D",
+    "############",
+    "#..........#",
+    "#AAS.......#",
+    "####.#######",
+    "####:#######",
+    "####Q######Y",
+    "############"
+  ],
+  "legend": {
+    "A": {
+      "type": "LAVA"
+    },
+    "D": {
+      "type": "DOOR",
+      "id": "door_1",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "F": {
+      "type": "FIRE",
+      "movable": true
+    },
+    "P": {
+      "type": "PLATE",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "Q": {
+      "type": "PLATE",
+      "properties": {
+        "channel": "C"
+      }
+    },
+    "S": {
+      "type": "STONE",
+      "movable": true
+    },
+    "W": {
+      "type": "WATER"
+    },
+    "Y": {
+      "type": "DOOR",
+      "id": "door_3",
+      "properties": {
+        "channel": "C"
+      }
+    },
+    "q": {
+      "type": "OIL"
+    },
+    "s": {
+      "type": "STONE"
+    },
+    "x": {
+      "type": "WOOD",
+      "properties": {
+        "gravity": false
+      }
+    }
+  },
+  "goals": [
+    {
+      "object_id": "door_1",
+      "required_state": "UNLOCKED"
+    },
+    {
+      "object_id": "door_3",
+      "required_state": "UNLOCKED"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "standard",
+      "kind": "STANDARD",
+      "requires": [
+        {
+          "rule": "heat_ignites_oil"
+        },
+        {
+          "rule": "weight_presses_plate",
+          "target": "plate_4_12"
+        }
+      ]
+    },
+    {
+      "id": "override",
+      "kind": "OVERRIDE",
+      "requires": [
+        {
+          "rule": "heat_ignites_oil"
+        },
+        {
+          "rule": "weight_presses_plate",
+          "source": "STONE",
+          "target": "plate_4_12"
+        }
+      ]
+    }
+  ]
+}

@@ -27,6 +27,8 @@ data class ObjectInfo(
     val joinRight: Boolean = false,
     val joinBelow: Boolean = false,
     val joinAbove: Boolean = false,
+    /** Electric current flows through or into the object right now. */
+    val powered: Boolean = false,
 )
 
 private const val TAU = (2 * PI).toFloat()
@@ -46,12 +48,22 @@ fun DrawScope.drawGameObject(
     when (obj.type) {
         "FIRE" -> if (obj.state == "OUT") drawFireOut(topLeft, cell, alpha, time) else drawFire(topLeft, cell, alpha, time)
         "ICE" -> drawIce(topLeft, cell, alpha)
-        "WATER" -> drawWater(topLeft, cell, alpha, time, info)
+        "WATER" -> drawLiquidTile(topLeft, cell, alpha, time, info, Palette.waterLight, Palette.water)
         "STEAM" -> drawSteam(topLeft, cell, alpha, time, obj.amount, obj.capacity)
         "STONE" -> drawStone(topLeft, cell, alpha)
         "WOOD" -> drawWood(topLeft, cell, alpha, time, obj)
         "METAL" -> drawMetal(topLeft, cell, alpha, time, obj, info)
         "GATE" -> drawGate(topLeft, cell, alpha)
+        "LAVA" -> drawLiquidTile(topLeft, cell, alpha, time, info, Palette.lava, Palette.lavaDeep)
+        "OIL" -> drawLiquidTile(topLeft, cell, alpha, time, info, Palette.oilLight, Palette.oil)
+        "SAND" -> drawSand(topLeft, cell, alpha, obj.state == "WET", info.powered)
+        "BATTERY" -> drawBattery(topLeft, cell, alpha, time)
+        "CABLE" -> drawCable(topLeft, cell, alpha, time, info)
+        "LAMP" -> drawLamp(topLeft, cell, alpha, time, obj.state == "ON")
+        "COIL" -> drawCoil(topLeft, cell, alpha, time, obj.state == "HOT")
+        "RELAY" -> drawRelay(topLeft, cell, alpha, time, obj.state == "CLOSED", info.powered)
+        "TURBINE" -> drawTurbine(topLeft, cell, alpha, time, obj.state == "SPINNING")
+        "MEMBRANE" -> drawMembrane(topLeft, cell, alpha)
         "BUTTON" -> drawButton(topLeft, cell, alpha, obj.state == "PRESSED")
         "PLATE" -> drawPlate(topLeft, cell, alpha, obj.state == "PRESSED", info)
         "DOOR" -> drawDoor(topLeft, cell, alpha, obj.state == "UNLOCKED")
@@ -147,7 +159,7 @@ private fun DrawScope.drawIce(tl: Offset, c: Float, alpha: Float) {
  * Water fills its cell and merges with neighbouring water. The top of a pool is a moving wave;
  * the wave uses the absolute x position, so it runs seamlessly across neighbouring cells.
  */
-private fun DrawScope.drawWater(tl: Offset, c: Float, alpha: Float, time: Float, info: ObjectInfo) {
+private fun DrawScope.drawLiquidTile(tl: Offset, c: Float, alpha: Float, time: Float, info: ObjectInfo, light: Color, deep: Color) {
     val gap = c * 0.04f
     val left = tl.x + if (info.joinLeft) 0f else gap
     val right = tl.x + c - if (info.joinRight) 0f else gap
@@ -179,7 +191,7 @@ private fun DrawScope.drawWater(tl: Offset, c: Float, alpha: Float, time: Float,
     }
     drawPath(
         body,
-        Brush.verticalGradient(listOf(Palette.waterLight, Palette.water), top - c * 0.1f, bottom + c * 0.6f),
+        Brush.verticalGradient(listOf(light, deep), top - c * 0.1f, bottom + c * 0.6f),
         alpha = alpha * 0.92f,
     )
     if (surface) {
@@ -573,4 +585,162 @@ private fun DrawScope.drawHatch(tl: Offset, c: Float, alpha: Float) {
         drawRect(Palette.stoneDark, Offset(tl.x + c * (x - 0.06f), tl.y), Size(c * 0.12f, c * 0.36f), alpha = alpha)
         drawCircle(Palette.stone, c * 0.04f, Offset(tl.x + c * x, tl.y + c * 0.18f), alpha = alpha)
     }
+}
+
+/** Sand: a heap of grains. Wet sand is darker and, carrying current, sparkles faintly. */
+private fun DrawScope.drawSand(tl: Offset, c: Float, alpha: Float, wet: Boolean, powered: Boolean) {
+    val base = if (wet) Palette.sandWet else Palette.sand
+    val shade = if (wet) Color(0xFF5E4626) else Palette.sandDark
+    val heap = Path().apply {
+        moveTo(tl.x + c * 0.02f, tl.y + c)
+        cubicTo(tl.x + c * 0.1f, tl.y + c * 0.2f, tl.x + c * 0.9f, tl.y + c * 0.2f, tl.x + c * 0.98f, tl.y + c)
+        close()
+    }
+    drawRect(Brush.verticalGradient(listOf(base, shade), tl.y + c * 0.3f, tl.y + c), Offset(tl.x, tl.y + c * 0.55f), Size(c, c * 0.45f), alpha = alpha)
+    drawPath(heap, Brush.verticalGradient(listOf(base, shade), tl.y + c * 0.25f, tl.y + c), alpha = alpha)
+    val grains = listOf(0.25f to 0.62f, 0.5f to 0.45f, 0.7f to 0.7f, 0.38f to 0.82f, 0.62f to 0.88f, 0.82f to 0.84f, 0.18f to 0.9f)
+    for ((gx, gy) in grains) {
+        drawCircle(shade, c * 0.035f, tl + Offset(c * gx, c * gy), alpha = alpha * 0.8f)
+    }
+    if (wet) {
+        drawCircle(Color.White, c * 0.03f, tl + Offset(c * 0.45f, c * 0.5f), alpha = alpha * 0.35f)
+    }
+    if (powered) {
+        drawRect(Palette.power, tl + Offset(0f, c * 0.55f), Size(c, c * 0.45f), alpha = alpha * 0.18f)
+    }
+}
+
+/** A battery block with its two poles. */
+private fun DrawScope.drawBattery(tl: Offset, c: Float, alpha: Float, time: Float) {
+    val body = Offset(tl.x + c * 0.14f, tl.y + c * 0.26f)
+    val size = Size(c * 0.72f, c * 0.66f)
+    drawRoundRect(Brush.verticalGradient(listOf(Color(0xFF3C4656), Color(0xFF232A35)), body.y, body.y + size.height), body, size, CornerRadius(c * 0.08f), alpha = alpha)
+    drawRoundRect(Palette.success, body + Offset(0f, size.height * 0.62f), Size(size.width, size.height * 0.38f), CornerRadius(c * 0.06f), alpha = alpha * 0.85f)
+    // Poles.
+    drawRect(Palette.copper, Offset(tl.x + c * 0.26f, tl.y + c * 0.16f), Size(c * 0.12f, c * 0.1f), alpha = alpha)
+    drawRect(Palette.copper, Offset(tl.x + c * 0.62f, tl.y + c * 0.16f), Size(c * 0.12f, c * 0.1f), alpha = alpha)
+    val plus = tl + Offset(c * 0.32f, c * 0.46f)
+    drawLine(Palette.text, plus + Offset(-c * 0.07f, 0f), plus + Offset(c * 0.07f, 0f), strokeWidth = c * 0.04f, alpha = alpha)
+    drawLine(Palette.text, plus + Offset(0f, -c * 0.07f), plus + Offset(0f, c * 0.07f), strokeWidth = c * 0.04f, alpha = alpha)
+    val minus = tl + Offset(c * 0.68f, c * 0.46f)
+    drawLine(Palette.text, minus + Offset(-c * 0.07f, 0f), minus + Offset(c * 0.07f, 0f), strokeWidth = c * 0.04f, alpha = alpha)
+    val pulse = 0.5f + 0.5f * sin(time * TAU * 2f)
+    drawCircle(Brush.radialGradient(listOf(Palette.power.copy(alpha = 0.25f * pulse), Color.Transparent), tl + Offset(c / 2, c / 2), c * 0.7f), c * 0.7f, tl + Offset(c / 2, c / 2), alpha = alpha)
+}
+
+/** A cable laid in the rock, joining its neighbours. Live, it glows and a spark runs along it. */
+private fun DrawScope.drawCable(tl: Offset, c: Float, alpha: Float, time: Float, info: ObjectInfo) {
+    drawRect(Palette.wall, tl, Size(c, c), alpha = alpha)
+    val center = tl + Offset(c / 2, c / 2)
+    val color = if (info.powered) Palette.power else Palette.copper
+    val width = c * 0.16f
+    val ends = buildList {
+        if (info.joinLeft) add(Offset(tl.x, center.y))
+        if (info.joinRight) add(Offset(tl.x + c, center.y))
+        if (info.joinAbove) add(Offset(center.x, tl.y))
+        if (info.joinBelow) add(Offset(center.x, tl.y + c))
+        if (isEmpty()) {
+            add(Offset(tl.x + c * 0.15f, center.y))
+            add(Offset(tl.x + c * 0.85f, center.y))
+        }
+    }
+    if (info.powered) {
+        drawCircle(Brush.radialGradient(listOf(Palette.power.copy(alpha = 0.35f), Color.Transparent), center, c * 0.7f), c * 0.7f, center, alpha = alpha)
+    }
+    for (end in ends) {
+        drawLine(Color.Black, center, end, strokeWidth = width * 1.5f, cap = StrokeCap.Round, alpha = alpha * 0.4f)
+        drawLine(color, center, end, strokeWidth = width, cap = StrokeCap.Round, alpha = alpha)
+    }
+    drawCircle(color, width * 0.8f, center, alpha = alpha)
+    if (info.powered) {
+        val end = ends.first()
+        val phase = (time * 3f + (tl.x + tl.y) / c * 0.3f) % 1f
+        drawCircle(Color.White, c * 0.06f, center + (end - center) * phase, alpha = alpha * 0.9f)
+    }
+}
+
+/** A light bulb in a wall socket. On, it shines and sends its signal. */
+private fun DrawScope.drawLamp(tl: Offset, c: Float, alpha: Float, time: Float, on: Boolean) {
+    drawRect(Palette.wall, tl, Size(c, c), alpha = alpha)
+    val center = tl + Offset(c / 2, c * 0.44f)
+    if (on) {
+        val r = c * (0.95f + 0.05f * sin(time * TAU * 4f))
+        drawCircle(Brush.radialGradient(listOf(Palette.signal.copy(alpha = 0.6f), Color.Transparent), center, r), r, center, alpha = alpha)
+    }
+    drawRect(Palette.metalDark, Offset(tl.x + c * 0.36f, tl.y + c * 0.66f), Size(c * 0.28f, c * 0.2f), alpha = alpha)
+    drawCircle(if (on) Palette.signal else Color(0xFF4A5363), c * 0.25f, center, alpha = alpha)
+    drawCircle(Color.White, c * 0.07f, center + Offset(-c * 0.08f, -c * 0.08f), alpha = alpha * (if (on) 0.9f else 0.3f))
+    if (!on) {
+        drawLine(Palette.textDim, center + Offset(-c * 0.08f, c * 0.06f), center + Offset(c * 0.08f, c * 0.06f), strokeWidth = c * 0.03f, alpha = alpha * 0.6f)
+    }
+}
+
+/** A heating rod: a coiled element that glows when current flows. */
+private fun DrawScope.drawCoil(tl: Offset, c: Float, alpha: Float, time: Float, hot: Boolean) {
+    val color = if (hot) Palette.glow else Palette.copper
+    if (hot) {
+        val center = tl + Offset(c / 2, c * 0.55f)
+        val r = c * (0.8f + 0.06f * sin(time * TAU * 3f))
+        drawCircle(Brush.radialGradient(listOf(Palette.glow.copy(alpha = 0.5f), Color.Transparent), center, r), r, center, alpha = alpha)
+    }
+    drawRoundRect(Palette.metalDark, tl + Offset(c * 0.1f, c * 0.18f), Size(c * 0.8f, c * 0.14f), CornerRadius(c * 0.05f), alpha = alpha)
+    val coil = Path().apply {
+        moveTo(tl.x + c * 0.2f, tl.y + c * 0.32f)
+        var x = tl.x + c * 0.2f
+        val step = c * 0.12f
+        var down = true
+        while (x < tl.x + c * 0.8f) {
+            lineTo(x + step / 2, tl.y + c * (if (down) 0.88f else 0.4f))
+            x += step / 2
+            down = !down
+        }
+    }
+    drawPath(coil, color, alpha = alpha, style = Stroke(width = c * 0.07f, cap = StrokeCap.Round))
+}
+
+/** A relay box: the contact closes on a signal. */
+private fun DrawScope.drawRelay(tl: Offset, c: Float, alpha: Float, time: Float, closed: Boolean, powered: Boolean) {
+    drawRect(Palette.wall, tl, Size(c, c), alpha = alpha)
+    val box = tl + Offset(c * 0.1f, c * 0.18f)
+    drawRoundRect(Color(0xFF2B3340), box, Size(c * 0.8f, c * 0.64f), CornerRadius(c * 0.08f), alpha = alpha)
+    val wire = if (powered && closed) Palette.power else Palette.copper
+    val left = tl + Offset(0f, c * 0.5f)
+    val pivot = tl + Offset(c * 0.32f, c * 0.5f)
+    val contact = tl + Offset(c * 0.68f, c * 0.5f)
+    drawLine(wire, left, pivot, strokeWidth = c * 0.12f, alpha = alpha)
+    drawLine(wire, contact, tl + Offset(c, c * 0.5f), strokeWidth = c * 0.12f, alpha = alpha)
+    val tip = if (closed) contact else tl + Offset(c * 0.64f, c * 0.24f)
+    drawLine(if (closed) Palette.signal else Palette.textDim, pivot, tip, strokeWidth = c * 0.08f, cap = StrokeCap.Round, alpha = alpha)
+    drawCircle(Palette.text, c * 0.05f, pivot, alpha = alpha)
+    if (powered && closed) {
+        drawCircle(Color.White, c * 0.05f, pivot + (contact - pivot) * ((time * 3f) % 1f), alpha = alpha * 0.9f)
+    }
+}
+
+/** A steam turbine in the ceiling: blades that spin while steam pushes from below. */
+private fun DrawScope.drawTurbine(tl: Offset, c: Float, alpha: Float, time: Float, spinning: Boolean) {
+    drawRect(Palette.wall, tl, Size(c, c), alpha = alpha)
+    val center = tl + Offset(c / 2, c * 0.58f)
+    if (spinning) {
+        drawCircle(Brush.radialGradient(listOf(Palette.power.copy(alpha = 0.4f), Color.Transparent), center, c * 0.75f), c * 0.75f, center, alpha = alpha)
+    }
+    drawCircle(Color(0xFF2B3340), c * 0.4f, center, alpha = alpha)
+    val angle = if (spinning) time * TAU * 4f else 0.3f
+    for (i in 0 until 4) {
+        val a = angle + i * TAU / 4f
+        val tip = center + Offset(cos(a) * c * 0.34f, sin(a) * c * 0.34f)
+        drawLine(if (spinning) Palette.metal else Palette.metalDark, center, tip, strokeWidth = c * 0.12f, cap = StrokeCap.Round, alpha = alpha)
+    }
+    drawCircle(Palette.brass, c * 0.08f, center, alpha = alpha)
+}
+
+/** A thin bursting disc set into the ceiling. */
+private fun DrawScope.drawMembrane(tl: Offset, c: Float, alpha: Float) {
+    drawRect(Palette.wall, tl, Size(c, c * 0.55f), alpha = alpha)
+    val disc = Offset(tl.x, tl.y + c * 0.55f)
+    drawRect(Brush.verticalGradient(listOf(Palette.ice.copy(alpha = 0.8f), Palette.iceDeep.copy(alpha = 0.6f)), disc.y, disc.y + c * 0.16f), disc, Size(c, c * 0.16f), alpha = alpha)
+    drawLine(Palette.brass, disc, disc + Offset(c, 0f), strokeWidth = c * 0.05f, alpha = alpha)
+    // Hairline cracks show it will not hold forever.
+    drawLine(Color.White, disc + Offset(c * 0.3f, c * 0.04f), disc + Offset(c * 0.42f, c * 0.13f), strokeWidth = c * 0.015f, alpha = alpha * 0.6f)
+    drawLine(Color.White, disc + Offset(c * 0.42f, c * 0.13f), disc + Offset(c * 0.55f, c * 0.06f), strokeWidth = c * 0.015f, alpha = alpha * 0.6f)
 }

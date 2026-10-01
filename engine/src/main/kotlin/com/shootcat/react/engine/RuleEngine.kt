@@ -36,7 +36,7 @@ data class StepResult(
 /**
  * Deterministic, data-driven rule engine. A step runs three fixed phases:
  *
- * 1. [Phase.STATE]   – TOUCH, LOAD and HEAT rules, evaluated once against the state at the start of the phase.
+ * 1. [Phase.STATE]   – TOUCH, LOAD, HEAT and POWER rules, evaluated once against the state at the start of the phase.
  * 2. [Phase.PHYSICS] – falling, floating, flowing, pressure and heat conduction.
  * 3. [Phase.SIGNAL]  – SIGNAL rules, propagated until nothing changes any more.
  *
@@ -152,6 +152,14 @@ class RuleEngine(
                     .ifEmpty { listOf(target) }
             }
 
+            Trigger.POWER -> if (!state.isPowered(target.position)) {
+                emptyList()
+            } else {
+                // Whatever brings the current: the live network cells touching the target.
+                target.position.neighbours().filter { it in state.powered }.mapNotNull { state.objectAt(it) }
+                    .ifEmpty { listOf(target) }
+            }
+
             Trigger.SIGNAL -> {
                 val channel = target.string(Props.CHANNEL)
                 if (channel == null) {
@@ -224,7 +232,7 @@ class RuleEngine(
     /**
      * Spawns at [origin] if free, otherwise next to it (up first: steam rises off a fire).
      * Liquids and gases merge into neighbouring cells of the same kind and spill over into further
-     * free cells. Gas that finds no room squeezes past liquid and loose objects to the nearest free cell.
+     * free cells. Gas that finds no room bubbles up through liquid to the nearest free cell.
      */
     private fun spawn(world: MutableWorld, type: String, amount: Int?, origin: Position): GameObject? {
         val t = types.require(type)
@@ -255,8 +263,8 @@ class RuleEngine(
         }
         for (cell in listOf(origin) + origin.neighbours()) pour(cell)
         if (remaining <= 0 || !gas) return first
-        // Bubbles squeeze past liquid and loose objects (never through walls) to the nearest free cells.
-        fun passable(p: Position) = world.inBounds(p) && !world.isWall(p) && world.at(p) != null
+        // Bubbles rise through liquid and other gas (never through solids) to the nearest free cells.
+        fun passable(p: Position) = world.inBounds(p) && !world.isWall(p) && world.at(p)?.isFluid == true
         val seen = hashSetOf(origin)
         var frontier = origin.neighbours().filter { passable(it) }
         repeat(GAS_SEARCH_DEPTH) {

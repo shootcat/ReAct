@@ -138,6 +138,7 @@ fun Board(
         rules.filter { it.trigger == Trigger.LOAD }.associate { it.conditions.target to it.conditions.minLoad }
     }
     val signalRules = remember(rules) { rules.filter { it.trigger == Trigger.SIGNAL } }
+    val electric = remember(rules) { rules.filter { it.trigger == Trigger.POWER }.map { it.conditions.target }.toSet() }
     val view = remember(state.width, state.height, state.walls) { Viewport.of(state) }
 
     BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
@@ -213,6 +214,7 @@ fun Board(
                 drawWires(state, signalRules, cell, time)
 
                 drawLiquids(state, previous, progress, cell, time)
+                drawLiveLiquid(state, cell, time)
                 for (o in state.objects) {
                     if (o.isLiquid) continue
                     val prev = previous?.objectById(o.id)
@@ -225,12 +227,12 @@ fun Board(
                         appearing -> progress
                         else -> 1f
                     }
-                    drawGameObject(o, Offset(x * cell, y * cell), cell, alpha, time, infoFor(o, state, thresholds))
+                    drawGameObject(o, Offset(x * cell, y * cell), cell, alpha, time, infoFor(o, state, thresholds, electric))
                 }
                 if (previous != null) {
                     for (gone in previous.objects.filter { !it.isLiquid && state.objectById(it.id) == null }) {
                         val tl = Offset(gone.position.x * cell, gone.position.y * cell)
-                        drawGameObject(gone, tl, cell, 1f - progress, time, infoFor(gone, previous, thresholds))
+                        drawGameObject(gone, tl, cell, 1f - progress, time, infoFor(gone, previous, thresholds, electric))
                     }
                 }
 
@@ -280,21 +282,51 @@ private fun PointerInputScope.pickMovable(
         ?.first
 }
 
-private fun infoFor(o: GameObject, state: GameState, thresholds: Map<String, Int>): ObjectInfo {
+private fun infoFor(o: GameObject, state: GameState, thresholds: Map<String, Int>, electric: Set<String>): ObjectInfo {
     val threshold = thresholds[o.type]
     if (threshold != null) {
         return ObjectInfo(load = state.loadStack(o.position).sumOf { it.load }, threshold = threshold)
     }
-    if (!o.isFluid && !o.conducts) return ObjectInfo()
-    // Fluids and metal rods merge visually with neighbouring cells of the same kind.
-    fun same(p: Position) = state.objectAt(p)?.type == o.type
     val p = o.position
+    val wired = o.flag(Props.WIRE) || o.flag(Props.POWER) || o.type in electric
+    val powered = wired && state.isPowered(p)
+    if (o.type == "CABLE") {
+        // Cables run towards everything electrical next to them.
+        fun live(n: Position): Boolean {
+            val other = state.objectAt(n) ?: return false
+            return !other.isFluid && (other.flag(Props.WIRE) || other.flag(Props.POWER) || other.type in electric)
+        }
+        return ObjectInfo(joinLeft = live(p.left()), joinRight = live(p.right()), joinBelow = live(p.down()), joinAbove = live(p.up()), powered = powered)
+    }
+    if (!o.isFluid && !o.conducts) return ObjectInfo(powered = powered)
+    // Fluids and metal rods merge visually with neighbouring cells of the same kind.
+    fun same(n: Position) = state.objectAt(n)?.type == o.type
     return ObjectInfo(
         joinLeft = same(p.left()),
         joinRight = same(p.right()),
         joinBelow = same(p.down()),
         joinAbove = same(p.up()),
+        powered = powered,
     )
+}
+
+/** Live water crackles: small sparks dance over every liquid cell that carries current. */
+private fun DrawScope.drawLiveLiquid(state: GameState, cell: Float, time: Float) {
+    for (p in state.powered) {
+        val o = state.objectAt(p) ?: continue
+        if (!o.isLiquid) continue
+        val top = p.y * cell + cell * (1f - (o.amount.toFloat() / o.capacity).coerceIn(0f, 1f))
+        val phase = (time * 4f + p.x * 0.37f + p.y * 0.61f) % 1f
+        val x = p.x * cell + cell * (0.2f + 0.6f * phase)
+        val y = top + cell * 0.15f
+        val bolt = Path().apply {
+            moveTo(x - cell * 0.08f, y)
+            lineTo(x, y + cell * 0.08f)
+            lineTo(x - cell * 0.02f, y + cell * 0.12f)
+            lineTo(x + cell * 0.08f, y + cell * 0.22f)
+        }
+        drawPath(bolt, Palette.power, alpha = 0.8f * (1f - phase * 0.6f), style = Stroke(width = cell * 0.035f, cap = StrokeCap.Round))
+    }
 }
 
 private fun DrawScope.drawBackground(state: GameState, cell: Float, showGrid: Boolean) {

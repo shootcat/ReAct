@@ -24,7 +24,7 @@ class DeterminismTest {
 
     @Test
     fun `real levels replay identically`() {
-        for (id in Levels.world.levelIds) {
+        for (id in Levels.allLevelIds) {
             val level = Levels.level(id)
             val setups = listOf(level.initialState()) + level.initialState().objects
                 .filter { it.movable }
@@ -42,11 +42,11 @@ class DeterminismTest {
 
     @Test
     fun `undoing and replaying a move in live mode gives the same world`() {
-        val level = Levels.level("level_04")
+        val level = Levels.level("w2_01")
         val live = Levels.live(level)
         val start = live.start()
-        val first = live.play(start, "fire_1", com.shootcat.react.engine.model.Position(6, 4))!!
-        val again = live.play(start, "fire_1", com.shootcat.react.engine.model.Position(6, 4))!!
+        val first = live.play(start, "fire_1_5", com.shootcat.react.engine.model.Position(4, 5))!!
+        val again = live.play(start, "fire_1_5", com.shootcat.react.engine.model.Position(4, 5))!!
         assertEquals(first, again)
     }
 }

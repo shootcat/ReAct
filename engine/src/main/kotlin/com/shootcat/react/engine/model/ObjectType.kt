@@ -11,6 +11,8 @@ data class ObjectType(
     val signalStates: Set<String> = emptySet(),
     val stateNames: Map<String, String> = emptyMap(),
     val description: String = "",
+    /** The world that introduces this element. */
+    val world: Int = 1,
 ) {
     fun stateName(state: String): String = stateNames[state] ?: state.lowercase()
 }

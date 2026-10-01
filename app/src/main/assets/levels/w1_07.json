@@ -1,0 +1,66 @@
+{
+  "id": "w1_07",
+  "title": "Zündschnur",
+  "world": 1,
+  "intro": "",
+  "map": [
+    "###########",
+    "#.........D",
+    "#f..O.....#",
+    "##::##s####",
+    "##xxxxx####",
+    "######:####",
+    "######:####",
+    "######P####",
+    "###########"
+  ],
+  "legend": {
+    "D": {
+      "type": "DOOR",
+      "id": "door_1",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "O": {
+      "type": "WOOD",
+      "movable": true
+    },
+    "P": {
+      "type": "PLATE",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "f": {
+      "type": "FIRE"
+    },
+    "s": {
+      "type": "STONE"
+    },
+    "x": {
+      "type": "WOOD",
+      "properties": {
+        "gravity": false
+      }
+    }
+  },
+  "goals": [
+    {
+      "object_id": "door_1",
+      "required_state": "UNLOCKED"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "standard",
+      "kind": "STANDARD",
+      "requires": [
+        {
+          "rule": "weight_presses_plate",
+          "source": "STONE"
+        }
+      ]
+    }
+  ]
+}

@@ -61,6 +61,7 @@ fun ObjectIcon(
                     ReactionSymbol.PRESSURE -> drawPressure(w)
                     ReactionSymbol.SIGNAL -> drawSignal(w)
                     ReactionSymbol.HEAT -> drawHeat(w)
+                    ReactionSymbol.POWER -> drawPower(w)
                     else -> drawWeight(w)
                 }
             } else {
@@ -135,4 +136,26 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawHeat(c: Float) 
             style = androidx.compose.ui.graphics.drawscope.Stroke(width = c * 0.08f, cap = androidx.compose.ui.graphics.StrokeCap.Round),
         )
     }
+}
+
+/** Electric current: a zigzag spark between two poles. */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPower(c: Float) {
+    val spark = Path().apply {
+        moveTo(c * 0.18f, c * 0.5f)
+        lineTo(c * 0.36f, c * 0.32f)
+        lineTo(c * 0.48f, c * 0.62f)
+        lineTo(c * 0.62f, c * 0.34f)
+        lineTo(c * 0.82f, c * 0.5f)
+    }
+    drawCircle(Palette.copper, c * 0.08f, Offset(c * 0.14f, c * 0.5f))
+    drawCircle(Palette.copper, c * 0.08f, Offset(c * 0.86f, c * 0.5f))
+    drawPath(
+        spark,
+        Palette.power,
+        style = androidx.compose.ui.graphics.drawscope.Stroke(
+            width = c * 0.07f,
+            cap = androidx.compose.ui.graphics.StrokeCap.Round,
+            join = androidx.compose.ui.graphics.StrokeJoin.Round,
+        ),
+    )
 }

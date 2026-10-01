@@ -1,0 +1,127 @@
+{
+  "id": "w1_20",
+  "title": "Meisterstück",
+  "world": 1,
+  "intro": "",
+  "map": [
+    "################",
+    "#:i::#####.#####",
+    "#:##:#####:#####",
+    "#:#............#",
+    "#:#.O....I..s.F#",
+    "#B##########xx##",
+    "############:###",
+    "############:###",
+    "############p###",
+    "###############E",
+    "D###############"
+  ],
+  "legend": {
+    "B": {
+      "type": "BUTTON",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "D": {
+      "type": "DOOR",
+      "id": "door_1",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "E": {
+      "type": "DOOR",
+      "id": "door_2",
+      "properties": {
+        "channel": "B"
+      }
+    },
+    "F": {
+      "type": "FIRE",
+      "movable": true
+    },
+    "I": {
+      "type": "ICE",
+      "movable": true
+    },
+    "O": {
+      "type": "WOOD",
+      "movable": true
+    },
+    "i": {
+      "type": "ICE"
+    },
+    "p": {
+      "type": "PLATE",
+      "properties": {
+        "channel": "B"
+      }
+    },
+    "s": {
+      "type": "STONE"
+    },
+    "x": {
+      "type": "WOOD",
+      "properties": {
+        "gravity": false
+      }
+    }
+  },
+  "goals": [
+    {
+      "object_id": "door_1",
+      "required_state": "UNLOCKED"
+    },
+    {
+      "object_id": "door_2",
+      "required_state": "UNLOCKED"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "standard",
+      "kind": "STANDARD",
+      "requires": [
+        {
+          "rule": "steam_melts_ice"
+        },
+        {
+          "rule": "weight_presses_plate",
+          "source": "STONE"
+        }
+      ]
+    },
+    {
+      "id": "minimal",
+      "kind": "MINIMAL",
+      "requires": [
+        {
+          "rule": "steam_melts_ice"
+        },
+        {
+          "rule": "weight_presses_plate",
+          "source": "WATER"
+        }
+      ],
+      "max_moved": 3
+    }
+  ],
+  "rules": [
+    {
+      "id": "weight_presses_plate",
+      "name": "Gewicht",
+      "trigger": "LOAD",
+      "conditions": {
+        "target": "PLATE",
+        "min_load": 48
+      },
+      "effect": {
+        "target_state": "PRESSED"
+      },
+      "else_effect": {
+        "target_state": "UP"
+      }
+    }
+  ]
+}

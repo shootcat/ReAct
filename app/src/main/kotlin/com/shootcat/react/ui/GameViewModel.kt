@@ -27,7 +27,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-enum class Screen { TITLE, MAP, LEVEL, DISCOVERIES, SETTINGS }
+enum class Screen { TITLE, WORLDS, MAP, LEVEL, DISCOVERIES, SETTINGS }
 
 /** One undoable player action: the world right before it and right after it. */
 data class HistoryEntry(val before: Run, val after: Run)
@@ -69,17 +69,35 @@ data class GameUiState(
     val session: LevelSession? = null,
     val completion: Completion? = null,
     val toast: Toast? = null,
+    /** The world whose map is shown. */
+    val worldNumber: Int = 1,
 ) {
-    fun isUnlocked(levelId: String): Boolean {
-        val levels = content?.levels ?: return false
-        val index = levels.indexOfFirst { it.id == levelId }
-        return index == 0 || (index > 0 && levels[index - 1].id in progress.completed)
+    /** A world opens once the last main level of the world before it is solved. */
+    fun isWorldUnlocked(number: Int): Boolean {
+        val worlds = content?.worlds ?: return false
+        val index = worlds.indexOfFirst { it.world == number }
+        if (index <= 0) return index == 0
+        return worlds[index - 1].levelIds.lastOrNull() in progress.completed
     }
+
+    /** Main levels open one after another; the bonus level opens when every main level is solved. */
+    fun isUnlocked(levelId: String): Boolean {
+        val world = content?.worldOf(levelId) ?: return false
+        if (!isWorldUnlocked(world.world)) return false
+        if (levelId == world.bonusLevelId) return world.levelIds.all { it in progress.completed }
+        val index = world.levelIds.indexOf(levelId)
+        return index == 0 || (index > 0 && world.levelIds[index - 1] in progress.completed)
+    }
+
+    /** Solved main levels of a world, for the world selection. */
+    fun solvedIn(number: Int): Int = content?.world(number)?.levelIds?.count { it in progress.completed } ?: 0
 }
 
 sealed interface GameEvent {
     data class OpenLevel(val levelId: String) : GameEvent
     data object OpenTitle : GameEvent
+    data object OpenWorlds : GameEvent
+    data class OpenWorld(val number: Int) : GameEvent
     data object OpenMap : GameEvent
     data object OpenDiscoveries : GameEvent
     data object OpenSettings : GameEvent
@@ -127,6 +145,13 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         when (event) {
             is GameEvent.OpenLevel -> openLevel(event.levelId)
             GameEvent.OpenTitle -> leaveLevel(Screen.TITLE)
+            GameEvent.OpenWorlds -> leaveLevel(Screen.WORLDS)
+            is GameEvent.OpenWorld -> {
+                if (_state.value.isWorldUnlocked(event.number)) {
+                    leaveLevel(Screen.MAP)
+                    _state.update { it.copy(worldNumber = event.number) }
+                }
+            }
             GameEvent.OpenMap -> leaveLevel(Screen.MAP)
             GameEvent.OpenDiscoveries -> openOverlay(Screen.DISCOVERIES)
             GameEvent.OpenSettings -> openOverlay(Screen.SETTINGS)
@@ -166,7 +191,8 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
             st.completion != null -> onEvent(GameEvent.DismissCompletion)
             st.screen == Screen.DISCOVERIES || st.screen == Screen.SETTINGS -> onEvent(GameEvent.CloseOverlay)
             st.screen == Screen.LEVEL -> onEvent(GameEvent.OpenMap)
-            st.screen == Screen.MAP -> onEvent(GameEvent.OpenTitle)
+            st.screen == Screen.MAP -> onEvent(GameEvent.OpenWorlds)
+            st.screen == Screen.WORLDS -> onEvent(GameEvent.OpenTitle)
             else -> Unit
         }
     }
@@ -194,10 +220,11 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         if (!st.isUnlocked(levelId)) return
         stopSimulation()
         completionJob?.cancel()
-        val sim = LiveSimulation(level, RuleEngine(content.world.types, level.rules))
+        val sim = LiveSimulation(level, RuleEngine(content.types, level.rules))
         live = sim
+        val world = content.worldOf(levelId)?.world ?: st.worldNumber
         _state.update {
-            it.copy(screen = Screen.LEVEL, session = LevelSession(level, sim.start()), completion = null)
+            it.copy(screen = Screen.LEVEL, session = LevelSession(level, sim.start()), completion = null, worldNumber = world)
         }
     }
 
@@ -313,8 +340,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         )
         store.save(progress)
         _state.update { it.copy(progress = progress) }
-        val next = content.levels.getOrNull(content.indexOf(s.level.id) + 1)?.id
-        val completion = Completion(s.level, found - known, next)
+        val completion = Completion(s.level, found - known, nextLevel(s.level.id))
         completionJob?.cancel()
         // Give the player a moment to see the door open before the dialog appears.
         completionJob = viewModelScope.launch {
@@ -333,7 +359,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     private fun showDiscoveries(ruleIds: List<String>) {
         val content = _state.value.content ?: return
         val reactions = ruleIds.mapNotNull { id -> content.allRules.firstOrNull { it.id == id } }
-            .map { Reactions.describe(it, content.world.types) }
+            .map { Reactions.describe(it, content.types) }
         val toast = Toast(++toastCounter, reactions)
         _state.update { it.copy(toast = toast) }
         toastJob?.cancel()
@@ -341,6 +367,21 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
             delay(TOAST_MILLIS)
             _state.update { if (it.toast?.id == toast.id) it.copy(toast = null) else it }
         }
+    }
+
+    /**
+     * Where "Weiter" leads after a solved level: the next main level, then the bonus level once it is
+     * open, then the first level of the next world. Null means back to the map.
+     */
+    private fun nextLevel(levelId: String): String? {
+        val st = _state.value
+        val content = st.content ?: return null
+        val world = content.worldOf(levelId) ?: return null
+        content.nextInWorld(levelId)?.let { return it }
+        val bonus = world.bonusLevelId
+        if (bonus != null && bonus != levelId && bonus !in st.progress.completed && st.isUnlocked(bonus)) return bonus
+        val nextWorld = content.worlds.getOrNull(content.worlds.indexOf(world) + 1) ?: return null
+        return nextWorld.levelIds.firstOrNull()?.takeIf { st.isUnlocked(it) && it !in st.progress.completed }
     }
 
     private fun session(): LevelSession? = _state.value.session

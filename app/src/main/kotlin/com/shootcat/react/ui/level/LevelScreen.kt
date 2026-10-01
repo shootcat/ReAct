@@ -81,7 +81,7 @@ fun LevelScreen(
     Column(Modifier.fillMaxSize()) {
         TopBar(
             title = level.title,
-            overline = "${level.world}·${content.indexOf(level.id)}",
+            overline = content.label(level.id),
             onBack = { onEvent(GameEvent.OpenMap) },
             modifier = Modifier.padding(horizontal = 12.dp),
         ) {
@@ -111,7 +111,7 @@ fun LevelScreen(
             previous = session.previous,
             progress = progress,
             rules = level.rules,
-            types = content.world.types,
+            types = content.types,
             interactive = session.canMove,
             overload = overload,
             onMove = { id, to -> onEvent(GameEvent.Move(id, to)) },
@@ -144,7 +144,7 @@ private fun GoalChip(level: LevelData, shown: GameState, content: GameContent) {
         GlyphIcon(Glyph.TARGET, color = color, size = 18.dp)
         for (goal in level.goals) {
             val type = level.objects.firstOrNull { it.id == goal.objectId }?.type
-            ObjectIcon(type, content.world.types, state = goal.requiredState, size = 26.dp, background = Palette.surface)
+            ObjectIcon(type, content.types, state = goal.requiredState, size = 26.dp, background = Palette.surface)
         }
     }
 }

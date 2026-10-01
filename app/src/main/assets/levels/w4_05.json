@@ -1,0 +1,67 @@
+{
+  "id": "w4_05",
+  "title": "Lavafluss",
+  "world": 4,
+  "intro": "",
+  "map": [
+    "#############",
+    "#...........#",
+    "#AAS....s...#",
+    "####....x####",
+    "########:####",
+    "########P###D",
+    "#############"
+  ],
+  "legend": {
+    "A": {
+      "type": "LAVA"
+    },
+    "D": {
+      "type": "DOOR",
+      "id": "door_1",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "P": {
+      "type": "PLATE",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "S": {
+      "type": "STONE",
+      "movable": true
+    },
+    "s": {
+      "type": "STONE"
+    },
+    "x": {
+      "type": "WOOD",
+      "properties": {
+        "gravity": false
+      }
+    }
+  },
+  "goals": [
+    {
+      "object_id": "door_1",
+      "required_state": "UNLOCKED"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "standard",
+      "kind": "STANDARD",
+      "requires": [
+        {
+          "rule": "heat_ignites_wood"
+        },
+        {
+          "rule": "weight_presses_plate",
+          "source": "STONE"
+        }
+      ]
+    }
+  ]
+}

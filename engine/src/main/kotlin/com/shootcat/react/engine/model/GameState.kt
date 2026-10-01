@@ -28,6 +28,13 @@ data class GameState(
 
     fun isBuildable(p: Position): Boolean = isFree(p) && p !in noBuild
 
+    /** Where the player may drop something: a buildable cell, or one only filled with gas (it gets pushed aside). */
+    fun canPlace(p: Position): Boolean {
+        if (!inBounds(p) || isWall(p) || p in noBuild) return false
+        val o = objectAt(p) ?: return true
+        return o.isGas
+    }
+
     /** Objects top-to-bottom, left-to-right, then by id. */
     fun objectsInReadingOrder(): List<GameObject> =
         objects.sortedWith(compareBy<GameObject>({ it.position.y }, { it.position.x }, { it.id }))
@@ -62,12 +69,84 @@ data class GameState(
         return seen.map { objectAt(it)!! }
     }
 
-    /** Player action while setting up: move a movable object to a free, buildable cell. */
+    /**
+     * Cells that carry electric current: every active source and everything that carries current
+     * connected to one. Current flows instantly through the whole network.
+     */
+    val powered: Set<Position> by lazy {
+        val network = HashSet<Position>()
+        val queue = ArrayDeque<Position>()
+        for (o in objects) {
+            if (o.isPowerSource && network.add(o.position)) queue += o.position
+        }
+        while (queue.isNotEmpty()) {
+            val cell = queue.removeFirst()
+            for (n in cell.neighbours()) {
+                if (n !in network && objectAt(n)?.carriesPower == true) {
+                    network += n
+                    queue += n
+                }
+            }
+        }
+        network
+    }
+
+    /** Whether current reaches the object at [p]: it is part of a live network or touches one. */
+    fun isPowered(p: Position): Boolean = p in powered || p.neighbours().any { it in powered }
+
+    /** Player action: move a movable object to a cell where it may be placed. Gas there is pushed aside. */
     fun withObjectMoved(id: String, to: Position): GameState? {
         val obj = objectById(id) ?: return null
         if (!obj.movable) return null
         if (obj.position == to) return this
-        if (!isBuildable(to)) return null
-        return copy(objects = objects.map { if (it.id == id) it.copy(position = to) else it })
+        if (!canPlace(to)) return null
+        val moved = obj.copy(position = to)
+        val gas = objectAt(to) ?: return copy(objects = objects.map { if (it.id == id) moved else it })
+        val rest = objects.filter { it.id != id && it.id != gas.id }
+        val displaced = displaceGas(gas, to, obj.position) ?: return null
+        val merged = rest.map { o -> displaced.firstOrNull { it.id == o.id } ?: o }
+        val added = displaced.filter { d -> rest.none { it.id == d.id } }
+        return copy(objects = (merged + added + moved).sortedBy { it.id })
+    }
+
+    /**
+     * Pushes the gas from [from] to the nearest place it fits (up first): it tops up a cell of the same gas
+     * or fills an empty cell. Returns the changed or new gas objects, or null if it cannot go anywhere.
+     */
+    private fun displaceGas(gas: GameObject, from: Position, vacated: Position): List<GameObject>? {
+        val seen = hashSetOf(from)
+        val queue = ArrayDeque(listOf(from))
+        var left = gas.amount
+        val result = mutableListOf<GameObject>()
+        var placedOwn = false
+        while (queue.isNotEmpty() && left > 0) {
+            val cell = queue.removeFirst()
+            for (n in cell.neighbours()) {
+                if (n in seen || !inBounds(n) || isWall(n)) continue
+                seen += n
+                val o = if (n == vacated) null else objectAt(n)
+                when {
+                    o == null -> {
+                        if (!placedOwn) {
+                            result += gas.copy(position = n, amount = left)
+                            placedOwn = true
+                            left = 0
+                        }
+                    }
+                    o.type == gas.type -> {
+                        val room = o.capacity - o.amount
+                        if (room > 0) {
+                            val add = minOf(room, left)
+                            result += o.copy(amount = o.amount + add)
+                            left -= add
+                        }
+                        queue += n
+                    }
+                    else -> Unit
+                }
+                if (left == 0) break
+            }
+        }
+        return if (left == 0) result else null
     }
 }

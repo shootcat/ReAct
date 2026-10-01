@@ -1,0 +1,59 @@
+{
+  "id": "w1_10",
+  "title": "Damm",
+  "world": 1,
+  "intro": "",
+  "map": [
+    "############",
+    "#..........#",
+    "#.i....F.S.#",
+    "###.######.#",
+    "##########:#",
+    "##########:D",
+    "##########B#",
+    "############"
+  ],
+  "legend": {
+    "B": {
+      "type": "BUTTON",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "D": {
+      "type": "DOOR",
+      "id": "door_1",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "F": {
+      "type": "FIRE",
+      "movable": true
+    },
+    "S": {
+      "type": "STONE",
+      "movable": true
+    },
+    "i": {
+      "type": "ICE"
+    }
+  },
+  "goals": [
+    {
+      "object_id": "door_1",
+      "required_state": "UNLOCKED"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "standard",
+      "kind": "STANDARD",
+      "requires": [
+        {
+          "rule": "water_triggers_button"
+        }
+      ]
+    }
+  ]
+}

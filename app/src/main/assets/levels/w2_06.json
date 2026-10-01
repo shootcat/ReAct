@@ -1,0 +1,73 @@
+{
+  "id": "w2_06",
+  "title": "Berstscheibe",
+  "world": 2,
+  "intro": "",
+  "map": [
+    "##########",
+    "####s#####",
+    "####~#####",
+    "###:::####",
+    "###323####",
+    "###mpm####",
+    "###mmm####",
+    "#F......E#",
+    "##########"
+  ],
+  "legend": {
+    "2": {
+      "type": "WATER",
+      "amount": 2
+    },
+    "3": {
+      "type": "WATER",
+      "amount": 3
+    },
+    "E": {
+      "type": "DOOR",
+      "id": "door_2",
+      "properties": {
+        "channel": "B"
+      }
+    },
+    "F": {
+      "type": "FIRE",
+      "movable": true
+    },
+    "m": {
+      "type": "METAL",
+      "properties": {
+        "gravity": false
+      }
+    },
+    "p": {
+      "type": "PLATE",
+      "properties": {
+        "channel": "B"
+      }
+    },
+    "s": {
+      "type": "STONE"
+    },
+    "~": {
+      "type": "MEMBRANE"
+    }
+  },
+  "goals": [
+    {
+      "object_id": "door_2",
+      "required_state": "UNLOCKED"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "standard",
+      "kind": "STANDARD",
+      "requires": [
+        {
+          "rule": "steam_bursts_membrane"
+        }
+      ]
+    }
+  ]
+}

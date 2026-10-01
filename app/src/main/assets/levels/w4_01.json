@@ -1,0 +1,54 @@
+{
+  "id": "w4_01",
+  "title": "Schwerflüssig",
+  "world": 4,
+  "intro": "",
+  "map": [
+    "############",
+    "#..........#",
+    "#AAS.......#",
+    "####.#######",
+    "####:#######",
+    "####P######D",
+    "############"
+  ],
+  "legend": {
+    "A": {
+      "type": "LAVA"
+    },
+    "D": {
+      "type": "DOOR",
+      "id": "door_1",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "P": {
+      "type": "PLATE",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "S": {
+      "type": "STONE",
+      "movable": true
+    }
+  },
+  "goals": [
+    {
+      "object_id": "door_1",
+      "required_state": "UNLOCKED"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "standard",
+      "kind": "STANDARD",
+      "requires": [
+        {
+          "rule": "weight_presses_plate"
+        }
+      ]
+    }
+  ]
+}

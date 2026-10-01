@@ -1,0 +1,86 @@
+{
+  "id": "w1_17",
+  "title": "Schwergewicht",
+  "world": 1,
+  "intro": "",
+  "map": [
+    "#############",
+    "#...........#",
+    "#.I.O.F.s...#",
+    "#######xx####",
+    "########:####",
+    "########:####",
+    "########P###D",
+    "#############"
+  ],
+  "legend": {
+    "D": {
+      "type": "DOOR",
+      "id": "door_1",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "F": {
+      "type": "FIRE",
+      "movable": true
+    },
+    "I": {
+      "type": "ICE",
+      "movable": true
+    },
+    "O": {
+      "type": "WOOD",
+      "movable": true
+    },
+    "P": {
+      "type": "PLATE",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "s": {
+      "type": "STONE"
+    },
+    "x": {
+      "type": "WOOD",
+      "properties": {
+        "gravity": false
+      }
+    }
+  },
+  "goals": [
+    {
+      "object_id": "door_1",
+      "required_state": "UNLOCKED"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "standard",
+      "kind": "STANDARD",
+      "requires": [
+        {
+          "rule": "weight_presses_plate"
+        }
+      ]
+    }
+  ],
+  "rules": [
+    {
+      "id": "weight_presses_plate",
+      "name": "Gewicht",
+      "trigger": "LOAD",
+      "conditions": {
+        "target": "PLATE",
+        "min_load": 60
+      },
+      "effect": {
+        "target_state": "PRESSED"
+      },
+      "else_effect": {
+        "target_state": "UP"
+      }
+    }
+  ]
+}

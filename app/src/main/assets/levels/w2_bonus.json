@@ -1,0 +1,119 @@
+{
+  "id": "w2_bonus",
+  "title": "Dampfimperium",
+  "world": 2,
+  "intro": "",
+  "map": [
+    "######################",
+    "#....................#",
+    "#.S.S.S...F....I.....#",
+    "#########s#######m####",
+    "##.......G.....##mI:##",
+    "##.......p#K#######:##",
+    "##77######...######B##",
+    "##mm######...#########",
+    "##..######mmm########E",
+    "##########...#########",
+    "D################Y####"
+  ],
+  "legend": {
+    "7": {
+      "type": "WATER",
+      "amount": 7
+    },
+    "B": {
+      "type": "BUTTON",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "D": {
+      "type": "DOOR",
+      "id": "door_1",
+      "properties": {
+        "channel": "A"
+      }
+    },
+    "E": {
+      "type": "DOOR",
+      "id": "door_2",
+      "properties": {
+        "channel": "B"
+      }
+    },
+    "F": {
+      "type": "FIRE",
+      "movable": true
+    },
+    "G": {
+      "type": "GATE"
+    },
+    "I": {
+      "type": "ICE",
+      "movable": true
+    },
+    "K": {
+      "type": "PISTON",
+      "properties": {
+        "channel": "C"
+      }
+    },
+    "S": {
+      "type": "STONE",
+      "movable": true
+    },
+    "Y": {
+      "type": "DOOR",
+      "id": "door_3",
+      "properties": {
+        "channel": "C"
+      }
+    },
+    "m": {
+      "type": "METAL",
+      "properties": {
+        "gravity": false
+      }
+    },
+    "p": {
+      "type": "PLATE",
+      "properties": {
+        "channel": "B"
+      }
+    },
+    "s": {
+      "type": "STONE"
+    }
+  },
+  "goals": [
+    {
+      "object_id": "door_1",
+      "required_state": "UNLOCKED"
+    },
+    {
+      "object_id": "door_2",
+      "required_state": "UNLOCKED"
+    },
+    {
+      "object_id": "door_3",
+      "required_state": "UNLOCKED"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "standard",
+      "kind": "STANDARD",
+      "requires": [
+        {
+          "rule": "metal_boils_water"
+        },
+        {
+          "rule": "water_triggers_button"
+        },
+        {
+          "rule": "steam_lifts_piston"
+        }
+      ]
+    }
+  ]
+}
