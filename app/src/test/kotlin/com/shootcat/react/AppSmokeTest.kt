@@ -10,7 +10,7 @@ import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.click
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -18,16 +18,12 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
+import androidx.test.core.app.ActivityScenario
 import com.shootcat.react.engine.LevelLoader
 import com.shootcat.react.ui.level.Viewport
 import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.ExternalResource
-import org.junit.rules.RuleChain
-import org.junit.rules.TestRule
-import org.junit.runner.Description
 import org.junit.runner.RunWith
-import org.junit.runners.model.Statement
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
@@ -46,26 +42,22 @@ import java.time.Duration
 @Config(sdk = [34], qualifiers = "w411dp-h891dp-xxhdpi")
 class AppSmokeTest {
 
-    private val compose = createAndroidComposeRule<MainActivity>()
+    @get:Rule
+    val compose = createEmptyComposeRule()
 
-    /** Tests whose name ends in "Unlocked" start with every level unlocked. */
-    private val progress = object : TestRule {
-        override fun apply(base: Statement, description: Description): Statement = object : ExternalResource() {
-            override fun before() {
-                if (!description.methodName.endsWith("Unlocked")) return
-                val levels = (0 until 12).map { "level_%02d".format(it) }.toSet()
-                RuntimeEnvironment.getApplication()
-                    .getSharedPreferences("react_progress", Context.MODE_PRIVATE)
-                    .edit().putStringSet("completed", levels).commit()
-            }
-        }.apply(base, description)
+    /** Starts the app; [unlockAll] first stores progress with every level unlocked. */
+    private fun launch(unlockAll: Boolean = false): ActivityScenario<MainActivity> {
+        if (unlockAll) {
+            val levels = (0 until 12).map { "level_%02d".format(it) }.toSet()
+            RuntimeEnvironment.getApplication()
+                .getSharedPreferences("react_progress", Context.MODE_PRIVATE)
+                .edit().putStringSet("completed", levels).commit()
+        }
+        return ActivityScenario.launch(MainActivity::class.java).also { compose.waitForIdle() }
     }
 
-    @get:Rule
-    val rules: RuleChain = RuleChain.outerRule(progress).around(compose)
-
     @Test
-    fun playFirstLevelsLive() {
+    fun playFirstLevelsLive(): Unit = launch().use {
         compose.onNodeWithText("REACT").assertExists()
         shot("01_titel")
         compose.onNodeWithText("Spielen").performClick()
@@ -152,9 +144,10 @@ class AppSmokeTest {
     }
 
     @Test
-    fun newMaterialsUnlocked() {
+    fun newMaterials(): Unit = launch(unlockAll = true).use {
         compose.onNodeWithText("Spielen").performClick()
         compose.waitForIdle()
+        compose.onNodeWithTag("level_level_12").assertIsEnabled()
 
         // Heat conduction: the fire on the metal rod melts the ice in the closed chamber.
         shot("19_weltkarte_alles_offen")
@@ -201,7 +194,7 @@ class AppSmokeTest {
     private fun openLevel(id: String) {
         compose.onNodeWithTag("level_$id").performScrollTo()
         compose.waitForIdle()
-        compose.onNodeWithTag("level_$id").performClick()
+        compose.onNodeWithTag("level_$id").assertIsEnabled().performClick()
         compose.waitForIdle()
         // Only the level screen has the history dock.
         compose.onNodeWithContentDescription("Rückgängig").assertExists("level $id did not open")
