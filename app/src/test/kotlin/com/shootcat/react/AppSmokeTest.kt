@@ -22,14 +22,17 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.core.app.ActivityScenario
 import com.shootcat.react.data.Progress
+import com.shootcat.react.data.ProgressStore
 import com.shootcat.react.engine.LevelLoader
 import com.shootcat.react.ui.GameUiState
 import com.shootcat.react.ui.GameViewModel
 import com.shootcat.react.ui.level.Viewport
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
@@ -51,6 +54,12 @@ class AppSmokeTest {
 
     @get:Rule
     val compose = createEmptyComposeRule()
+
+    /** Robolectric keeps the preferences between tests: every test starts without progress. */
+    @Before
+    fun clearProgress() {
+        ProgressStore(RuntimeEnvironment.getApplication()).clear()
+    }
 
     /** Starts the app; [completed] levels are set directly in the view model's state. */
     private fun launch(completed: Set<String> = emptySet()): ActivityScenario<MainActivity> {
@@ -147,8 +156,7 @@ class AppSmokeTest {
         compose.onNodeWithText("Geschafft").assertExists()
         shot("11_level3_geloest")
 
-        compose.onNodeWithText("Karte").performClick()
-        compose.waitForIdle()
+        leaveToMap()
         shot("12_weltkarte_fortschritt")
 
         compose.onNodeWithContentDescription("Einstellungen").performClick()
@@ -180,8 +188,7 @@ class AppSmokeTest {
         shot("24_w2_kessel_dampf")
         advance(millis = 2500)
         compose.onNodeWithText("Geschafft").assertExists()
-        compose.onNodeWithText("Karte").performClick()
-        compose.waitForIdle()
+        leaveToMap()
         backToWorlds()
 
         // World 3 – electricity: the battery powers the cable, the lamp lights up.
@@ -191,8 +198,7 @@ class AppSmokeTest {
         moveOnBoard("w3_01", from = 2 to 2, to = 6 to 2)
         advance(millis = 1500)
         compose.onNodeWithText("Geschafft").assertExists()
-        compose.onNodeWithText("Karte").performClick()
-        compose.waitForIdle()
+        leaveToMap()
 
         // The steam turbine: fire under the metal, the steam spins the turbine and powers the lamp.
         openLevel("w3_08")
@@ -202,8 +208,7 @@ class AppSmokeTest {
         advance(millis = 2500)
         compose.onNodeWithText("Geschafft").assertExists()
         shot("27_w3_turbine_geloest")
-        compose.onNodeWithText("Karte").performClick()
-        compose.waitForIdle()
+        leaveToMap()
         backToWorlds()
 
         // World 4 – volcano: lava, oil and sand.
@@ -214,8 +219,7 @@ class AppSmokeTest {
         moveOnBoard("w4_01", from = 3 to 2, to = 9 to 1)
         advance(millis = 2500)
         compose.onNodeWithText("Geschafft").assertExists()
-        compose.onNodeWithText("Karte").performClick()
-        compose.waitForIdle()
+        leaveToMap()
 
         openLevel("w4_03")
         moveOnBoard("w4_03", from = 2 to 2, to = 1 to 3)
@@ -223,8 +227,7 @@ class AppSmokeTest {
         shot("30_w4_oel_brennt")
         advance(millis = 6000)
         compose.onNodeWithText("Geschafft").assertExists()
-        compose.onNodeWithText("Karte").performClick()
-        compose.waitForIdle()
+        leaveToMap()
 
         openLevel("w4_04")
         moveOnBoard("w4_04", from = 7 to 3, to = 5 to 3)
@@ -232,8 +235,7 @@ class AppSmokeTest {
         shot("31_w4_sand_rutscht")
         advance(millis = 4000)
         compose.onNodeWithText("Geschafft").assertExists()
-        compose.onNodeWithText("Karte").performClick()
-        compose.waitForIdle()
+        leaveToMap()
 
         // Later levels: just a look at the boards.
         for (id in listOf("w4_06", "w4_07")) {
@@ -256,6 +258,15 @@ class AppSmokeTest {
         compose.onNodeWithTag("world_$number").assertIsEnabled().performClick()
         compose.waitForIdle()
         compose.onNodeWithTag("level_w${number}_01").assertExists("world $number did not open")
+    }
+
+    /** Closes the completion card and goes back from the level to the world map. */
+    private fun leaveToMap() {
+        compose.onNodeWithText("Nochmal").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("back").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription("Rückgängig").assertDoesNotExist()
     }
 
     private fun backToWorlds() {
