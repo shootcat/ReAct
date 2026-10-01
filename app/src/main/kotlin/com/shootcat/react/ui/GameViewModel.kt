@@ -280,8 +280,19 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         )
         store.save(progress)
         val next = content.levels.getOrNull(content.indexOf(s.level.id) + 1)?.id
-        _state.update {
-            it.copy(progress = progress, completion = Completion(s.level, found - known, next))
+        val completion = Completion(s.level, found - known, next)
+        _state.update { it.copy(progress = progress) }
+        // Give the player a moment to see the door open before the dialog appears.
+        viewModelScope.launch {
+            delay(COMPLETION_DELAY_MILLIS)
+            _state.update { st ->
+                val current = st.session
+                if (current != null && current.level.id == s.level.id && current.mode == Mode.SIMULATION) {
+                    st.copy(completion = completion)
+                } else {
+                    st
+                }
+            }
         }
     }
 
@@ -308,5 +319,6 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     companion object {
         const val STEP_MILLIS = 420L
         private const val TOAST_MILLIS = 3500L
+        private const val COMPLETION_DELAY_MILLIS = 900L
     }
 }
