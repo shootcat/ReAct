@@ -298,8 +298,8 @@ private fun infoFor(o: GameObject, state: GameState, thresholds: Map<String, Int
         }
         return ObjectInfo(joinLeft = live(p.left()), joinRight = live(p.right()), joinBelow = live(p.down()), joinAbove = live(p.up()), powered = powered)
     }
-    if (!o.isFluid && !o.conducts) return ObjectInfo(powered = powered)
-    // Fluids and metal rods merge visually with neighbouring cells of the same kind.
+    if (!o.isFluid && !o.conducts && !o.flag(Props.GRANULAR)) return ObjectInfo(powered = powered)
+    // Fluids, metal rods and sand merge visually with neighbouring cells of the same kind.
     fun same(n: Position) = state.objectAt(n)?.type == o.type
     return ObjectInfo(
         joinLeft = same(p.left()),

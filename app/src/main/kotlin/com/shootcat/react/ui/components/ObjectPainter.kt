@@ -56,7 +56,7 @@ fun DrawScope.drawGameObject(
         "GATE" -> drawGate(topLeft, cell, alpha)
         "LAVA" -> drawLiquidTile(topLeft, cell, alpha, time, info, Palette.lava, Palette.lavaDeep)
         "OIL" -> drawLiquidTile(topLeft, cell, alpha, time, info, Palette.oilLight, Palette.oil)
-        "SAND" -> drawSand(topLeft, cell, alpha, obj.state == "WET", info.powered)
+        "SAND" -> drawSand(topLeft, cell, alpha, obj.state == "WET", info)
         "BATTERY" -> drawBattery(topLeft, cell, alpha, time)
         "CABLE" -> drawCable(topLeft, cell, alpha, time, info)
         "LAMP" -> drawLamp(topLeft, cell, alpha, time, obj.state == "ON")
@@ -588,25 +588,41 @@ private fun DrawScope.drawHatch(tl: Offset, c: Float, alpha: Float) {
 }
 
 /** Sand: a heap of grains. Wet sand is darker and, carrying current, sparkles faintly. */
-private fun DrawScope.drawSand(tl: Offset, c: Float, alpha: Float, wet: Boolean, powered: Boolean) {
+/**
+ * Sand: a heap on its own, a dune surface next to other sand, and a solid fill under more sand.
+ */
+private fun DrawScope.drawSand(tl: Offset, c: Float, alpha: Float, wet: Boolean, info: ObjectInfo) {
     val base = if (wet) Palette.sandWet else Palette.sand
     val shade = if (wet) Color(0xFF5E4626) else Palette.sandDark
-    val heap = Path().apply {
-        moveTo(tl.x + c * 0.02f, tl.y + c)
-        cubicTo(tl.x + c * 0.1f, tl.y + c * 0.2f, tl.x + c * 0.9f, tl.y + c * 0.2f, tl.x + c * 0.98f, tl.y + c)
-        close()
+    if (info.joinAbove) {
+        drawRect(Brush.verticalGradient(listOf(shade, base, shade), tl.y, tl.y + c), tl, Size(c, c), alpha = alpha)
+    } else {
+        // Where sand continues to the side, the surface meets it halfway up instead of at the floor.
+        val leftY = if (info.joinLeft) c * 0.42f else c
+        val rightY = if (info.joinRight) c * 0.42f else c
+        val heap = Path().apply {
+            moveTo(tl.x, tl.y + c)
+            lineTo(tl.x + (if (info.joinLeft) 0f else c * 0.02f), tl.y + leftY)
+            cubicTo(tl.x + c * 0.15f, tl.y + c * 0.2f, tl.x + c * 0.85f, tl.y + c * 0.2f, tl.x + c - (if (info.joinRight) 0f else c * 0.02f), tl.y + rightY)
+            lineTo(tl.x + c, tl.y + c)
+            close()
+        }
+        drawPath(heap, Brush.verticalGradient(listOf(base, shade), tl.y + c * 0.25f, tl.y + c), alpha = alpha)
     }
-    drawRect(Brush.verticalGradient(listOf(base, shade), tl.y + c * 0.3f, tl.y + c), Offset(tl.x, tl.y + c * 0.55f), Size(c, c * 0.45f), alpha = alpha)
-    drawPath(heap, Brush.verticalGradient(listOf(base, shade), tl.y + c * 0.25f, tl.y + c), alpha = alpha)
-    val grains = listOf(0.25f to 0.62f, 0.5f to 0.45f, 0.7f to 0.7f, 0.38f to 0.82f, 0.62f to 0.88f, 0.82f to 0.84f, 0.18f to 0.9f)
+    val grains = if (info.joinAbove) {
+        listOf(0.2f to 0.15f, 0.55f to 0.25f, 0.8f to 0.12f, 0.35f to 0.42f, 0.75f to 0.48f, 0.25f to 0.62f, 0.5f to 0.7f, 0.7f to 0.75f, 0.38f to 0.88f, 0.82f to 0.9f, 0.12f to 0.85f)
+    } else {
+        listOf(0.25f to 0.62f, 0.5f to 0.45f, 0.7f to 0.7f, 0.38f to 0.82f, 0.62f to 0.88f, 0.82f to 0.84f, 0.18f to 0.9f)
+    }
     for ((gx, gy) in grains) {
         drawCircle(shade, c * 0.035f, tl + Offset(c * gx, c * gy), alpha = alpha * 0.8f)
     }
     if (wet) {
         drawCircle(Color.White, c * 0.03f, tl + Offset(c * 0.45f, c * 0.5f), alpha = alpha * 0.35f)
     }
-    if (powered) {
-        drawRect(Palette.power, tl + Offset(0f, c * 0.55f), Size(c, c * 0.45f), alpha = alpha * 0.18f)
+    if (info.powered) {
+        val top = if (info.joinAbove) 0f else c * 0.55f
+        drawRect(Palette.power, tl + Offset(0f, top), Size(c, c - top), alpha = alpha * 0.18f)
     }
 }
 
