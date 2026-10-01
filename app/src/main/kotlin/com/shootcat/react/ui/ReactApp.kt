@@ -108,7 +108,7 @@ fun ReactApp(viewModel: GameViewModel) {
                 }
 
                 val toast = state.toast
-                if (toast != null && content != null && state.screen == Screen.LEVEL) {
+                if (toast != null && content != null && state.screen == Screen.LEVEL && completion == null) {
                     DiscoveryToast(
                         toast = toast,
                         types = content.world.types,
