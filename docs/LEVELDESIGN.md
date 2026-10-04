@@ -32,3 +32,13 @@ Zehn Level nach dem Leitfaden: jedes hat genau eine Einsicht, eine Falle für de
 - **Hebel:** Reihenfolge (Schild vor dem ersten Überlauf), Irreversibilität (verdampftes Wasser ist weg), Umnutzung (der Bimsstein, der nichts hebt, wird zum Hitzeschild).
 - **Kennzahlen:** 3 Mindestzüge · 8 Lösungen (Reihenfolge der Steine und welches der beiden Felder über dem Teich) · 33 % Sackgassen (4 von 12) · der naheliegende Zug (ein Ding auf das Feld über der Mulde) führt nicht zur Lösung.
 - **Abweichung vom Leitfaden:** Ein Stein kann ein Feuer in dieser Engine nicht ersticken (es gibt keine solche Regel). Stattdessen neutralisiert ein Gegenstand im Spalt das Feuer, weil feste Dinge die Strahlungshitze des großen Feuers aufhalten. Die Einsicht und die Falle bleiben gleich.
+
+## p_04 „Tragbares Wasser“
+
+![Start](screenshots/pruefung/p_04.png)
+
+- **Einsicht:** Gefrorenes Wasser kann man mitnehmen: Süßwasser, das am Frostkristall zu Eis wird, ist ein Block, den man über jede Mauer tragen und erst am Ziel wieder schmelzen kann.
+- **Falle:** Der Samen liegt direkt am Meer, und seit p_03 weiß man, dass ein Stein Wasser hebt. Ein Stein im Meer hebt aber Salzwasser an den Samen und versalzt ihn. Eine Flamme direkt neben dem Samen verbrennt ihn, im Brunnen oder im Meer verlischt sie.
+- **Lösung:** Den Stein in den Brunnen werfen, damit das Süßwasser bis unter das Feld steigt. Den Frost auf dieses Feld setzen: das oberste Wasser gefriert. Das Eis neben den Samen tragen und die Flamme auf der anderen Seite des Eises ablegen.
+- **Hebel:** Reihenfolge (Stein und Frost brauchen dasselbe Feld über dem Brunnen; wer zuerst den Frost setzt, muss ihn wieder wegnehmen), Irreversibilität (verbrannter oder versalzener Samen, verloschene Flamme), Nebenwirkung (der Stein im Meer hebt das falsche Wasser), Umnutzung (der Stein hebt hier Wasser für den Frost, nicht für das Ziel).
+- **Kennzahlen:** 4 Mindestzüge · 4 Lösungen (wann die Flamme kommt) · 33 % Sackgassen (4 von 12 ersten Zügen: Flamme in den Brunnen, ins Meer oder neben den Samen, Stein ins Meer) · der naheliegende Zug (ein Ding auf das Feld neben dem Samen) führt nicht zur Lösung · Köder: keiner (erst ab Level 5 gefordert).

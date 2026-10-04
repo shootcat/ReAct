@@ -1,0 +1,54 @@
+{
+ "id": "p_04",
+ "title": "Tragbares Wasser",
+ "world": 1,
+ "intro": "",
+ "look": 4,
+ "placement": "marked",
+ "map": [
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  ".SZF.......",
+  "%%%%%......",
+  ".+.........",
+  "%.%........",
+  "%~%........",
+  "%~%...++e.+",
+  "%~%%%%%%%==",
+  "%%%%%%%%%==",
+  "%%%%%%%%%%%"
+ ],
+ "legend": {
+  "=": {
+   "type": "SEAWATER"
+  },
+  "F": {
+   "type": "FIRE",
+   "isMovable": true
+  },
+  "S": {
+   "type": "STONE",
+   "isMovable": true
+  },
+  "Z": {
+   "type": "FROST",
+   "isMovable": true
+  },
+  "e": {
+   "type": "SEED"
+  },
+  "~": {
+   "type": "WATER"
+  }
+ },
+ "goals": [
+  {
+   "type": "state",
+   "object": "seed_8_9",
+   "state": "SPROUTED",
+   "text": "Lass den Samen keimen"
+  }
+ ]
+}

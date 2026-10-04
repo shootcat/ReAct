@@ -5,3 +5,5 @@ p_02 min=3
 p_02 [] water_2_5@5,8 water_8_5@5,8 water_2_5@8,11
 p_03 min=3
 p_03 [] pumice_2_4@8,7 stone_0_4@3,7 stone_1_4@4,7
+p_04 min=4
+p_04 [] stone_1_4@1,6 frost_2_4@1,6 ice#1@7,9 fire_3_4@6,9
