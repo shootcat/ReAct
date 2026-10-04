@@ -10,6 +10,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -18,6 +19,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.core.app.ActivityScenario
@@ -115,6 +117,8 @@ class AppSmokeTest {
 
         compose.onNodeWithTag("discoveries").performClick()
         compose.waitForIdle()
+        // The merges follow the world's rules further down the list.
+        compose.onNodeWithTag("discovery_list").performScrollToNode(hasText("Flamme + Flamme → Großes Feuer"))
         compose.onNodeWithText("Flamme + Flamme → Großes Feuer").assertExists()
         shot("06_entdeckungen")
 
