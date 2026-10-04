@@ -2,20 +2,20 @@
 
 > „Du lernst nicht die Lösungen. Du lernst die Welt.“
 
-REACT ist ein deterministisches 2D-Logik-Puzzle für Android. Die Welt besteht aus Objekten, Zuständen und festen Regeln. Jede Bewegung des Spielers setzt die Welt sofort in Gang – man sieht live, was passiert.
+REACT ist ein deterministisches 2D-Logik-Puzzle für Android über die Kräfte der Natur. Jedes Level ist ein Schnitt durch eine Landschaft: Feuer, Wasser, Dampf, Wolken, Erde und Stein folgen festen Regeln. Jede Bewegung des Spielers setzt die Welt sofort in Gang – man sieht live, wie Eis schmilzt, Wasser in Mulden läuft, Dampf aufsteigt und als Regen wiederkommt.
 
-**Stand:** Live-Simulation mit Rückgängig/Wiederholen, realistische Physik (Wasser, Dampfdruck, Auftrieb, Wärmeleitung, Verbrennen, Strom, Lava, Öl, Sand) und **vier Welten mit je 20 Leveln plus Bonuslevel** – 84 Level, deren Lösungen und Mindestzugzahlen per Solver bewiesen sind.
+**Stand:** Live-Simulation mit Rückgängig/Wiederholen, Ziehen-und-Verschmelzen, Aufgaben mit Sternen, Wasserkreislauf, Geräusche und Musik – und **vier Welten mit je 20 Leveln plus Bonuslevel**. Alle 84 Level haben eine bewiesene Mindestzugzahl.
 
 ## Welten
 
-| Welt | Thema | Neue Elemente | Schwerpunkt |
-|---|---|---|---|
-| 1 · Materie | Feuer, Eis, Wasser, Holz | Feuer, Eis, Wasser, Dampf, Stein, Holz, Schalter, Platte, Klappe, Tür | Grundreaktionen, Fließen, Gewicht, Reihenfolge |
-| 2 · Druck | Dampf unter Druck | Metall, Schieber, Kolben, Berstscheibe | Wärmeleitung, Kessel, Kammerdruck, mehrere Türen gleichzeitig |
-| 3 · Strom | Elektrizität | Batterie, Kabel, Lampe, Heizspirale, Relais, Turbine | Stromnetze, leitendes Wasser und Metall, Dampf → Strom → Hitze |
-| 4 · Vulkan | Lava, Öl, Sand | Lava, Öl, Sand | Schichtung nach Dichte, Lava + Wasser → Stein, brennendes Öl, rutschender und nasser Sand |
+| Welt | Neue Elemente | Kniff |
+|---|---|---|
+| 1 · Wald | Flamme, großes Feuer, Wasser, Dampf, Wolke, Eis, Stein, Holz, Holzstapel, Samen, Baum | Wärme schmilzt Eis, Wasser lässt Samen keimen und löscht Feuer, Dampf wird zur Wolke, Wind treibt sie, Regen fällt |
+| 2 · Küste | Meerwasser, Sand | Meerwasser ist schwerer als Süßwasser und lässt nichts wachsen, nasser Sand hält Wasser auf, Steine bringen das Meer zum Überlaufen |
+| 3 · Vulkan | Lava, Glutfels, Bimsstein | Lava fließt und erstarrt an Wasser zu Stein, der Glutfels kocht jedes Wasser, Bimsstein schwimmt |
+| 4 · Frost | Frostkristall, Schnee, Salz | Wasser gefriert am Frost zu einem **losen Eisblock**, den man tragen kann; Salz taut Eis und Schnee, macht Wasser aber salzig – und sinkt im Meer wie ein Stein |
 
-Innerhalb jeder Welt steigt die Schwierigkeit: die ersten Level führen je ein Element mit einem Zug ein, danach braucht es zwei, drei und mehr Züge in der richtigen Reihenfolge, gemeinsam genutzte Ressourcen und mehrere Türen, die gleichzeitig offen sein müssen. Das **Bonuslevel** jeder Welt öffnet sich, wenn alle 20 Level gelöst sind; die nächste Welt öffnet sich mit dem letzten Level der vorigen.
+Die Schwierigkeit steigt innerhalb jeder Welt von einem Zug bis zu sechs oder sieben Zügen in der richtigen Reihenfolge, mit geteilten Ressourcen und Ketten aus mehreren Reaktionen. Jede Welt knüpft an die vorige an: das zweite Level einer Welt ist etwa so schwer wie das zehnte der vorigen. Höhere Level haben **optionale Aufgaben** (Sterne), z. B. einen Baum nicht zu verbrennen oder mit wenigen Zügen auszukommen. Das **Bonuslevel** jeder Welt öffnet sich, wenn alle 20 Level gelöst sind; die nächste Welt öffnet sich mit dem letzten Level der vorigen.
 
 ## APK herunterladen
 
@@ -23,66 +23,64 @@ Jeder Push baut automatisch eine APK und veröffentlicht sie als Release:
 
 **[Neueste APK herunterladen](https://github.com/shootcat/ReAct/releases/latest/download/REACT-beta.apk)** · [alle Builds](https://github.com/shootcat/ReAct/releases)
 
-Alle Builds sind mit demselben Schlüssel signiert und installieren sich als Update übereinander.
+Alle Builds sind mit demselben Schlüssel signiert und installieren sich als Update übereinander. Jedes Release enthält auch Screenshots aller Bildschirme.
 
 ## Spielen
 
-1. Startbildschirm → **Spielen** → Welt wählen → auf der Weltkarte ein Level wählen.
-2. Markierte Objekte ziehen – oder antippen und dann ein freies Feld antippen. Man muss nicht genau treffen: das nächste bewegliche Objekt in Fingerreichweite wird gegriffen.
-3. Die Welt reagiert **sofort**: Physik und Regeln laufen nach jedem Zug Schritt für Schritt, bis wieder alles ruht. Man darf auch eingreifen, während noch etwas passiert.
-4. **↶ Rückgängig** und **↷ Wiederholen** gehen durch die eigenen Züge (jeder Zug speichert den Zustand davor), **↺** startet das Level neu – auch das lässt sich rückgängig machen.
+1. Startbildschirm → **Spielen** → auf der Weltkarte (Wald unten, Frost oben) eine Welt wählen → ein Level wählen.
+2. Bewegliche Dinge liegen auf einem weichen Schatten in einem hellen Rahmen. Man zieht sie – oder tippt sie an und dann das Zielfeld. Man muss nicht genau treffen.
+3. **Ziehen und Verschmelzen:** zwei Flammen werden ein großes Feuer, zwei Hölzer ein Holzstapel, Wasser auf Wasser wird tiefes Wasser. Was nicht zusammenpasst, prallt ab – oder reagiert, wenn es eine Regel dafür gibt (eine Flamme neben Eis landet daneben und schmilzt es). Beim Ziehen zeigt das Zielfeld, was passieren wird.
+4. Die Welt reagiert **sofort** und läuft Schritt für Schritt, bis alles ruht.
+5. Oben stehen die **Aufgaben** (Mulde füllen, Feuer löschen, Regen auslösen, Samen keimen lassen …) mit Häkchen und Sternen. Sobald alle Hauptaufgaben erfüllt sind, erscheint **„Aufgabe erfüllt“**.
+6. **↶ Rückgängig** und **↷ Wiederholen** gehen durch die eigenen Züge (jeder Zug speichert den Zustand davor), **↺** startet das Level neu – auch das lässt sich rückgängig machen.
 
-Das Spielfeld nutzt die volle Bildschirmbreite; reine Wandränder werden abgeschnitten.
+Das Spielfeld skaliert auf jede Bildschirmgröße und hält ringsum mindestens 20 dp Abstand (mehr, wo die Zurück-Geste des Systems weiter hereinreicht). Überschüssige Höhe wird zu mehr Himmel und mehr Erde.
 
-Die Oberfläche arbeitet bewusst mit Symbolen statt Text. Das **Discovery Log** (Reaktions-Matrix) sammelt jede beobachtete Reaktion; unbekannte erscheinen als Silhouette. Beim Abschluss zeigt das Spiel, welche Lösungsklassen gefunden wurden (Standard-Weg, Minimal-Weg mit möglichst wenigen Zügen, System-Override).
+Das **Entdeckungsbuch** sammelt jede beobachtete Reaktion; unbekannte erscheinen als Silhouette.
 
-**Einstellungen:** Simulationstempo, Reaktions-Vorschau, Markierungen, Level-Texte (standardmäßig aus), Vibration und Fortschritt zurücksetzen.
+**Einstellungen:** Tempo, Vorschau beim Ziehen, Rahmen um Bewegliches, Level-Texte, Geräusche, Musik, Vibration, Fortschritt zurücksetzen.
+
+**Klang:** kurze Effekte für das, was in der Welt passiert (Zischen, Plätschern, Knistern, Gefrieren, Regen …) und für jede Welt eine ruhige, meditative Melodie (`SoundManager`).
 
 ## Projektstruktur
 
 ```
-engine/                     Reine Kotlin-Rule-Engine (ohne Android, voll getestet)
-  model/                    GameObject, Rule, LevelData, GameState …
-  RuleEngine.kt             Phasenbasierte Simulation + Kaskaden-Schutz
-  Physics.kt                Phase 2: Schwerkraft, Fließen, Druck, Wärme, Verbrennen
+engine/                     Reine Kotlin-Engine (ohne Android, voll getestet)
+  model/                    GameObject, Rule, LevelData, GameState, Ziele …
+  RuleEngine.kt             Ein Schritt: Physik, dann Regeln (Hitze, Löschen, Gefrieren …), Kaskaden-Schutz
+  Physics.kt                Fallen, Auftrieb, Flüssigkeiten, Dampf, Wolken, Wind, Regen, Wärme, Verbrennen
+  Drops.kt                  Ziehen und Ablegen: platzieren, verschmelzen, reagieren oder abprallen
   LiveSimulation.kt         Live-Modus: Zug → Welt reagiert bis zur Ruhe (unveränderliche Runs für Undo)
   Simulator.kt              Ganze Zeitleiste am Stück (Tests, Determinismus)
   LevelLoader.kt            JSON-Loader mit Validierung
-  Reactions.kt              Texte für Discovery Log und Schritt-Log
-  SolutionClassifier.kt     Standard / Minimal / System-Override
+  Reactions.kt              Texte fürs Entdeckungsbuch
 app/                        Android-App (Kotlin, Jetpack Compose, MVVM/UDF)
-  src/main/assets/levels/   elements.json (alle Materialien + Regeln), world_01–04.json, w1_01 … w4_bonus.json
+  ui/level/                 Spielfeld, Landschaft, Wasserdarstellung, Aufgaben, „Aufgabe erfüllt“
+  audio/SoundManager.kt     Effekte (SoundPool) und Musik je Welt (MediaPlayer)
+  data/                     Fortschritt, Einstellungen, Inhalte
+  src/main/assets/levels/   elements.json (Elemente, Regeln, Verschmelzungen), world_01–04.json, w1_01 … w4_bonus.json
 ```
 
 ## Engine-Regeln
 
 Jeder Simulationsschritt läuft in festen Phasen:
 
-1. **Zustand** – Regeln aus `elements.json`: Hitze schmilzt Eis und entzündet Holz und Öl, Wasser löscht Feuer und brennendes Holz (es entsteht Dampf), Dampf taut Eis, Wärme leitet sich durch Metall, heißes Metall und Heizspiralen bringen Wasser zum Sieden, Dampf hebt Kolben, sprengt Berstscheiben und dreht Turbinen, Strom lässt Lampen leuchten und Spiralen glühen, Wasser kühlt Lava zu Stein und durchnässt Sand, Wasser löst Schalter aus, Gewicht drückt Platten
-2. **Physik** – realistisches Verhalten jedes Materials:
-   - **Wasser** ist ein Volumen (bis 8 Einheiten pro Zelle): es fällt, füllt Becken von unten, läuft zu nahen Kanten und Gruben ab und verteilt sich sonst zu Pfützen
-   - **Dampf** ist ebenfalls ein Volumen – wie umgedrehtes Wasser: er steigt, perlt durch Wasser, läuft unter Decken zu Öffnungen und füllt Kammern von oben. Aus 3 Einheiten Wasser werden 6 Einheiten Dampf
-   - **Druck:** Jede zusammenhängende Luftkammer hat einen Druck (Dampf pro Feld). Ein **Schieber** wird von der Seite mit höherem Druck weggedrückt, sobald der Unterschied reicht – und bleibt stehen, wenn sich der Dampf genug ausdehnen kann
-   - **Auftrieb und Verdrängung:** leichte Objekte (Holz, Eis) schwimmen und steigen in Wasser nach oben, schwere (Stein, Metall, Feuerschalen) sinken und verdrängen das Wasser
-   - **Wärmeleitung:** Metall nimmt die Hitze von Feuer oder brennendem Holz auf und gibt sie weiter – ein Feld pro Schritt, mit jedem Feld ein Grad weniger. Ohne Quelle kühlt es langsam ab
-   - **Verbrennen:** Holz und Öl brennen eine Weile und zerfallen dann; gelöschtes Holz bleibt verkohlt zurück
-   - **Strom** fließt von Batterien und drehenden Turbinen durch Kabel, Metall, Wasser, nassen Sand und geschlossene Relais
-   - **Schichtung:** Flüssigkeiten ordnen sich nach Dichte – Lava sinkt unter Wasser, Öl schwimmt oben. Lava ist zäh und schwer, Öl leicht und brennbar
-   - **Sand** rieselt schräg ab und bildet Hänge; nass leitet er Strom
-3. **Signal** – Schalter, Platten und Kolben senden Signale; Türen und Klappen reagieren, bis das Netz stabil ist
+1. **Physik** – Feststoffe fallen und sinken (schwere verdrängen Wasser), leichte steigen auf (Holz, Eis, Bimsstein, Schnee). Flüssigkeiten sind Volumen (bis 8 Einheiten pro Feld): sie fallen, füllen Mulden von unten und schichten sich nach Dichte (Lava unter Meer unter Süßwasser). Dampf steigt wie umgekehrtes Wasser; sammelt sich genug davon unter einem Hindernis, wird er zur **Wolke**, die nahen Dampf aufnimmt, mit dem **Wind** treibt und voll geworden **regnet**. Wärme reicht bei großem Feuer und Lava zwei Felder weit durch die Luft; Holz und Bäume brennen eine Weile und zerfallen.
+2. **Regeln** aus `elements.json` – z. B. Hitze + Eis → Wasser, Wasser + Flamme → Dampf, Wasser + Samen → Keimling, Meerwasser + Samen → versalzen, Wasser + Lava → Stein, Glutfels kocht Wasser, Frost + volles Feld Süßwasser → Eisblock, Salz + Eis → Wasser, Salz + Wasser → Meerwasser.
 
-Pro Schritt sind höchstens **100 Regel-Transformationen** erlaubt; darüber bricht die Simulation kontrolliert mit „Kurzschluss“ ab (dann hilft Rückgängig). Gleiche Züge ergeben immer exakt denselben Ablauf.
+Pro Schritt sind höchstens **100 Regel-Transformationen** erlaubt; darüber bricht die Simulation kontrolliert ab. Gleiche Züge ergeben immer exakt denselben Ablauf.
 
-Es gibt keine Level-Sonderfälle im Code: Alles kommt aus den JSON-Dateien. Materialien werden über Eigenschaften beschrieben (`gravity`, `liquid`, `gas`, `density`, `weight`, `heat`/`heat_state`, `conducts`, `fuel`/`burnt_state`, `pushable`/`resist` …). Level werden als ASCII-Karte mit Legende beschrieben (`#` Wand, `.` frei, `:` frei aber nicht bebaubar, Buchstaben laut `legend`; eine Legende kann Eigenschaften überschreiben, z. B. `"gravity": false` für fest eingebaute Metallstangen). Neue Level brauchen nur eine neue Datei und einen Eintrag in der passenden `world_0N.json`.
+Es gibt keine Level-Sonderfälle im Code: alles kommt aus den JSON-Dateien. Elemente werden über Eigenschaften beschrieben (`gravity`, `liquid`, `gas`, `density`, `heat`, `heat_radius`, `fuel`, `granular`, `condense`, `cloud` …). Level sind ASCII-Landschaften mit Legende: `#` Erde, `%` Fels, `.` frei, `:` frei, aber nicht bebaubar; Großbuchstaben sind bewegliche Dinge (`isMovable`), Kleinbuchstaben gehören zur Landschaft. Ziele: `fill`, `extinguish`, `rain`, `state`, `preserve`, `clear` und `max_moves`, jeweils optional als Stern.
 
-Die Musterlösungen aller Level stehen in `engine/src/test/resources/walkthroughs.txt` (`w2_10 [STANDARD] fire_1_5@4,5 …`, dazu `w2_10 min=2`). Der Test spielt jede Lösung durch, prüft die angegebenen Lösungsklassen und beweist per Breitensuche, dass es keine kürzere Lösung als die angegebene Mindestzugzahl gibt.
+Die Musterlösungen aller Level stehen in `engine/src/test/resources/walkthroughs.txt` (`w4_02 min=2`, `w1_01 [1] fire_1_11@7,9` – in Klammern die erreichten optionalen Aufgaben). Der Test spielt jede Lösung durch, prüft die Sterne und beweist per Breitensuche, dass es keine kürzere Lösung gibt.
 
 ## Bauen und testen
 
 ```bash
-./gradlew test           # Rule-Engine-Tests
-./gradlew assembleDebug  # Debug-APK -> app/build/outputs/apk/debug/
-./gradlew installDebug   # auf Gerät/Emulator installieren
+./gradlew :engine:test                # Engine-Tests (Physik, Regeln, alle Level und Lösungen)
+./gradlew :app:testDebugUnitTest      # App-Smoke-Test mit Robolectric, Screenshots in app/build/screenshots
+./gradlew assembleDebug               # Debug-APK -> app/build/outputs/apk/debug/
+./gradlew installDebug                # auf Gerät/Emulator installieren
 ```
 
-Benötigt JDK 17+ und ein Android SDK (compileSdk 35). Die GitHub-Action `.github/workflows/build-apk.yml` führt Tests und Build bei jedem Push aus.
+Benötigt JDK 17+ und ein Android SDK (compileSdk 35). Die GitHub-Action `.github/workflows/build-apk.yml` führt Tests und Build bei jedem Push aus und veröffentlicht die APK.
