@@ -215,8 +215,9 @@ class AppSmokeTest {
     private fun gridOf(levelId: String): Pair<Int, Int> {
         val dir = File("src/main/assets/levels")
         val catalog = LevelLoader.parseCatalog(File(dir, "elements.json").readText())
-        val number = levelId.removePrefix("w").substringBefore('_').toInt()
-        val world = LevelLoader.parseWorld(File(dir, "world_%02d.json".format(number)).readText(), catalog)
+        val world = dir.listFiles { f -> f.name.startsWith("world_") }!!.sorted()
+            .map { LevelLoader.parseWorld(it.readText(), catalog) }
+            .first { levelId in it.allLevelIds }
         val level = LevelLoader.parseLevel(File(dir, "$levelId.json").readText(), world)
         return level.width to level.height
     }
