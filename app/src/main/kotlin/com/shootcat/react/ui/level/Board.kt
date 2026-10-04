@@ -23,11 +23,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -131,6 +133,8 @@ fun Board(
     showMarkers: Boolean = true,
     showPreview: Boolean = true,
     haptics: Boolean = true,
+    /** Changes whenever the world jumped (undo, redo, reset): the water then snaps instead of flowing. */
+    snapKey: Int = 0,
 ) {
     val haptic = LocalHapticFeedback.current
     val transition = rememberInfiniteTransition(label = "board")
@@ -164,6 +168,13 @@ fun Board(
     }
     // A selected object that melted, burnt or was undone away is no longer selected.
     val shownSelection = selected?.takeIf { state.objectById(it)?.isMovable == true }
+
+    // The water keeps its own smoothly moving picture of the simulation, driven by the frame clock.
+    val water = remember(level.id) { WaterView() }
+    var frameNanos by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(Unit) {
+        while (true) withFrameNanos { frameNanos = it }
+    }
 
     val landscape = remember(state.width, state.height, state.walls, level.id) {
         Landscape(state, level.terrain, level.world, WorldLooks.of(level.world))
@@ -267,6 +278,8 @@ fun Board(
             val layout = BoardLayout.of(size.width, size.height, state.width, state.height)
             val cell = layout.cell
             if (cell <= 0f) return@Canvas
+            water.update(state, previous, progress, frameNanos, snapKey)
+            fun shownAt(o: GameObject) = objectOffset(o, previous, progress) + Offset(0f, water.sinkOf(o.id))
             val d = drag
             val placing = d != null || shownSelection != null
             // Everything below is drawn in grid coordinates.
@@ -282,10 +295,10 @@ fun Board(
 
                 // Movable things rest on a soft shadow.
                 for (o in state.objects) {
-                    if (!o.isMovable || o.isAiry || o.id == d?.objectId) continue
+                    if (!o.isMovable || o.isAiry || o.id == d?.objectId || water.sinkOf(o.id) > 0f) continue
                     drawShadow(objectOffset(o, previous, progress), cell)
                 }
-                drawLiquids(state, previous, progress, cell, time)
+                water.drawBehind(this, cell)
                 for (o in state.objects) {
                     if (o.isLiquid) continue
                     val prev = previous?.objectById(o.id)
@@ -295,7 +308,7 @@ fun Board(
                         appearing -> progress
                         else -> 1f
                     }
-                    var at = objectOffset(o, previous, progress)
+                    var at = shownAt(o)
                     if (o.id == shaking) at += Offset(sin(shake.value * TAU * 3f) * 0.14f * shake.value, 0f)
                     drawGameObject(o, at * cell, cell, alpha, time, infoFor(o, state))
                 }
@@ -306,8 +319,10 @@ fun Board(
                     }
                 }
 
+                water.drawInFront(this, cell, state, ::shownAt)
+
                 if (interactive) {
-                    drawMovableFrames(state, previous, progress, cell, shownSelection, d?.objectId, time, showMarkers)
+                    drawMovableFrames(state, ::shownAt, cell, shownSelection, d?.objectId, time, showMarkers)
                     if (d != null) drawDrag(d, dropPreview, state, types, cell, time, showPreview)
                 }
             }
@@ -459,8 +474,7 @@ private fun DrawScope.drawGoalAreas(goals: List<LevelGoal>, met: List<Boolean>, 
 /** A light frame around everything the player may move; the selected object glows. */
 private fun DrawScope.drawMovableFrames(
     state: GameState,
-    previous: GameState?,
-    progress: Float,
+    shownAt: (GameObject) -> Offset,
     cell: Float,
     selected: String?,
     dragged: String?,
@@ -470,7 +484,7 @@ private fun DrawScope.drawMovableFrames(
     val pulse = 0.5f + 0.5f * sin(time * TAU * 2f)
     for (o in state.objects.filter { it.isMovable && it.id != dragged }) {
         if (!showMarkers && o.id != selected) continue
-        val at = objectOffset(o, previous, progress) * cell
+        val at = shownAt(o) * cell
         val inset = cell * 0.04f
         val tl = at + Offset(inset, inset)
         val s = Size(cell - 2 * inset, cell - 2 * inset)

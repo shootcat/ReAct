@@ -43,6 +43,8 @@ data class LevelSession(
     val tick: Int = 0,
     val undo: List<HistoryEntry> = emptyList(),
     val redo: List<HistoryEntry> = emptyList(),
+    /** Counts jumps through history (undo, redo, reset): the board then shows the new world at once. */
+    val snaps: Int = 0,
 ) {
     val state: GameState get() = run.state
     val canUndo: Boolean get() = undo.isNotEmpty()
@@ -324,7 +326,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     private fun show(session: LevelSession) {
         stopSimulation()
         completionJob?.cancel()
-        _state.update { it.copy(session = session.copy(previous = null, tick = session.tick + 1), completion = null) }
+        _state.update { it.copy(session = session.copy(previous = null, tick = session.tick + 1, snaps = session.snaps + 1), completion = null) }
         simulate(initialDelay = stepMillis())
     }
 

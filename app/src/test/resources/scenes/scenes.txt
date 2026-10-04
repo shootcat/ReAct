@@ -1,0 +1,7 @@
+# scene  move (object@x,y)  moments in motion (ms after the move, multiples of 50)
+stein_im_teich stone_4_2@5,5 300
+holz_schwimmt wood_4_2@5,5 300
+wasserfall fire_0_1@4,1 1500
+wasser_auf_stein stone_1_1@2,3 1400
+meer_unter_suess stone_1_1@2,3 1400
+lava_trifft_wasser stone_1_1@2,3 1400

@@ -119,6 +119,7 @@ fun LevelScreen(
             showMarkers = settings.markers,
             showPreview = settings.reactionPreview,
             haptics = settings.haptics,
+            snapKey = session.snaps,
         )
 
         HistoryDock(session, overload, onEvent)
