@@ -21,3 +21,14 @@ Zehn Level nach dem Leitfaden: jedes hat genau eine Einsicht, eine Falle für de
 - **Lösung:** Eine Pfütze in die kleine Mulde in der Mitte tragen, die andere dazugießen (7 Einheiten), das gesammelte Wasser ans große Feuer.
 - **Hebel:** Knappheit (7 Einheiten reichen genau, 5 nicht mehr), Reihenfolge (erst sammeln, dann gießen), Irreversibilität (verdampftes und versickertes Wasser ist weg).
 - **Kennzahlen:** 3 Mindestzüge · 2 Lösungen · 75 % Sackgassen (6 von 8 ersten Zügen) · der naheliegende Zug (Pfütze ans Feuer) führt nicht zur Lösung · Köder: die kleine Flamme (fest, kein bewegliches Objekt).
+
+## p_03 „Verdrängung“
+
+![Start](screenshots/pruefung/p_03.png)
+
+- **Einsicht:** Ein Stein kann Wasser heben: was im Teich versinkt, schiebt das Wasser über den Rand in die höhere Mulde.
+- **Falle:** Wer zuerst einen Stein in den Teich wirft, schickt den Überlauf an das große Feuer, das ihn verdampft; danach reicht das Wasser nicht mehr. Der Bimsstein im Teich schwimmt nur und hebt nichts. Ein Stein im Spalt vor dem Feuer fehlt danach im Teich.
+- **Lösung:** Erst den Bimsstein in den Spalt zwischen Mulde und Feuer: er hält dort das Wasser und schirmt die Hitze ab. Dann beide Steine in den Teich.
+- **Hebel:** Reihenfolge (Schild vor dem ersten Überlauf), Irreversibilität (verdampftes Wasser ist weg), Umnutzung (der Bimsstein, der nichts hebt, wird zum Hitzeschild).
+- **Kennzahlen:** 3 Mindestzüge · 8 Lösungen (Reihenfolge der Steine und welches der beiden Felder über dem Teich) · 33 % Sackgassen (4 von 12) · der naheliegende Zug (ein Ding auf das Feld über der Mulde) führt nicht zur Lösung.
+- **Abweichung vom Leitfaden:** Ein Stein kann ein Feuer in dieser Engine nicht ersticken (es gibt keine solche Regel). Stattdessen neutralisiert ein Gegenstand im Spalt das Feuer, weil feste Dinge die Strahlungshitze des großen Feuers aufhalten. Die Einsicht und die Falle bleiben gleich.
