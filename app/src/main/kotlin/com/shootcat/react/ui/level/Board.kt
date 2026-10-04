@@ -7,6 +7,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.withInfiniteAnimationFrameNanos
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -29,7 +30,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -135,6 +135,8 @@ fun Board(
     haptics: Boolean = true,
     /** Changes whenever the world jumped (undo, redo, reset): the water then snaps instead of flowing. */
     snapKey: Int = 0,
+    /** Drives the water's animation instead of the frame clock (for tests that step time themselves). */
+    clockNanos: Long? = null,
 ) {
     val haptic = LocalHapticFeedback.current
     val transition = rememberInfiniteTransition(label = "board")
@@ -172,8 +174,11 @@ fun Board(
     // The water keeps its own smoothly moving picture of the simulation, driven by the frame clock.
     val water = remember(level.id) { WaterView() }
     var frameNanos by remember { mutableLongStateOf(0L) }
-    LaunchedEffect(Unit) {
-        while (true) withFrameNanos { frameNanos = it }
+    if (clockNanos == null) {
+        // An infinite animation: paused where infinite animations are (tests); the water then just shows the world.
+        LaunchedEffect(Unit) {
+            while (true) withInfiniteAnimationFrameNanos { frameNanos = it }
+        }
     }
 
     val landscape = remember(state.width, state.height, state.walls, level.id) {
@@ -278,7 +283,7 @@ fun Board(
             val layout = BoardLayout.of(size.width, size.height, state.width, state.height)
             val cell = layout.cell
             if (cell <= 0f) return@Canvas
-            water.update(state, previous, progress, frameNanos, snapKey)
+            water.update(state, previous, progress, clockNanos ?: frameNanos, snapKey)
             fun shownAt(o: GameObject) = objectOffset(o, previous, progress) + Offset(0f, water.sinkOf(o.id))
             val d = drag
             val placing = d != null || shownSelection != null

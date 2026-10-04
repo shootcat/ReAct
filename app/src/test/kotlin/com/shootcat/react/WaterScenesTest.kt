@@ -76,6 +76,8 @@ class WaterScenesTest {
             }
 
             val shown = mutableStateOf(Shown(states[0], null, 1f))
+            // The test steps time itself: the water animates on this clock, not on the (paused) frame clock.
+            val clock = mutableStateOf(0L)
             scenario.onActivity { activity ->
                 activity.setContent {
                     ReactTheme {
@@ -94,6 +96,7 @@ class WaterScenesTest {
                                 onMove = { _, _ -> },
                                 onBounce = {},
                                 modifier = Modifier.fillMaxSize(),
+                                clockNanos = clock.value,
                             )
                         }
                     }
@@ -107,7 +110,10 @@ class WaterScenesTest {
             val captures = (inMotion.map { it to "bewegung" } + (atRest to "ruhe")).toMap()
             var ms = 0L
             while (ms <= atRest) {
-                compose.runOnIdle { shown.value = shownAt(ms) }
+                compose.runOnIdle {
+                    shown.value = shownAt(ms)
+                    clock.value = (ms + 1_000) * 1_000_000L
+                }
                 compose.mainClock.advanceTimeBy(FRAME)
                 captures[ms]?.let { label ->
                     val suffix = if (label == "bewegung" && inMotion.size > 1) "${label}_$ms" else label

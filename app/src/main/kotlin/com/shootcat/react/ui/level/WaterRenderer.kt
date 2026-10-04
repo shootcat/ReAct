@@ -136,6 +136,7 @@ internal class WaterView {
     private var lastNanos = -1L
     private var shown: GameState? = null
     private var lastSnap = 0
+    private var stillFrames = 0
     private var clock = 0f
 
     private var bodies: List<Body> = emptyList()
@@ -152,10 +153,12 @@ internal class WaterView {
      */
     fun update(state: GameState, previous: GameState?, progress: Float, nanos: Long, snapKey: Int = 0) {
         val dt = if (lastNanos < 0) 0f else ((nanos - lastNanos) / 1e9f).coerceIn(0f, 0.1f)
+        // Without a running frame clock (paused animations) there is nothing to flow with: show the world as it is.
+        stillFrames = if (lastNanos >= 0 && nanos == lastNanos) stillFrames + 1 else 0
         lastNanos = nanos
         clock += dt
         val changed = state !== shown
-        val jump = shown == null || snapKey != lastSnap
+        val jump = shown == null || snapKey != lastSnap || (changed && stillFrames > 2)
         shown = state
         lastSnap = snapKey
 
@@ -183,7 +186,7 @@ internal class WaterView {
             }
         }
 
-        updateStreams(state, previous, progress, falling, dt)
+        updateStreams(state, previous, progress, falling, dt, instant = jump)
         if (changed && !jump && previous != null) addLandings(state, previous)
         for (i in impulses) i.age += dt
         impulses.removeAll { it.age > 1.6f }
@@ -242,7 +245,8 @@ internal class WaterView {
         return (if (state.inBounds(p)) p.y else state.height).toFloat() to false
     }
 
-    private fun updateStreams(state: GameState, previous: GameState?, progress: Float, falling: List<GameObject>, dt: Float) {
+    /** Streams follow their water; [instant] (a jump) shows them fully formed right away. */
+    private fun updateStreams(state: GameState, previous: GameState?, progress: Float, falling: List<GameObject>, dt: Float, instant: Boolean) {
         for (s in streams) s.seen = false
         val runs = runsOf(falling)
         for (run in runs) {
@@ -279,7 +283,7 @@ internal class WaterView {
             // The same stream as before (also when the pool sank a row), otherwise a new one at the lip.
             val s = streams.firstOrNull { !it.seen && it.type == type && it.column == x && it.attached && it.dir == dir }
                 ?: streams.firstOrNull { !it.seen && it.type == type && it.column == x && it.attached }
-                ?: Stream(type, x, dir, startY).also { streams += it }
+                ?: Stream(type, x, dir, if (instant) impact else startY).also { streams += it }
             val fresh = !s.seen && s.width == 0f
             s.seen = true
             s.attached = true
