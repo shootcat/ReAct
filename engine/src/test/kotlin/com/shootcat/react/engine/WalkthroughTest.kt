@@ -3,7 +3,6 @@ package com.shootcat.react.engine
 import com.shootcat.react.engine.model.GameObject
 import com.shootcat.react.engine.model.LevelData
 import com.shootcat.react.engine.model.Position
-import com.shootcat.react.engine.model.SolutionKind
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.test.Test
@@ -12,13 +11,15 @@ import kotlin.test.assertTrue
 import kotlin.test.fail
 
 /**
- * Every level is played with the walkthroughs in walkthroughs.txt: each one must solve the level with
- * exactly the listed solution classes, together they must show every class the level offers, and an
+ * Every level is played with the walkthroughs in walkthroughs.txt: each one must solve the level and
+ * meet exactly the listed optional goals, together they must show every optional goal, and an
  * exhaustive search proves there is no solution with fewer moves than the level's declared minimum.
+ *
+ * Format: `w1_05 min=2` and `w1_05 [1,2] fire_2_3@5,3 ice_4_1@6,2` (optional goal indices, then moves).
  */
 class WalkthroughTest {
 
-    private class Walk(val level: String, val classes: Set<SolutionKind>, val moves: List<Pair<String, Position>>)
+    private class Walk(val level: String, val achieved: Set<Int>, val moves: List<Pair<String, Position>>)
 
     private val minimum = HashMap<String, Int>()
     private val walks = mutableListOf<Walk>()
@@ -31,14 +32,14 @@ class WalkthroughTest {
                 minimum[parts[0]] = parts[1].removePrefix("min=").toInt()
                 continue
             }
-            val classes = parts[1].removePrefix("[").removeSuffix("]").split(",").filter { it.isNotEmpty() }
-                .map { SolutionKind.valueOf(it) }.toSet()
+            val achieved = parts[1].removePrefix("[").removeSuffix("]").split(",").filter { it.isNotEmpty() }
+                .map { it.toInt() }.toSet()
             val moves = parts.drop(2).map { token ->
                 val (id, xy) = token.split("@")
                 val (x, y) = xy.split(",").map { it.toInt() }
                 id to Position(x, y)
             }
-            walks += Walk(parts[0], classes, moves)
+            walks += Walk(parts[0], achieved, moves)
         }
     }
 
@@ -51,20 +52,21 @@ class WalkthroughTest {
     }
 
     @Test
-    fun `walkthroughs solve their level with the listed solution classes`() {
+    fun `walkthroughs solve their level and meet exactly the listed optional goals`() {
         for (walk in walks) {
             val a = Levels.attempt(walk.level, *walk.moves.toTypedArray())
             assertTrue(a.solved, "${walk.level} ${walk.moves} should be solved, was ${a.run.outcome}")
-            assertEquals(walk.classes, a.solutions, "${walk.level} ${walk.moves}")
+            assertEquals(walk.achieved, a.achieved, "${walk.level} ${walk.moves}")
         }
     }
 
     @Test
-    fun `every solution class of a level can be reached`() {
+    fun `every optional goal of a level can be reached`() {
         for (id in Levels.allLevelIds) {
-            val shown = walks.filter { it.level == id }.flatMap { it.classes }.toSet()
-            val offered = Levels.level(id).solutions.map { it.kind }.toSet()
-            assertEquals(offered, shown, "$id: classes in walkthroughs")
+            val level = Levels.level(id)
+            val shown = walks.filter { it.level == id }.flatMap { it.achieved }.toSet()
+            val offered = level.goals.indices.filter { level.goals[it].optional }.toSet()
+            assertEquals(offered, shown, "$id: optional goals in walkthroughs")
         }
     }
 
@@ -97,7 +99,7 @@ class WalkthroughTest {
             val next = Collections.synchronizedList(mutableListOf<Pair<List<Pair<String, Position>>, Run>>())
             val found = Collections.synchronizedList(mutableListOf<List<Pair<String, Position>>>())
             val jobs = frontier.flatMap { (moves, run) ->
-                run.state.objects.filter { it.movable }.flatMap { o -> cells.map { Triple(moves, run, o.id to it) } }
+                run.state.objects.filter { it.isMovable }.flatMap { o -> cells.map { Triple(moves, run, o.id to it) } }
             }
             jobs.parallelStream().forEach { (moves, run, move) ->
                 if (found.isNotEmpty()) return@forEach

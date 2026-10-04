@@ -2,7 +2,7 @@ package com.shootcat.react.engine
 
 import com.shootcat.react.engine.model.GameObject
 import com.shootcat.react.engine.model.GameState
-import com.shootcat.react.engine.model.Goal
+import com.shootcat.react.engine.model.TargetState
 import com.shootcat.react.engine.model.Position
 import com.shootcat.react.engine.model.Rule
 import com.shootcat.react.engine.model.RuleConditions
@@ -43,7 +43,7 @@ class CascadeLimitTest {
 
     @Test
     fun `the simulation stops with an overload`() {
-        val result = Simulator(TestWorld.engine(), listOf(Goal("fire_0", "NEVER")), 50).run(meltingRow(101))
+        val result = Simulator(TestWorld.engine(), listOf(TargetState("fire_0", "NEVER", vanishes = false, text = "nie")), 50).run(meltingRow(101))
         assertEquals(Outcome.OVERLOAD, result.outcome)
         assertEquals(1, result.lastIndex)
     }

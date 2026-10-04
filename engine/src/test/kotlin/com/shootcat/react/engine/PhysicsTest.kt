@@ -169,6 +169,7 @@ class PhysicsTest {
     @Test
     fun `steam runs along a ceiling into a dome and fills it from the top`() {
         val start = TestWorld.state(
+            "#######",
             "####.##",
             "####.##",
             "#.....#",
@@ -177,8 +178,19 @@ class PhysicsTest {
         )
         val s = start.after(20, physicsOnly)
         assertEquals(16, s.totalSteam())
-        assertEquals(8, s.objects.first { it.position == Position(4, 0) }.amount)
         assertEquals(8, s.objects.first { it.position == Position(4, 1) }.amount)
+        assertEquals(8, s.objects.first { it.position == Position(4, 2) }.amount)
+    }
+
+    @Test
+    fun `steam that rises out of the top escapes into the open sky`() {
+        val start = TestWorld.state(
+            "#.#",
+            "#.#",
+            "#V#",
+            "###",
+        )
+        assertEquals(0, start.after(4, physicsOnly).totalSteam())
     }
 
     @Test
@@ -197,6 +209,7 @@ class PhysicsTest {
     @Test
     fun `steam volume is conserved`() {
         var s = TestWorld.state(
+            "#########",
             "#.......#",
             "#.##.#..#",
             "#V.c.Wb.#",

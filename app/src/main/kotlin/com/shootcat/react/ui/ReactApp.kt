@@ -81,8 +81,8 @@ fun ReactApp(viewModel: GameViewModel) {
                     state.screen == Screen.LEVEL && session != null -> LevelScreen(
                         session = session,
                         content = content,
-                        progress = state.progress,
                         settings = state.settings,
+                        previewDrop = viewModel::previewDrop,
                         onEvent = onEvent,
                     )
                     state.screen == Screen.WORLDS -> WorldSelectScreen(
@@ -111,7 +111,6 @@ fun ReactApp(viewModel: GameViewModel) {
                 if (completion != null && content != null) {
                     CompletionOverlay(
                         completion = completion,
-                        found = state.progress.solutionsFor(completion.level.id),
                         types = content.types,
                         onNext = { onEvent(GameEvent.NextLevel) },
                         onReplay = { onEvent(GameEvent.Replay) },

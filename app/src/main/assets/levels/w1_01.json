@@ -1,53 +1,56 @@
 {
-  "id": "w1_01",
-  "title": "Schmelzpunkt",
-  "world": 1,
-  "intro": "",
-  "map": [
-    "########",
-    "#......#",
-    "#......D",
-    "#.F...i#",
-    "######B#",
-    "########"
-  ],
-  "legend": {
-    "B": {
-      "type": "BUTTON",
-      "properties": {
-        "channel": "A"
-      }
-    },
-    "D": {
-      "type": "DOOR",
-      "id": "door_1",
-      "properties": {
-        "channel": "A"
-      }
-    },
-    "F": {
-      "type": "FIRE",
-      "movable": true
-    },
-    "i": {
-      "type": "ICE"
-    }
+ "id": "w1_01",
+ "title": "Tauwetter",
+ "world": 1,
+ "intro": "Wärme schmilzt Eis.",
+ "map": [
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "........i.t",
+  ".......####",
+  ".F....#####",
+  "###..######",
+  "###..######",
+  "####.######",
+  "###########",
+  "###########"
+ ],
+ "legend": {
+  "F": {
+   "type": "FIRE",
+   "isMovable": true
   },
-  "goals": [
-    {
-      "object_id": "door_1",
-      "required_state": "UNLOCKED"
-    }
-  ],
-  "solutions": [
-    {
-      "id": "standard",
-      "kind": "STANDARD",
-      "requires": [
-        {
-          "rule": "water_triggers_button"
-        }
-      ]
-    }
-  ]
+  "i": {
+   "type": "ICE"
+  },
+  "t": {
+   "type": "TREE"
+  }
+ },
+ "goals": [
+  {
+   "type": "fill",
+   "area": [
+    3,
+    12,
+    4,
+    14
+   ],
+   "min": 6,
+   "text": "Fülle die Mulde mit Wasser"
+  },
+  {
+   "type": "preserve",
+   "object": "tree_10_9",
+   "text": "Der Baum bleibt grün",
+   "optional": true
+  }
+ ]
 }

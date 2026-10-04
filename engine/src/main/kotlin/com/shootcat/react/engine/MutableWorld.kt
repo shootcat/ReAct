@@ -14,6 +14,9 @@ internal class MutableWorld(private val base: GameState) {
     private val grid = HashMap<Position, String>()
     private var spawnCounter = base.spawnCounter
 
+    /** Sounds of this step that physics produced (clouds forming, rain starting …). */
+    val cues = mutableListOf<Cue>()
+
     init {
         base.objects.forEach { put(it) }
     }
@@ -50,7 +53,7 @@ internal class MutableWorld(private val base: GameState) {
         objects[id] = o.copy(burnt = burnt)
     }
 
-    /** Sets a liquid's or gas's amount; an empty cell disappears. */
+    /** Sets the amount of a liquid, gas or cloud; an empty cell disappears. */
     fun setAmount(id: String, amount: Int) {
         val o = objects.getValue(id)
         if (amount <= 0) remove(id) else objects[id] = o.copy(amount = amount)
@@ -77,6 +80,10 @@ internal class MutableWorld(private val base: GameState) {
 
     fun fluidCapacity(type: String, types: TypeCatalog): Int =
         types.require(type).properties["capacity"]?.toIntOrNull() ?: 8
+
+    fun cue(sound: String, at: Position) {
+        if (cues.none { it.sound == sound }) cues += Cue(sound, at)
+    }
 
     fun spawn(type: String, at: Position, types: TypeCatalog, amount: Int? = null): GameObject {
         spawnCounter++

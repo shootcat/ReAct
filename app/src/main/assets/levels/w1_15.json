@@ -1,79 +1,48 @@
 {
-  "id": "w1_15",
-  "title": "Kaskade",
-  "world": 1,
-  "intro": "",
-  "map": [
-    "###############",
-    "#.............#",
-    "#.F....#..s...#",
-    "#######i##xxxx#",
-    "#######h##:####",
-    "#######:##:####",
-    "#######:##p####",
-    "#######.B######",
-    "#######.#######",
-    "#############D#",
-    "###############"
-  ],
-  "legend": {
-    "B": {
-      "type": "BUTTON",
-      "properties": {
-        "channel": "A"
-      }
-    },
-    "D": {
-      "type": "DOOR",
-      "id": "door_1",
-      "properties": {
-        "channel": "A"
-      }
-    },
-    "F": {
-      "type": "FIRE",
-      "movable": true
-    },
-    "h": {
-      "type": "HATCH",
-      "properties": {
-        "channel": "B"
-      }
-    },
-    "i": {
-      "type": "ICE"
-    },
-    "p": {
-      "type": "PLATE",
-      "properties": {
-        "channel": "B"
-      }
-    },
-    "s": {
-      "type": "STONE"
-    },
-    "x": {
-      "type": "WOOD",
-      "properties": {
-        "gravity": false
-      }
-    }
+ "id": "w1_15",
+ "title": "Holzstapel",
+ "world": 1,
+ "intro": "",
+ "map": [
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "..%%%%%%%..",
+  "..%.....%..",
+  "...........",
+  "...........",
+  "...........",
+  "W.F.......W",
+  "####555####",
+  "####~~~####",
+  "###########",
+  "###########"
+ ],
+ "legend": {
+  "5": {
+   "type": "WATER",
+   "amount": 5
   },
-  "goals": [
-    {
-      "object_id": "door_1",
-      "required_state": "UNLOCKED"
-    }
-  ],
-  "solutions": [
-    {
-      "id": "standard",
-      "kind": "STANDARD",
-      "requires": [
-        {
-          "rule": "water_triggers_button"
-        }
-      ]
-    }
-  ]
+  "F": {
+   "type": "FIRE",
+   "isMovable": true
+  },
+  "W": {
+   "type": "WOOD",
+   "isMovable": true
+  },
+  "~": {
+   "type": "WATER"
+  }
+ },
+ "goals": [
+  {
+   "type": "rain",
+   "text": "Lass es regnen"
+  }
+ ]
 }

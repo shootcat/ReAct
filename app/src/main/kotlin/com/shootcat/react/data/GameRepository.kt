@@ -4,6 +4,7 @@ import android.content.Context
 import com.shootcat.react.engine.LevelLoader
 import com.shootcat.react.engine.model.Catalog
 import com.shootcat.react.engine.model.LevelData
+import com.shootcat.react.engine.model.MergeRule
 import com.shootcat.react.engine.model.Rule
 import com.shootcat.react.engine.model.TypeCatalog
 import com.shootcat.react.engine.model.WorldData
@@ -17,6 +18,9 @@ class GameContent(val catalog: Catalog, val worlds: List<WorldData>, levels: Lis
 
     /** Every reaction that exists – the full Discovery matrix. */
     val allRules: List<Rule> = (catalog.rules + levels.flatMap { it.rules }).distinctBy { it.id }
+
+    /** Everything that can be merged by dropping one element onto another. */
+    val merges: List<MergeRule> get() = catalog.merges
 
     fun level(id: String): LevelData? = byId[id]
 

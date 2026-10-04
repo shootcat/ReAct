@@ -31,6 +31,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.shootcat.react.BuildConfig
@@ -63,9 +64,15 @@ fun SettingsScreen(
 
             Section("Hilfen")
             Card {
-                ToggleRow("Reaktions-Vorschau", settings.reactionPreview) { onChange(settings.copy(reactionPreview = it)) }
-                ToggleRow("Markierungen", settings.markers) { onChange(settings.copy(markers = it)) }
+                ToggleRow("Vorschau beim Ziehen", settings.reactionPreview) { onChange(settings.copy(reactionPreview = it)) }
+                ToggleRow("Rahmen um Bewegliches", settings.markers) { onChange(settings.copy(markers = it)) }
                 ToggleRow("Level-Texte", settings.levelTexts) { onChange(settings.copy(levelTexts = it)) }
+            }
+
+            Section("Klang")
+            Card {
+                ToggleRow("Geräusche", settings.sound) { onChange(settings.copy(sound = it)) }
+                ToggleRow("Musik", settings.music) { onChange(settings.copy(music = it)) }
             }
 
             Section("Gerät")
@@ -103,15 +110,15 @@ fun SettingsScreen(
             onDismissRequest = { confirmReset = false },
             containerColor = Palette.surface,
             title = { Text("Alles zurücksetzen?", color = Palette.text) },
-            text = { Text("Level, Lösungen und Entdeckungen gehen verloren.", color = Palette.textDim) },
+            text = { Text("Gelöste Level, Sterne und Entdeckungen gehen verloren.", color = Palette.textDim) },
             confirmButton = {
                 TextButton(onClick = {
                     confirmReset = false
                     onResetProgress()
-                }) { Text("Zurücksetzen", color = Palette.danger) }
+                }) { Text("Zurücksetzen", color = Palette.danger, maxLines = 1, overflow = TextOverflow.Ellipsis) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmReset = false }) { Text("Abbrechen") }
+                TextButton(onClick = { confirmReset = false }) { Text("Abbrechen", maxLines = 1, overflow = TextOverflow.Ellipsis) }
             },
         )
     }

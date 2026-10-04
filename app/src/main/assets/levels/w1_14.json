@@ -1,58 +1,49 @@
 {
-  "id": "w1_14",
-  "title": "Umweg",
-  "world": 1,
-  "intro": "",
-  "map": [
-    "#############",
-    "#:i::#####.##",
-    "#:##:#####:##",
-    "#:#........##",
-    "#:#......I.F#",
-    "#B###########",
-    "############D"
-  ],
-  "legend": {
-    "B": {
-      "type": "BUTTON",
-      "properties": {
-        "channel": "A"
-      }
-    },
-    "D": {
-      "type": "DOOR",
-      "id": "door_1",
-      "properties": {
-        "channel": "A"
-      }
-    },
-    "F": {
-      "type": "FIRE",
-      "movable": true
-    },
-    "I": {
-      "type": "ICE",
-      "movable": true
-    },
-    "i": {
-      "type": "ICE"
-    }
+ "id": "w1_14",
+ "title": "Regentanz",
+ "world": 1,
+ "intro": "",
+ "map": [
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "..%%%%%%%..",
+  "..%.....%..",
+  "...........",
+  "...%f:f%...",
+  "...%%:%%...",
+  "...%%:%%...",
+  ".F.......F.",
+  "###~~~~####",
+  "###~~~~####",
+  "###########",
+  "###########"
+ ],
+ "legend": {
+  "F": {
+   "type": "FIRE",
+   "isMovable": true
   },
-  "goals": [
-    {
-      "object_id": "door_1",
-      "required_state": "UNLOCKED"
-    }
-  ],
-  "solutions": [
-    {
-      "id": "standard",
-      "kind": "STANDARD",
-      "requires": [
-        {
-          "rule": "water_triggers_button"
-        }
-      ]
-    }
-  ]
+  "f": {
+   "type": "FIRE"
+  },
+  "~": {
+   "type": "WATER"
+  }
+ },
+ "goals": [
+  {
+   "type": "extinguish",
+   "text": "Lösche die Feuer auf dem Felsen",
+   "area": [
+    3,
+    9,
+    7,
+    9
+   ]
+  }
+ ]
 }

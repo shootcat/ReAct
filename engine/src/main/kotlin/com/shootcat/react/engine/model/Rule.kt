@@ -30,8 +30,17 @@ data class RuleConditions(
     val targetState: String? = null,
     val minLoad: Int = 1,
     val direction: LoadDirection = LoadDirection.DOWN,
-    /** TOUCH: any hot neighbour counts as source (fire, burning wood, hot metal …). */
+    /**
+     * TOUCH: anything hot counts as source (fire, burning wood, lava …): touching it, or within its
+     * heat radius.
+     */
     val sourceHot: Boolean = false,
+    /** With [sourceHot]: the heat the source must give off at least (a big fire boils water, embers do not). */
+    val minHeat: Int = 1,
+    /** A liquid or gas source must hold at least this much (only deep water douses a big fire). */
+    val sourceMinAmount: Int = 0,
+    /** A liquid or gas target must hold at least this much (only a full cell of water freezes). */
+    val targetMinAmount: Int = 0,
 )
 
 data class RuleEffect(
@@ -45,6 +54,8 @@ data class RuleEffect(
     val sourceConsume: Int = 0,
     /** Amount the target loses if it is a liquid or gas, e.g. water boiling on hot metal. */
     val targetConsume: Int = 0,
+    /** The target turns into another element in place (water freezing to ice); liquids keep their amount. */
+    val transform: String? = null,
 )
 
 data class Rule(
@@ -57,6 +68,8 @@ data class Rule(
     val elseEffect: RuleEffect? = null,
     /** The world that introduces this reaction (Discovery Log grouping). */
     val world: Int = 1,
+    /** Sound effect played when the reaction happens (e.g. "hiss", "crackle"). */
+    val sound: String? = null,
 ) {
     val phase: Phase get() = if (trigger == Trigger.SIGNAL) Phase.SIGNAL else Phase.STATE
 }

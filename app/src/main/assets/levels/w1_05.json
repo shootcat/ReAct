@@ -1,57 +1,40 @@
 {
-  "id": "w1_05",
-  "title": "Doppelt",
-  "world": 1,
-  "intro": "",
-  "map": [
-    "##########",
-    "#........#",
-    "#........#",
-    "#.F.i.i..#",
-    "#####.####",
-    "#####:####",
-    "#####:##.D",
-    "#####P####",
-    "##########"
-  ],
-  "legend": {
-    "D": {
-      "type": "DOOR",
-      "id": "door_1",
-      "properties": {
-        "channel": "A"
-      }
-    },
-    "F": {
-      "type": "FIRE",
-      "movable": true
-    },
-    "P": {
-      "type": "PLATE",
-      "properties": {
-        "channel": "A"
-      }
-    },
-    "i": {
-      "type": "ICE"
-    }
+ "id": "w1_05",
+ "title": "Zwei Feuerstellen",
+ "world": 1,
+ "intro": "",
+ "map": [
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "I..........",
+  "##.........",
+  "##...f.....",
+  "##..###....",
+  "##..###....",
+  "##.......f.",
+  "###########",
+  "###########"
+ ],
+ "legend": {
+  "I": {
+   "type": "ICE",
+   "isMovable": true
   },
-  "goals": [
-    {
-      "object_id": "door_1",
-      "required_state": "UNLOCKED"
-    }
-  ],
-  "solutions": [
-    {
-      "id": "standard",
-      "kind": "STANDARD",
-      "requires": [
-        {
-          "rule": "weight_presses_plate",
-          "source": "WATER"
-        }
-      ]
-    }
-  ]
+  "f": {
+   "type": "FIRE"
+  }
+ },
+ "goals": [
+  {
+   "type": "extinguish",
+   "text": "Lösche beide Feuerstellen"
+  }
+ ]
 }

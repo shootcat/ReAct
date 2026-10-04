@@ -1,59 +1,49 @@
 {
-  "id": "w1_10",
-  "title": "Damm",
-  "world": 1,
-  "intro": "",
-  "map": [
-    "############",
-    "#..........#",
-    "#.i....F.S.#",
-    "###.######.#",
-    "##########:#",
-    "##########:D",
-    "##########B#",
-    "############"
-  ],
-  "legend": {
-    "B": {
-      "type": "BUTTON",
-      "properties": {
-        "channel": "A"
-      }
-    },
-    "D": {
-      "type": "DOOR",
-      "id": "door_1",
-      "properties": {
-        "channel": "A"
-      }
-    },
-    "F": {
-      "type": "FIRE",
-      "movable": true
-    },
-    "S": {
-      "type": "STONE",
-      "movable": true
-    },
-    "i": {
-      "type": "ICE"
-    }
+ "id": "w1_10",
+ "title": "Holzbrücke",
+ "world": 1,
+ "intro": "",
+ "map": [
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "W.........W",
+  "##.....%%##",
+  "##f..wwi%%%",
+  "#######%%%%",
+  "#######%%%%",
+  "###########",
+  "###########"
+ ],
+ "legend": {
+  "W": {
+   "type": "WOOD",
+   "isMovable": true
   },
-  "goals": [
-    {
-      "object_id": "door_1",
-      "required_state": "UNLOCKED"
-    }
-  ],
-  "solutions": [
-    {
-      "id": "standard",
-      "kind": "STANDARD",
-      "requires": [
-        {
-          "rule": "water_triggers_button"
-        }
-      ]
-    }
-  ]
+  "f": {
+   "type": "FIRE"
+  },
+  "i": {
+   "type": "ICE"
+  },
+  "w": {
+   "type": "WOOD"
+  }
+ },
+ "goals": [
+  {
+   "type": "clear",
+   "types": [
+    "ICE"
+   ],
+   "text": "Schmilz das Eis unter dem Felsen"
+  }
+ ]
 }

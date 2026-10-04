@@ -1,62 +1,58 @@
 {
-  "id": "w1_08",
-  "title": "Dampfwolke",
-  "world": 1,
-  "intro": "",
-  "map": [
-    "############",
-    "####.i######",
-    "####:#######",
-    "#...:......#",
-    "#.F.:......#",
-    "####B###4###",
-    "########W##D",
-    "############"
-  ],
-  "legend": {
-    "4": {
-      "type": "WATER",
-      "amount": 4
-    },
-    "B": {
-      "type": "BUTTON",
-      "properties": {
-        "channel": "A"
-      }
-    },
-    "D": {
-      "type": "DOOR",
-      "id": "door_1",
-      "properties": {
-        "channel": "A"
-      }
-    },
-    "F": {
-      "type": "FIRE",
-      "movable": true
-    },
-    "W": {
-      "type": "WATER"
-    },
-    "i": {
-      "type": "ICE"
-    }
+ "id": "w1_08",
+ "title": "Zwischen den Blöcken",
+ "world": 1,
+ "intro": "",
+ "map": [
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "....i.i...F",
+  "...#####..#",
+  "...#####...",
+  "...#####...",
+  "##.#####.##",
+  "##.#####.##",
+  "###########"
+ ],
+ "legend": {
+  "F": {
+   "type": "FIRE",
+   "isMovable": true
   },
-  "goals": [
-    {
-      "object_id": "door_1",
-      "required_state": "UNLOCKED"
-    }
-  ],
-  "solutions": [
-    {
-      "id": "standard",
-      "kind": "STANDARD",
-      "requires": [
-        {
-          "rule": "water_triggers_button"
-        }
-      ]
-    }
-  ]
+  "i": {
+   "type": "ICE"
+  }
+ },
+ "goals": [
+  {
+   "type": "fill",
+   "area": [
+    2,
+    14,
+    2,
+    15
+   ],
+   "min": 5,
+   "text": "Fülle die linke Senke"
+  },
+  {
+   "type": "fill",
+   "area": [
+    8,
+    14,
+    8,
+    15
+   ],
+   "min": 5,
+   "text": "Fülle die rechte Senke"
+  }
+ ]
 }

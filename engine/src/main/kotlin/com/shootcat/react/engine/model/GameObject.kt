@@ -44,6 +44,22 @@ object Props {
     const val GRANULAR = "granular"
     /** … only while in this state (wet sand sticks together). */
     const val GRANULAR_STATE = "granular_state"
+    /** An open flame while it gives off heat (fire, burning wood): what "extinguish" goals look for. */
+    const val FLAME = "flame"
+    /** How far (in cells, around obstacles) the heat of a hot object reaches; 1 means touching only. */
+    const val HEAT_RADIUS = "heat_radius"
+    /** A cloud: hovers in place, drifts with the wind, takes up steam and rains once it is dense enough. */
+    const val CLOUD = "cloud"
+    /** Liquid a cloud rains … */
+    const val RAIN = "rain"
+    /** … and the state it is in while it rains (it starts raining when it is full). */
+    const val RAIN_STATE = "rain_state"
+    /** Cloud type a gas condenses into once enough of it gathers under an obstacle. */
+    const val CONDENSE = "condense"
+    /** Gas units in one row under an obstacle needed to form a cloud (default: the gas's capacity). */
+    const val CONDENSE_AT = "condense_at"
+    /** Gas units per unit of cloud (steam takes twice the room of the water it came from). */
+    const val CONDENSE_RATIO = "condense_ratio"
 }
 
 /** Liquid density everything else is compared with. */
@@ -61,8 +77,8 @@ data class GameObject(
     val state: String,
     val position: Position,
     val properties: Map<String, String> = emptyMap(),
-    /** Whether the player may drag this object. */
-    val movable: Boolean = false,
+    /** Whether the player may drag this object; landscape and anything the world creates never is. */
+    val isMovable: Boolean = false,
     val amount: Int = 0,
     val temp: Int = 0,
     val burnt: Int = 0,
@@ -80,6 +96,13 @@ data class GameObject(
     val conducts: Boolean get() = flag(Props.CONDUCTS)
     val density: Int get() = int(Props.DENSITY, LIQUID_DENSITY)
     val capacity: Int get() = int(Props.CAPACITY, 8)
+    val isCloud: Boolean get() = flag(Props.CLOUD)
+    val isRaining: Boolean get() = isCloud && string(Props.RAIN_STATE)?.let { it == state } == true
+    /** Liquids, gases and clouds carry an amount. */
+    val hasAmount: Boolean get() = isFluid || isCloud
+    /** Air-like: falling things pass through gas and clouds. */
+    val isAiry: Boolean get() = isGas || isCloud
+    val heatRadius: Int get() = int(Props.HEAT_RADIUS, 1)
 
     /** Load this object puts on what is below it. Gas weighs nothing. */
     val load: Int
@@ -98,6 +121,9 @@ data class GameObject(
             val heat = int(Props.HEAT)
             return if (heat > 0 && inState(Props.HEAT_STATE)) heat else 0
         }
+
+    /** Burns with an open flame right now. */
+    val isFlame: Boolean get() = flag(Props.FLAME) && heatOutput > 0
 
     /** Emits electric current right now. */
     val isPowerSource: Boolean get() = flag(Props.POWER) && inState(Props.POWER_STATE)

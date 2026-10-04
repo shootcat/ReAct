@@ -11,6 +11,7 @@ import com.shootcat.react.engine.model.RuleConditions
 import com.shootcat.react.engine.model.RuleEffect
 import com.shootcat.react.engine.model.Trigger
 import com.shootcat.react.engine.model.TypeCatalog
+import com.shootcat.react.engine.model.WindZone
 
 /** One applied rule effect. [positive] is false when a rule's else-effect was applied. */
 data class RuleEvent(
@@ -24,20 +25,26 @@ data class RuleEvent(
     val sourceIds: List<String>,
     val sourceTypes: List<String>,
     val spawnedId: String? = null,
+    /** Where the target was when the rule acted on it. */
+    val position: Position = Position(0, 0),
 )
+
+/** Something audible happened at [position]: a reaction's sound, a cloud forming, rain starting … */
+data class Cue(val sound: String, val position: Position)
 
 data class StepResult(
     val state: GameState,
     val events: List<RuleEvent>,
     val transformations: Int,
     val overloaded: Boolean,
+    val cues: List<Cue> = emptyList(),
 )
 
 /**
  * Deterministic, data-driven rule engine. A step runs three fixed phases:
  *
  * 1. [Phase.STATE]   – TOUCH, LOAD, HEAT and POWER rules, evaluated once against the state at the start of the phase.
- * 2. [Phase.PHYSICS] – falling, floating, flowing, pressure and heat conduction.
+ * 2. [Phase.PHYSICS] – falling, floating, flowing, clouds, wind and rain, pressure and heat conduction.
  * 3. [Phase.SIGNAL]  – SIGNAL rules, propagated until nothing changes any more.
  *
  * Per target and phase only one effect applies: the first matching rule (in rule order) wins,
@@ -45,12 +52,15 @@ data class StepResult(
  * [maxTransformationsPerStep] applied effects abort the step (cascade protection).
  */
 class RuleEngine(
-    private val types: TypeCatalog,
-    rules: List<Rule>,
+    val types: TypeCatalog,
+    val rules: List<Rule>,
     private val maxTransformationsPerStep: Int = DEFAULT_MAX_TRANSFORMATIONS,
+    /** The level's steady winds that carry clouds along. */
+    private val wind: List<WindZone> = emptyList(),
 ) {
     private val stateRules = rules.filter { it.phase == Phase.STATE }
     private val signalRules = rules.filter { it.phase == Phase.SIGNAL }
+    private val sounds = rules.mapNotNull { r -> r.sound?.let { r.id to it } }.toMap()
 
     fun step(state: GameState): StepResult {
         val world = MutableWorld(state)
@@ -59,13 +69,17 @@ class RuleEngine(
 
         runPhase(stateRules, Phase.STATE, world, events, budget)
         if (!budget.exceeded) {
-            Physics.apply(world, types)
+            Physics.apply(world, types, wind)
         }
         if (!budget.exceeded) {
             // Signals travel instantly: keep propagating until the network is stable.
             while (runPhase(signalRules, Phase.SIGNAL, world, events, budget) && !budget.exceeded) Unit
         }
-        return StepResult(world.snapshot(), events, budget.used, budget.exceeded)
+        val ruleCues = events.filter { it.positive }.mapNotNull { e ->
+            val sound = sounds[e.ruleId] ?: return@mapNotNull null
+            Cue(sound, e.position)
+        }
+        return StepResult(world.snapshot(), events, budget.used, budget.exceeded, ruleCues + world.cues)
     }
 
     private class Budget(private val max: Int) {
@@ -99,9 +113,10 @@ class RuleEngine(
     ): Boolean {
         if (rules.isEmpty()) return false
         val snapshot = world.snapshot()
+        val heat = if (phase == Phase.STATE) farHeat(snapshot) else emptyMap()
         val byTarget = LinkedHashMap<String, MutableList<Match>>()
         for (rule in rules) {
-            for (match in evaluate(rule, snapshot)) {
+            for (match in evaluate(rule, snapshot, heat)) {
                 byTarget.getOrPut(match.target.id) { mutableListOf() } += match
             }
         }
@@ -121,18 +136,54 @@ class RuleEngine(
         return changed
     }
 
-    private fun evaluate(rule: Rule, state: GameState): List<Match> {
+    private fun evaluate(rule: Rule, state: GameState, heat: Map<Position, List<GameObject>>): List<Match> {
         val c = rule.conditions
         return state.objectsInReadingOrder()
             .filter { it.type == c.target && (c.targetState == null || it.state == c.targetState) }
-            .map { target -> Match(rule, target, sourcesFor(rule.trigger, c, target, state)) }
+            .filter { c.targetMinAmount <= 0 || it.amount >= c.targetMinAmount }
+            .map { target -> Match(rule, target, sourcesFor(rule.trigger, c, target, state, heat)) }
     }
 
-    private fun sourcesFor(trigger: Trigger, c: RuleConditions, target: GameObject, state: GameState): List<GameObject> =
+    /**
+     * Hot objects whose heat reaches a cell from further away than touching (a big fire, lava): it
+     * spreads up to their [GameObject.heatRadius] through open air and gas. Whatever stands in the
+     * way (rock, water, a stone) takes the heat but does not pass it on.
+     */
+    private fun farHeat(state: GameState): Map<Position, List<GameObject>> {
+        val result = HashMap<Position, MutableList<GameObject>>()
+        for (o in state.objects) {
+            val radius = o.heatRadius
+            if (radius < 2 || o.heatOutput <= 0) continue
+            val distance = hashMapOf(o.position to 0)
+            val queue = ArrayDeque(listOf(o.position))
+            while (queue.isNotEmpty()) {
+                val p = queue.removeFirst()
+                val d = distance.getValue(p)
+                if (d >= 2) result.getOrPut(p) { mutableListOf() } += o
+                val occupant = state.objectAt(p)
+                if (d == radius || (p != o.position && occupant != null && !occupant.isAiry)) continue
+                for (n in p.neighbours()) {
+                    if (n in distance || !state.inBounds(n) || state.isWall(n)) continue
+                    distance[n] = d + 1
+                    queue += n
+                }
+            }
+        }
+        return result
+    }
+
+    private fun sourcesFor(
+        trigger: Trigger,
+        c: RuleConditions,
+        target: GameObject,
+        state: GameState,
+        heat: Map<Position, List<GameObject>>,
+    ): List<GameObject> =
         when (trigger) {
-            Trigger.TOUCH -> target.position.neighbours()
-                .mapNotNull { state.objectAt(it) }
-                .filter { matchesSource(it, c) }
+            Trigger.TOUCH -> {
+                val touching = target.position.neighbours().mapNotNull { state.objectAt(it) }.filter { matchesSource(it, c) }
+                if (!c.sourceHot) touching else touching + heat[target.position].orEmpty().filter { matchesSource(it, c) && it !in touching }
+            }
 
             Trigger.LOAD -> when (c.direction) {
                 LoadDirection.DOWN -> state.loadStack(target.position)
@@ -175,7 +226,8 @@ class RuleEngine(
     private fun matchesSource(o: GameObject, c: RuleConditions): Boolean =
         (c.source == null || o.type == c.source) &&
             (c.sourceState == null || o.state == c.sourceState) &&
-            (!c.sourceHot || o.heatOutput > 0)
+            (!c.sourceHot || (o.heatOutput > 0 && o.heatOutput >= c.minHeat)) &&
+            (c.sourceMinAmount <= 0 || o.amount >= c.sourceMinAmount)
 
     /** Without an explicit source, any object in one of its type's signal states sends a signal. */
     private fun isSignalling(o: GameObject, c: RuleConditions): Boolean =
@@ -194,11 +246,18 @@ class RuleEngine(
         val source = match.sources.firstOrNull()?.let { world.byId(it.id) }
         val changesState = effect.targetState != null && effect.targetState != target.state
         val spawns = effect.spawnObject != null && (effect.targetState == null || changesState)
-        if (!changesState && !spawns) return false
+        val transforms = effect.transform != null && effect.transform != target.type
+        if (!changesState && !spawns && !transforms) return false
         if (!budget.consume()) return false
 
-        if (changesState) setState(world, target, effect.targetState!!)
-        if (effect.targetConsume > 0 && target.isFluid) {
+        if (transforms) {
+            world.remove(target.id)
+            val amount = target.amount.takeIf { target.hasAmount }
+            world.spawn(effect.transform!!, target.position, types, amount)
+        } else if (changesState) {
+            setState(world, target, effect.targetState!!)
+        }
+        if (effect.targetConsume > 0 && target.isFluid && !transforms) {
             world.setAmount(target.id, target.amount - effect.targetConsume)
         }
         var spawned: GameObject? = null
@@ -220,6 +279,7 @@ class RuleEngine(
             sourceIds = match.sources.map { it.id },
             sourceTypes = match.sources.map { it.type },
             spawnedId = spawned?.id,
+            position = target.position,
         )
         return true
     }

@@ -17,24 +17,25 @@ class ProgressStoreTest {
     @Test
     fun progressSurvivesARestart() {
         val progress = Progress(
-            completed = setOf("level_00", "level_01"),
-            solutions = setOf("level_00/standard", "level_01/minimal"),
+            completed = setOf("w1_01", "w1_02"),
+            extras = setOf("w1_01/1", "w1_02/2"),
             discoveries = setOf("heat_melts_ice", "water_douses_fire"),
         )
         ProgressStore(app).save(progress)
         assertEquals(progress, ProgressStore(app).load())
+        assertEquals(setOf(1), ProgressStore(app).load().extrasFor("w1_01"))
     }
 
     @Test
     fun clearForgetsEverything() {
-        ProgressStore(app).save(Progress(completed = setOf("level_00")))
+        ProgressStore(app).save(Progress(completed = setOf("w1_01")))
         ProgressStore(app).clear()
         assertEquals(Progress(), ProgressStore(app).load())
     }
 
     @Test
     fun settingsSurviveARestart() {
-        val settings = Settings(speed = Speed.FAST, markers = false, levelTexts = true, haptics = false)
+        val settings = Settings(speed = Speed.FAST, markers = false, levelTexts = true, haptics = false, sound = false, music = false)
         SettingsStore(app).save(settings)
         assertEquals(settings, SettingsStore(app).load())
     }

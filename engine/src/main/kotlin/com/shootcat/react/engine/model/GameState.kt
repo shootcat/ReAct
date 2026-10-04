@@ -28,7 +28,7 @@ data class GameState(
 
     fun isBuildable(p: Position): Boolean = isFree(p) && p !in noBuild
 
-    /** Where the player may drop something: a buildable cell, or one only filled with gas (it gets pushed aside). */
+    /** Where the player may put something down: a buildable cell, or one only filled with gas (it gets pushed aside). */
     fun canPlace(p: Position): Boolean {
         if (!inBounds(p) || isWall(p) || p in noBuild) return false
         val o = objectAt(p) ?: return true
@@ -97,26 +97,62 @@ data class GameState(
     /** Player action: move a movable object to a cell where it may be placed. Gas there is pushed aside. */
     fun withObjectMoved(id: String, to: Position): GameState? {
         val obj = objectById(id) ?: return null
-        if (!obj.movable) return null
+        if (!obj.isMovable) return null
         if (obj.position == to) return this
         if (!canPlace(to)) return null
-        val moved = obj.copy(position = to)
-        val gas = objectAt(to) ?: return copy(objects = objects.map { if (it.id == id) moved else it })
-        val rest = objects.filter { it.id != id && it.id != gas.id }
-        val displaced = displaceGas(gas, to, obj.position) ?: return null
-        val merged = rest.map { o -> displaced.firstOrNull { it.id == o.id } ?: o }
-        val added = displaced.filter { d -> rest.none { it.id == d.id } }
-        return copy(objects = (merged + added + moved).sortedBy { it.id })
+        val gas = objectAt(to) ?: return copy(objects = objects.map { if (it.id == id) obj.copy(position = to) else it })
+        return replacing(obj, to, gas)
     }
 
     /**
-     * Pushes the gas from [from] to the nearest place it fits (up first): it tops up a cell of the same gas
-     * or fills an empty cell. Returns the changed or new gas objects, or null if it cannot go anywhere.
+     * Player action: drop a solid into a liquid. It takes the cell and pushes the liquid out of the way
+     * (up first), so the level rises – a stone thrown into a pond.
      */
-    private fun displaceGas(gas: GameObject, from: Position, vacated: Position): List<GameObject>? {
+    fun withLiquidDisplaced(id: String, to: Position): GameState? {
+        val obj = objectById(id) ?: return null
+        val liquid = objectAt(to)?.takeIf { it.isLiquid } ?: return null
+        if (!obj.isMovable || obj.hasAmount || isWall(to) || to in noBuild) return null
+        return replacing(obj, to, liquid)
+    }
+
+    /**
+     * Two objects merge: [sourceId] disappears and the object [into] takes the target's place. When
+     * [into] holds more than one cell can, the rest overflows into the cells around it (up first).
+     */
+    fun withMerged(sourceId: String, into: GameObject): GameState? {
+        val source = objectById(sourceId) ?: return null
+        val target = objectAt(into.position) ?: return null
+        val rest = objects.filter { it.id != source.id && it.id != target.id }
+        if (!into.hasAmount || into.amount <= into.capacity) {
+            return copy(objects = (rest + into).sortedBy { it.id })
+        }
+        val full = into.copy(amount = into.capacity)
+        val overflow = source.copy(type = into.type, state = into.state, properties = into.properties, isMovable = false,
+            amount = into.amount - into.capacity)
+        val spilled = displace(overflow, into.position, vacated = source.position, others = rest + full) ?: return null
+        return copy(objects = (rest.map { o -> spilled.firstOrNull { it.id == o.id } ?: o } +
+            spilled.filter { s -> rest.none { it.id == s.id } } + full).sortedBy { it.id })
+    }
+
+    /** [obj] takes the cell of the fluid [fluid], which is pushed aside. */
+    private fun replacing(obj: GameObject, to: Position, fluid: GameObject): GameState? {
+        val rest = objects.filter { it.id != obj.id && it.id != fluid.id }
+        val displaced = displace(fluid, to, obj.position, rest) ?: return null
+        val merged = rest.map { o -> displaced.firstOrNull { it.id == o.id } ?: o }
+        val added = displaced.filter { d -> rest.none { it.id == d.id } }
+        return copy(objects = (merged + added + obj.copy(position = to)).sortedBy { it.id })
+    }
+
+    /**
+     * Pushes the fluid [fluid] from [from] to the nearest place it fits (up first): it tops up cells of
+     * the same kind or fills one empty cell. [vacated] counts as empty. Returns the changed or new
+     * objects, or null if the fluid cannot go anywhere.
+     */
+    private fun displace(fluid: GameObject, from: Position, vacated: Position, others: List<GameObject>): List<GameObject>? {
+        val at = others.associateBy { it.position }
         val seen = hashSetOf(from)
         val queue = ArrayDeque(listOf(from))
-        var left = gas.amount
+        var left = fluid.amount
         val result = mutableListOf<GameObject>()
         var placedOwn = false
         while (queue.isNotEmpty() && left > 0) {
@@ -124,16 +160,16 @@ data class GameState(
             for (n in cell.neighbours()) {
                 if (n in seen || !inBounds(n) || isWall(n)) continue
                 seen += n
-                val o = if (n == vacated) null else objectAt(n)
+                val o = if (n == vacated) null else at[n]
                 when {
                     o == null -> {
                         if (!placedOwn) {
-                            result += gas.copy(position = n, amount = left)
+                            result += fluid.copy(position = n, amount = left)
                             placedOwn = true
                             left = 0
                         }
                     }
-                    o.type == gas.type -> {
+                    o.type == fluid.type -> {
                         val room = o.capacity - o.amount
                         if (room > 0) {
                             val add = minOf(room, left)

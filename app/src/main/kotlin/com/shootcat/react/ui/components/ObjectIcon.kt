@@ -65,9 +65,9 @@ fun ObjectIcon(
                     else -> drawWeight(w)
                 }
             } else {
-                // Slightly smaller and lower than a board cell, so raised parts (button caps) stay visible.
+                // Slightly smaller and lower than a board cell, so what reaches above its cell (tree crowns) stays visible.
                 val obj = types.create("icon", type.id, Position(0, 0), state = state ?: type.defaultState)
-                drawGameObject(obj, Offset(w * 0.14f, w * 0.2f), w * 0.72f, info = ObjectInfo(0, 0))
+                drawGameObject(obj, Offset(w * 0.14f, w * 0.2f), w * 0.72f, info = ObjectInfo())
             }
             if (silhouette) drawRect(Color(0xFF07090C), blendMode = BlendMode.SrcAtop)
         }
@@ -147,11 +147,11 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPower(c: Float)
         lineTo(c * 0.62f, c * 0.34f)
         lineTo(c * 0.82f, c * 0.5f)
     }
-    drawCircle(Palette.copper, c * 0.08f, Offset(c * 0.14f, c * 0.5f))
-    drawCircle(Palette.copper, c * 0.08f, Offset(c * 0.86f, c * 0.5f))
+    drawCircle(Palette.woodLight, c * 0.08f, Offset(c * 0.14f, c * 0.5f))
+    drawCircle(Palette.woodLight, c * 0.08f, Offset(c * 0.86f, c * 0.5f))
     drawPath(
         spark,
-        Palette.power,
+        Palette.signal,
         style = androidx.compose.ui.graphics.drawscope.Stroke(
             width = c * 0.07f,
             cap = androidx.compose.ui.graphics.StrokeCap.Round,

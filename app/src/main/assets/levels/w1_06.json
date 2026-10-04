@@ -1,63 +1,40 @@
 {
-  "id": "w1_06",
-  "title": "Verdrängung",
-  "world": 1,
-  "intro": "",
-  "map": [
-    "###########",
-    "#.........#",
-    "#.S.O.I...#",
-    "#####.#####",
-    "#####.....D",
-    "#####W#B###",
-    "#####W#####",
-    "###########"
-  ],
-  "legend": {
-    "B": {
-      "type": "BUTTON",
-      "properties": {
-        "channel": "A"
-      }
-    },
-    "D": {
-      "type": "DOOR",
-      "id": "door_1",
-      "properties": {
-        "channel": "A"
-      }
-    },
-    "I": {
-      "type": "ICE",
-      "movable": true
-    },
-    "O": {
-      "type": "WOOD",
-      "movable": true
-    },
-    "S": {
-      "type": "STONE",
-      "movable": true
-    },
-    "W": {
-      "type": "WATER"
-    }
+ "id": "w1_06",
+ "title": "Feuergrube",
+ "world": 1,
+ "intro": "",
+ "map": [
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  ".I.........",
+  "###........",
+  "###..%.%...",
+  "###..%b%...",
+  "#####%%%###",
+  "###########",
+  "###########"
+ ],
+ "legend": {
+  "I": {
+   "type": "ICE",
+   "isMovable": true
   },
-  "goals": [
-    {
-      "object_id": "door_1",
-      "required_state": "UNLOCKED"
-    }
-  ],
-  "solutions": [
-    {
-      "id": "standard",
-      "kind": "STANDARD",
-      "requires": [
-        {
-          "rule": "water_triggers_button"
-        }
-      ]
-    }
-  ]
+  "b": {
+   "type": "BIG_FIRE"
+  }
+ },
+ "goals": [
+  {
+   "type": "extinguish",
+   "text": "Lösche das Lagerfeuer"
+  }
+ ]
 }

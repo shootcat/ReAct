@@ -17,4 +17,14 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent { ReactApp(viewModel) }
     }
+
+    override fun onResume() {
+        super.onResume()
+        viewModel.setForeground(true)
+    }
+
+    override fun onPause() {
+        viewModel.setForeground(false)
+        super.onPause()
+    }
 }

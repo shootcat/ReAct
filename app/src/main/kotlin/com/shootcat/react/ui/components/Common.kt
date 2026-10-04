@@ -70,6 +70,8 @@ fun TopBar(
                     style = MaterialTheme.typography.labelSmall,
                     letterSpacing = 2.sp,
                     color = Palette.textDim,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
             Text(
@@ -116,7 +118,7 @@ fun RoundIconButton(
     }
 }
 
-/** Pill button with icon and a short, never wrapping label. */
+/** Pill button with icon and a single-line label, shortened with "…" if it does not fit. */
 @Composable
 fun PillButton(
     glyph: Glyph,
@@ -151,8 +153,7 @@ fun PillButton(
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
-            softWrap = false,
-            overflow = TextOverflow.Clip,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -173,7 +174,13 @@ fun DiscoveryBadge(found: Int, total: Int, onClick: () -> Unit) {
     ) {
         GlyphIcon(Glyph.LOG, color = Palette.accent, size = 18.dp)
         Spacer(Modifier.width(6.dp))
-        Text("$found/$total", style = MaterialTheme.typography.labelLarge, color = Palette.text, maxLines = 1)
+        Text(
+            "$found/$total",
+            style = MaterialTheme.typography.labelLarge,
+            color = Palette.text,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 

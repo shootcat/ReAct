@@ -3,19 +3,21 @@ package com.shootcat.react.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.shootcat.react.audio.SoundManager
 import com.shootcat.react.data.GameContent
 import com.shootcat.react.data.GameRepository
 import com.shootcat.react.data.Progress
 import com.shootcat.react.data.ProgressStore
 import com.shootcat.react.data.Settings
 import com.shootcat.react.data.SettingsStore
+import com.shootcat.react.engine.Drop
 import com.shootcat.react.engine.LiveSimulation
 import com.shootcat.react.engine.Outcome
 import com.shootcat.react.engine.Reaction
 import com.shootcat.react.engine.Reactions
 import com.shootcat.react.engine.RuleEngine
 import com.shootcat.react.engine.Run
-import com.shootcat.react.engine.SolutionClassifier
+import com.shootcat.react.engine.Tick
 import com.shootcat.react.engine.model.GameState
 import com.shootcat.react.engine.model.LevelData
 import com.shootcat.react.engine.model.Position
@@ -45,14 +47,24 @@ data class LevelSession(
     val state: GameState get() = run.state
     val canUndo: Boolean get() = undo.isNotEmpty()
     val canRedo: Boolean get() = redo.isNotEmpty()
-    /** Once the door is open (or the cascade protection fired) only undo, redo and reset are left. */
+    /** Once the task is done (or the cascade protection fired) only undo, redo and reset are left. */
     val canMove: Boolean get() = run.outcome == null
+
+    /** For every goal of the level: does it hold right now (or has it happened, for rain)? */
+    val goalsMet: List<Boolean>
+        get() = level.goals.mapIndexed { i, goal -> i in run.latched || goal.isMet(run.state, run.moves.size) }
     val atStart: Boolean get() = run.moves.isEmpty() && !run.active
 }
 
 data class Completion(
     val level: LevelData,
-    val newlyFound: Set<String>,
+    /** Optional goals (indices into the level's goals) met this time. */
+    val achieved: Set<Int>,
+    /** Optional goals met for the first time. */
+    val newlyAchieved: Set<Int>,
+    /** Optional goals met in any run so far, this one included. */
+    val everAchieved: Set<Int>,
+    val moves: Int,
     val nextLevelId: String?,
 )
 
@@ -105,6 +117,8 @@ sealed interface GameEvent {
     data class UpdateSettings(val settings: Settings) : GameEvent
     data object ResetProgress : GameEvent
     data class Move(val objectId: String, val to: Position) : GameEvent
+    /** A drop that is not allowed: the object bounced back. */
+    data class Bounce(val objectId: String) : GameEvent
     data object Undo : GameEvent
     data object Redo : GameEvent
     data object Reset : GameEvent
@@ -127,6 +141,10 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     private val settingsStore = SettingsStore(app)
     private val _state = MutableStateFlow(load(app))
     val state: StateFlow<GameUiState> = _state.asStateFlow()
+    private val sound = SoundManager(app).apply {
+        val settings = _state.value.settings
+        configure(effects = settings.sound, music = settings.music)
+    }
 
     private var live: LiveSimulation? = null
     private var simJob: Job? = null
@@ -150,6 +168,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
                 if (_state.value.isWorldUnlocked(event.number)) {
                     leaveLevel(Screen.MAP)
                     _state.update { it.copy(worldNumber = event.number) }
+                    sound.setTrack(event.number)
                 }
             }
             GameEvent.OpenMap -> leaveLevel(Screen.MAP)
@@ -162,12 +181,14 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
             is GameEvent.UpdateSettings -> {
                 settingsStore.save(event.settings)
                 _state.update { it.copy(settings = event.settings) }
+                sound.configure(effects = event.settings.sound, music = event.settings.music)
             }
             GameEvent.ResetProgress -> {
                 store.clear()
                 _state.update { it.copy(progress = Progress()) }
             }
             is GameEvent.Move -> move(event.objectId, event.to)
+            is GameEvent.Bounce -> sound.play("bounce")
             GameEvent.Undo -> undo()
             GameEvent.Redo -> redo()
             GameEvent.Reset -> reset()
@@ -183,6 +204,21 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
             }
             GameEvent.Back -> back()
         }
+    }
+
+    /** What dropping [objectId] on [to] would do right now; null means it would bounce off. */
+    fun previewDrop(objectId: String, to: Position): Drop? {
+        val s = session() ?: return null
+        return live?.drop(s.run, objectId, to)
+    }
+
+    /** The app came to the front or went to the background: the melody follows. */
+    fun setForeground(foreground: Boolean) {
+        sound.setForeground(foreground)
+    }
+
+    override fun onCleared() {
+        sound.release()
     }
 
     private fun back() {
@@ -220,9 +256,10 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         if (!st.isUnlocked(levelId)) return
         stopSimulation()
         completionJob?.cancel()
-        val sim = LiveSimulation(level, RuleEngine(content.types, level.rules))
+        val sim = LiveSimulation(level, RuleEngine(content.types, level.rules, wind = level.wind))
         live = sim
         val world = content.worldOf(levelId)?.world ?: st.worldNumber
+        sound.setTrack(world)
         _state.update {
             it.copy(screen = Screen.LEVEL, session = LevelSession(level, sim.start()), completion = null, worldNumber = world)
         }
@@ -233,7 +270,20 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     private fun move(objectId: String, to: Position) {
         val s = session() ?: return
         val sim = live ?: return
-        val after = sim.move(s.run, objectId, to) ?: return
+        val drop = sim.drop(s.run, objectId, to)
+        if (drop == null) {
+            sound.play("bounce")
+            return
+        }
+        val after = sim.apply(s.run, objectId, to, drop)
+        if (drop is Drop.Merged) discover(listOf(drop.rule.id))
+        sound.play(
+            when (drop) {
+                is Drop.Merged -> drop.rule.sound ?: "merge"
+                is Drop.NextTo -> "place"
+                is Drop.Placed -> if (s.state.objectAt(to)?.isLiquid == true) "splash" else "place"
+            },
+        )
         _state.update {
             it.copy(
                 session = s.copy(
@@ -295,6 +345,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
                 val tick = sim.step(s.run)
                 val next = tick.run
                 val changed = next.state != s.run.state
+                playStep(s, tick)
                 _state.update { st ->
                     st.copy(
                         session = s.copy(
@@ -327,22 +378,59 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         showDiscoveries(found)
     }
 
-    /** The goals were reached: record the solution classes and show the result after a short pause. */
+    /**
+     * The sounds of one step: what the rules and the weather did, things that landed, and a soft chime
+     * when a task is met.
+     */
+    private fun playStep(before: LevelSession, tick: Tick) {
+        val old = before.run.state
+        val new = tick.run.state
+        for (cue in tick.cues.map { it.sound }.distinct()) sound.play(cue)
+        var thud = false
+        var splash = false
+        for (o in new.objects) {
+            val was = old.objectById(o.id) ?: continue
+            if (was.position.x != o.position.x || was.position.y >= o.position.y) continue
+            val below = o.position.down()
+            val landed = new.isWall(below) || new.objectAt(below)?.let { !it.isAiry } == true
+            if (!landed) continue
+            if (o.isLiquid || new.objectAt(below)?.isLiquid == true) splash = true else if (!o.isAiry) thud = true
+        }
+        // Falling water that has run into a pool.
+        for (o in old.objects) {
+            if (!o.isLiquid || new.objectById(o.id) != null) continue
+            if (old.isFree(o.position.down()) && new.objectAt(o.position.down())?.isLiquid == true) splash = true
+        }
+        if (thud) sound.play("thud")
+        if (splash) sound.play("splash", 0.6f)
+        val wasMet = before.goalsMet
+        val nowMet = before.copy(run = tick.run).goalsMet
+        val newlyMet = before.level.goals.indices.any { !before.level.goals[it].optional && nowMet[it] && !wasMet[it] }
+        if (newlyMet && tick.run.outcome != Outcome.SUCCESS) sound.play("goal")
+    }
+
+    /** The task is done: record the optional goals met and show the result after a short pause. */
     private fun complete(run: Run) {
         val s = session() ?: return
-        val content = _state.value.content ?: return
-        val found = SolutionClassifier.classify(s.level, run).map { it.id }.toSet()
         val before = _state.value.progress
-        val known = before.solutionsFor(s.level.id)
+        val known = before.extrasFor(s.level.id)
         val progress = before.copy(
             completed = before.completed + s.level.id,
-            solutions = before.solutions + found.map { "${s.level.id}/$it" },
+            extras = before.extras + run.achieved.map { "${s.level.id}/$it" },
         )
         store.save(progress)
         _state.update { it.copy(progress = progress) }
-        val completion = Completion(s.level, found - known, nextLevel(s.level.id))
+        sound.play("success")
+        val completion = Completion(
+            level = s.level,
+            achieved = run.achieved,
+            newlyAchieved = run.achieved - known,
+            everAchieved = known + run.achieved,
+            moves = run.moves.size,
+            nextLevelId = nextLevel(s.level.id),
+        )
         completionJob?.cancel()
-        // Give the player a moment to see the door open before the dialog appears.
+        // Give the player a moment to see the world settle before the card appears.
         completionJob = viewModelScope.launch {
             delay(COMPLETION_DELAY_MILLIS)
             _state.update { st ->
@@ -358,8 +446,10 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun showDiscoveries(ruleIds: List<String>) {
         val content = _state.value.content ?: return
-        val reactions = ruleIds.mapNotNull { id -> content.allRules.firstOrNull { it.id == id } }
-            .map { Reactions.describe(it, content.types) }
+        val reactions = ruleIds.mapNotNull { id ->
+            content.allRules.firstOrNull { it.id == id }?.let { Reactions.describe(it, content.types) }
+                ?: content.merges.firstOrNull { it.id == id }?.let { Reactions.describeMerge(it, content.types) }
+        }
         val toast = Toast(++toastCounter, reactions)
         _state.update { it.copy(toast = toast) }
         toastJob?.cancel()

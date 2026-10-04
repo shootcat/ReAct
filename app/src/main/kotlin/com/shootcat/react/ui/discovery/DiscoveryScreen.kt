@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.shootcat.react.data.GameContent
@@ -49,14 +50,26 @@ fun DiscoveryScreen(
 ) {
     val types = content.types
     val rules = remember(content) { content.allRules }
-    val reactions = remember(content) { rules.map { Reactions.describe(it, types) } }
+    val merges = remember(content) { content.merges.map { it.id }.toSet() }
+    val reactions = remember(content) {
+        rules.map { Reactions.describe(it, types) } + content.merges.map { Reactions.describeMerge(it, types) }
+    }
     val found = reactions.count { it.ruleId in progress.discoveries }
     val materials = remember(content, progress) { knownMaterials(content, progress, reactions, isUnlocked) }
-    val byWorld = remember(content) { rules.zip(reactions).groupBy({ it.first.world }, { it.second }).toSortedMap() }
+    val byWorld = remember(content) {
+        val worldOf = rules.associate { it.id to it.world } + content.merges.associate { it.id to it.world }
+        reactions.groupBy { worldOf[it.ruleId] ?: 1 }.toSortedMap()
+    }
 
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         TopBar(title = "Entdeckungen", onBack = onBack) {
-            Text("$found/${reactions.size}", style = MaterialTheme.typography.titleMedium, color = Palette.accent)
+            Text(
+                "$found/${reactions.size}",
+                style = MaterialTheme.typography.titleMedium,
+                color = Palette.accent,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
             Spacer(Modifier.width(8.dp))
         }
         LazyColumn(
@@ -69,7 +82,7 @@ fun DiscoveryScreen(
                     SectionTitle(if (title != null) "Welt $world · $title" else "Welt $world")
                 }
                 items(list, key = { it.ruleId }) { reaction ->
-                    ReactionCard(reaction, reaction.ruleId in progress.discoveries, types)
+                    ReactionCard(reaction, reaction.ruleId in progress.discoveries, types, merge = reaction.ruleId in merges)
                 }
             }
             if (materials.isNotEmpty()) {
@@ -106,7 +119,7 @@ private fun SectionTitle(text: String) {
 }
 
 @Composable
-private fun ReactionCard(reaction: Reaction, discovered: Boolean, types: TypeCatalog) {
+private fun ReactionCard(reaction: Reaction, discovered: Boolean, types: TypeCatalog, merge: Boolean) {
     Column(
         Modifier
             .fillMaxWidth()
@@ -117,7 +130,11 @@ private fun ReactionCard(reaction: Reaction, discovered: Boolean, types: TypeCat
         Row(verticalAlignment = Alignment.CenterVertically) {
             ReactionSymbols(reaction, types, iconSize = 40.dp, silhouette = !discovered)
             Spacer(Modifier.weight(1f))
-            if (discovered) PhaseBadge(reaction.phase.number)
+            if (discovered && merge) {
+                Text("Verbinden", style = MaterialTheme.typography.labelSmall, color = Palette.accent, maxLines = 1)
+            } else if (discovered) {
+                PhaseBadge(reaction.phase.number)
+            }
         }
         if (discovered) {
             Spacer(Modifier.height(8.dp))

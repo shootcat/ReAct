@@ -1,11 +1,11 @@
 package com.shootcat.react.engine
 
 import com.shootcat.react.engine.model.GameState
-import com.shootcat.react.engine.model.Goal
 import com.shootcat.react.engine.model.LevelData
+import com.shootcat.react.engine.model.LevelGoal
 
 enum class Outcome {
-    /** All goals were reached. */
+    /** All main goals were met. */
     SUCCESS,
     /** Nothing changes any more and the goals were not reached. */
     STABLE,
@@ -34,9 +34,11 @@ data class SimulationResult(val frames: List<Frame>, val outcome: Outcome) {
  */
 class Simulator(
     private val engine: RuleEngine,
-    private val goals: List<Goal>,
+    goals: List<LevelGoal>,
     private val maxSteps: Int,
 ) {
+    private val mainGoals = goals.filter { !it.optional }
+
     constructor(level: LevelData, engine: RuleEngine) : this(engine, level.goals, level.maxSteps)
 
     fun run(initial: GameState): SimulationResult {
@@ -58,6 +60,5 @@ class Simulator(
         return SimulationResult(frames, Outcome.TIMEOUT)
     }
 
-    fun goalsReached(state: GameState): Boolean =
-        goals.isNotEmpty() && goals.all { state.objectById(it.objectId)?.state == it.requiredState }
+    fun goalsReached(state: GameState): Boolean = mainGoals.isNotEmpty() && mainGoals.all { it.isMet(state, 0) }
 }

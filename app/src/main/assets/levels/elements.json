@@ -1,732 +1,933 @@
 {
-  "types": [
-    {
-      "type": "FIRE",
-      "name": "Feuer",
-      "default_state": "ACTIVE",
-      "properties": {
-        "gravity": true,
-        "density": 15,
-        "weight": 10,
-        "heat": 6,
-        "heat_state": "ACTIVE"
-      },
-      "state_names": {
-        "ACTIVE": "brennt",
-        "OUT": "erloschen"
-      },
-      "description": "Eine Feuerschale. Fällt, wenn nichts sie hält, und gibt Hitze ab. Wasser löscht sie.",
-      "world": 1
-    },
-    {
-      "type": "ICE",
-      "name": "Eis",
-      "default_state": "SOLID",
-      "properties": {
-        "gravity": true,
-        "density": 9,
-        "weight": 14
-      },
-      "vanish_states": [
-        "MELTED"
-      ],
-      "state_names": {
-        "SOLID": "fest",
-        "MELTED": "geschmolzen"
-      },
-      "description": "Fällt, schwimmt auf Wasser und schmilzt bei Hitze zu Wasser.",
-      "world": 1
-    },
-    {
-      "type": "WATER",
-      "name": "Wasser",
-      "default_state": "LIQUID",
-      "properties": {
-        "liquid": true,
-        "capacity": 8,
-        "density": 10,
-        "weight": 2,
-        "wire": true
-      },
-      "state_names": {
-        "LIQUID": "flüssig"
-      },
-      "description": "Fällt, läuft auseinander und füllt Becken. Löscht Feuer.",
-      "world": 1
-    },
-    {
-      "type": "STEAM",
-      "name": "Dampf",
-      "default_state": "GAS",
-      "properties": {
-        "gas": true,
-        "capacity": 8,
-        "lift": 1
-      },
-      "state_names": {
-        "GAS": "gasförmig"
-      },
-      "description": "Steigt auf, sammelt sich unter Decken und füllt geschlossene Kammern.",
-      "world": 1
-    },
-    {
-      "type": "STONE",
-      "name": "Stein",
-      "default_state": "SOLID",
-      "properties": {
-        "gravity": true,
-        "density": 25,
-        "weight": 40
-      },
-      "state_names": {
-        "SOLID": "fest"
-      },
-      "description": "Schwer. Fällt, sinkt in Wasser und verdrängt es.",
-      "world": 1
-    },
-    {
-      "type": "WOOD",
-      "name": "Holz",
-      "default_state": "DRY",
-      "properties": {
-        "gravity": true,
-        "density": 6,
-        "weight": 8,
-        "heat": 4,
-        "heat_state": "BURNING",
-        "fuel": 10,
-        "burnt_state": "ASH"
-      },
-      "vanish_states": [
-        "ASH"
-      ],
-      "state_names": {
-        "DRY": "trocken",
-        "BURNING": "brennt",
-        "CHARRED": "verkohlt",
-        "ASH": "verbrannt"
-      },
-      "description": "Leicht: schwimmt und steigt in Wasser auf. Fängt Feuer und brennt ab.",
-      "world": 1
-    },
-    {
-      "type": "BUTTON",
-      "name": "Schalter",
-      "default_state": "UP",
-      "properties": {},
-      "signal_states": [
-        "PRESSED"
-      ],
-      "state_names": {
-        "UP": "bereit",
-        "PRESSED": "aktiviert"
-      },
-      "description": "Ein Schwimmerschalter. Reagiert auf Wasser.",
-      "world": 1
-    },
-    {
-      "type": "PLATE",
-      "name": "Druckplatte",
-      "default_state": "UP",
-      "properties": {},
-      "signal_states": [
-        "PRESSED"
-      ],
-      "state_names": {
-        "UP": "oben",
-        "PRESSED": "gedrückt"
-      },
-      "description": "Sendet ein Signal, solange genug auf ihr lastet.",
-      "world": 1
-    },
-    {
-      "type": "HATCH",
-      "name": "Klappe",
-      "default_state": "CLOSED",
-      "properties": {},
-      "vanish_states": [
-        "OPEN"
-      ],
-      "state_names": {
-        "CLOSED": "zu",
-        "OPEN": "offen"
-      },
-      "description": "Klappt auf ein Signal hin weg.",
-      "world": 1
-    },
-    {
-      "type": "DOOR",
-      "name": "Tür",
-      "default_state": "LOCKED",
-      "properties": {},
-      "state_names": {
-        "LOCKED": "verschlossen",
-        "UNLOCKED": "offen"
-      },
-      "description": "Öffnet sich, solange ein Signal ankommt.",
-      "world": 1
-    },
-    {
-      "type": "METAL",
-      "name": "Metall",
-      "default_state": "COLD",
-      "properties": {
-        "gravity": true,
-        "density": 30,
-        "weight": 30,
-        "conducts": true,
-        "heat": 3,
-        "heat_state": "HOT",
-        "wire": true
-      },
-      "state_names": {
-        "COLD": "kalt",
-        "HOT": "heiß"
-      },
-      "description": "Schwer. Leitet Hitze weiter – jedes Stück ein bisschen weniger.",
-      "world": 2
-    },
-    {
-      "type": "GATE",
-      "name": "Schieber",
-      "default_state": "IDLE",
-      "properties": {
-        "pushable": true,
-        "resist": 2
-      },
-      "state_names": {
-        "IDLE": "in Ruhe"
-      },
-      "description": "Eine Sperre, die Dampfdruck vor sich herschiebt.",
-      "world": 2
-    },
-    {
-      "type": "PISTON",
-      "name": "Kolben",
-      "default_state": "IDLE",
-      "properties": {},
-      "signal_states": [
-        "PUSHED"
-      ],
-      "state_names": {
-        "IDLE": "in Ruhe",
-        "PUSHED": "hochgedrückt"
-      },
-      "description": "Sendet ein Signal, solange genug Dampf von unten drückt.",
-      "world": 2
-    },
-    {
-      "type": "MEMBRANE",
-      "name": "Berstscheibe",
-      "default_state": "WHOLE",
-      "properties": {},
-      "vanish_states": [
-        "BURST"
-      ],
-      "state_names": {
-        "WHOLE": "ganz",
-        "BURST": "geborsten"
-      },
-      "description": "Eine dünne Scheibe in der Decke. Hält nur begrenzten Dampfdruck aus.",
-      "world": 2
-    },
-    {
-      "type": "BATTERY",
-      "name": "Batterie",
-      "default_state": "CHARGED",
-      "properties": {
-        "gravity": true,
-        "density": 20,
-        "weight": 20,
-        "power": true
-      },
-      "state_names": {
-        "CHARGED": "geladen"
-      },
-      "description": "Liefert Strom an alles, was ihn weiterleitet.",
-      "world": 3
-    },
-    {
-      "type": "CABLE",
-      "name": "Kabel",
-      "default_state": "IDLE",
-      "properties": {
-        "wire": true
-      },
-      "state_names": {
-        "IDLE": "verlegt"
-      },
-      "description": "Fest verlegter Draht. Leitet Strom.",
-      "world": 3
-    },
-    {
-      "type": "LAMP",
-      "name": "Lampe",
-      "default_state": "OFF",
-      "properties": {},
-      "signal_states": [
-        "ON"
-      ],
-      "state_names": {
-        "OFF": "aus",
-        "ON": "an"
-      },
-      "description": "Leuchtet, wenn Strom ankommt, und gibt dann ein Signal.",
-      "world": 3
-    },
-    {
-      "type": "COIL",
-      "name": "Heizstab",
-      "default_state": "COLD",
-      "properties": {
-        "gravity": true,
-        "density": 30,
-        "weight": 20,
-        "heat": 6,
-        "heat_state": "HOT"
-      },
-      "state_names": {
-        "COLD": "kalt",
-        "HOT": "glühend"
-      },
-      "description": "Glüht, solange Strom fließt.",
-      "world": 3
-    },
-    {
-      "type": "RELAY",
-      "name": "Relais",
-      "default_state": "OPEN",
-      "properties": {
-        "wire": true,
-        "wire_state": "CLOSED"
-      },
-      "state_names": {
-        "OPEN": "offen",
-        "CLOSED": "geschlossen"
-      },
-      "description": "Ein Schalter im Kabel. Schließt sich auf ein Signal.",
-      "world": 3
-    },
-    {
-      "type": "TURBINE",
-      "name": "Turbine",
-      "default_state": "IDLE",
-      "properties": {
-        "power": true,
-        "power_state": "SPINNING"
-      },
-      "state_names": {
-        "IDLE": "steht",
-        "SPINNING": "dreht sich"
-      },
-      "description": "Dampf von unten treibt sie an – dann liefert sie Strom.",
-      "world": 3
-    },
-    {
-      "type": "LAVA",
-      "name": "Lava",
-      "default_state": "MOLTEN",
-      "properties": {
-        "liquid": true,
-        "capacity": 8,
-        "density": 30,
-        "weight": 6,
-        "heat": 6,
-        "heat_state": "MOLTEN"
-      },
-      "vanish_states": [
-        "COOLED"
-      ],
-      "state_names": {
-        "MOLTEN": "glühend",
-        "COOLED": "erstarrt"
-      },
-      "description": "Schwer, glühend heiß und flüssig. Erstarrt an Wasser zu Stein.",
-      "world": 4
-    },
-    {
-      "type": "OIL",
-      "name": "Öl",
-      "default_state": "LIQUID",
-      "properties": {
-        "liquid": true,
-        "capacity": 8,
-        "density": 8,
-        "weight": 1,
-        "heat": 5,
-        "heat_state": "BURNING",
-        "fuel": 8,
-        "burnt_state": "BURNT"
-      },
-      "vanish_states": [
-        "BURNT"
-      ],
-      "state_names": {
-        "LIQUID": "flüssig",
-        "BURNING": "brennt",
-        "BURNT": "verbrannt"
-      },
-      "description": "Leichter als Wasser: schwimmt oben. Brennt – und Wasser löscht es nicht.",
-      "world": 4
-    },
-    {
-      "type": "SAND",
-      "name": "Sand",
-      "default_state": "DRY",
-      "properties": {
-        "gravity": true,
-        "density": 20,
-        "weight": 20,
-        "granular": true,
-        "granular_state": "DRY",
-        "wire": true,
-        "wire_state": "WET"
-      },
-      "state_names": {
-        "DRY": "trocken",
-        "WET": "nass"
-      },
-      "description": "Rieselt zur Seite, wenn er nicht fallen kann. Saugt Wasser auf.",
-      "world": 4
-    }
-  ],
-  "rules": [
-    {
-      "id": "heat_melts_ice",
-      "name": "Schmelzen",
-      "trigger": "TOUCH",
-      "conditions": {
-        "source_hot": true,
-        "target": "ICE",
-        "target_state": "SOLID"
-      },
-      "effect": {
-        "target_state": "MELTED",
-        "spawn_object": "WATER"
-      },
-      "world": 1
-    },
-    {
-      "id": "water_douses_fire",
-      "name": "Löschen",
-      "trigger": "TOUCH",
-      "conditions": {
-        "source": "WATER",
-        "target": "FIRE",
-        "target_state": "ACTIVE"
-      },
-      "effect": {
-        "target_state": "OUT",
-        "spawn_object": "STEAM",
-        "spawn_amount": 6,
-        "source_consume": 3
-      },
-      "world": 1
-    },
-    {
-      "id": "steam_melts_ice",
-      "name": "Tauen",
-      "trigger": "TOUCH",
-      "conditions": {
-        "source": "STEAM",
-        "target": "ICE",
-        "target_state": "SOLID"
-      },
-      "effect": {
-        "target_state": "MELTED",
-        "spawn_object": "WATER",
-        "source_consume": 4
-      },
-      "world": 1
-    },
-    {
-      "id": "heat_ignites_wood",
-      "name": "Entzünden",
-      "trigger": "TOUCH",
-      "conditions": {
-        "source_hot": true,
-        "target": "WOOD",
-        "target_state": "DRY"
-      },
-      "effect": {
-        "target_state": "BURNING"
-      },
-      "world": 1
-    },
-    {
-      "id": "water_douses_wood",
-      "name": "Ablöschen",
-      "trigger": "TOUCH",
-      "conditions": {
-        "source": "WATER",
-        "target": "WOOD",
-        "target_state": "BURNING"
-      },
-      "effect": {
-        "target_state": "CHARRED",
-        "spawn_object": "STEAM",
-        "spawn_amount": 4,
-        "source_consume": 2
-      },
-      "world": 1
-    },
-    {
-      "id": "water_triggers_button",
-      "name": "Wasserkontakt",
-      "trigger": "TOUCH",
-      "conditions": {
-        "source": "WATER",
-        "target": "BUTTON",
-        "target_state": "UP"
-      },
-      "effect": {
-        "target_state": "PRESSED"
-      },
-      "world": 1
-    },
-    {
-      "id": "weight_presses_plate",
-      "name": "Gewicht",
-      "trigger": "LOAD",
-      "conditions": {
-        "target": "PLATE",
-        "min_load": 32
-      },
-      "effect": {
-        "target_state": "PRESSED"
-      },
-      "else_effect": {
-        "target_state": "UP"
-      },
-      "world": 1
-    },
-    {
-      "id": "signal_opens_door",
-      "name": "Tür-Signal",
-      "trigger": "SIGNAL",
-      "conditions": {
-        "target": "DOOR"
-      },
-      "effect": {
-        "target_state": "UNLOCKED"
-      },
-      "else_effect": {
-        "target_state": "LOCKED"
-      },
-      "world": 1
-    },
-    {
-      "id": "signal_opens_hatch",
-      "name": "Klappen-Signal",
-      "trigger": "SIGNAL",
-      "conditions": {
-        "target": "HATCH"
-      },
-      "effect": {
-        "target_state": "OPEN"
-      },
-      "world": 1
-    },
-    {
-      "id": "metal_conducts",
-      "name": "Wärmeleitung",
-      "trigger": "HEAT",
-      "conditions": {
-        "target": "METAL",
-        "min_load": 1
-      },
-      "effect": {
-        "target_state": "HOT"
-      },
-      "else_effect": {
-        "target_state": "COLD"
-      },
-      "world": 2
-    },
-    {
-      "id": "metal_boils_water",
-      "name": "Sieden",
-      "trigger": "TOUCH",
-      "conditions": {
-        "source": "METAL",
-        "source_state": "HOT",
-        "target": "WATER"
-      },
-      "effect": {
-        "spawn_object": "STEAM",
-        "spawn_amount": 2,
-        "target_consume": 1
-      },
-      "world": 2
-    },
-    {
-      "id": "steam_lifts_piston",
-      "name": "Dampfdruck",
-      "trigger": "LOAD",
-      "conditions": {
-        "target": "PISTON",
-        "min_load": 9,
-        "direction": "UP"
-      },
-      "effect": {
-        "target_state": "PUSHED"
-      },
-      "else_effect": {
-        "target_state": "IDLE"
-      },
-      "world": 2
-    },
-    {
-      "id": "steam_bursts_membrane",
-      "name": "Bersten",
-      "trigger": "LOAD",
-      "conditions": {
-        "target": "MEMBRANE",
-        "min_load": 14,
-        "direction": "UP"
-      },
-      "effect": {
-        "target_state": "BURST"
-      },
-      "world": 2
-    },
-    {
-      "id": "power_lights_lamp",
-      "name": "Licht",
-      "trigger": "POWER",
-      "conditions": {
-        "target": "LAMP"
-      },
-      "effect": {
-        "target_state": "ON"
-      },
-      "else_effect": {
-        "target_state": "OFF"
-      },
-      "world": 3
-    },
-    {
-      "id": "power_heats_coil",
-      "name": "Glühen",
-      "trigger": "POWER",
-      "conditions": {
-        "target": "COIL"
-      },
-      "effect": {
-        "target_state": "HOT"
-      },
-      "else_effect": {
-        "target_state": "COLD"
-      },
-      "world": 3
-    },
-    {
-      "id": "coil_boils_water",
-      "name": "Tauchsieder",
-      "trigger": "TOUCH",
-      "conditions": {
-        "source": "COIL",
-        "source_state": "HOT",
-        "target": "WATER"
-      },
-      "effect": {
-        "spawn_object": "STEAM",
-        "spawn_amount": 2,
-        "target_consume": 1
-      },
-      "world": 3
-    },
-    {
-      "id": "signal_closes_relay",
-      "name": "Relais",
-      "trigger": "SIGNAL",
-      "conditions": {
-        "target": "RELAY"
-      },
-      "effect": {
-        "target_state": "CLOSED"
-      },
-      "else_effect": {
-        "target_state": "OPEN"
-      },
-      "world": 3
-    },
-    {
-      "id": "steam_spins_turbine",
-      "name": "Turbine",
-      "trigger": "LOAD",
-      "conditions": {
-        "target": "TURBINE",
-        "min_load": 6,
-        "direction": "UP"
-      },
-      "effect": {
-        "target_state": "SPINNING"
-      },
-      "else_effect": {
-        "target_state": "IDLE"
-      },
-      "world": 3
-    },
-    {
-      "id": "water_cools_lava",
-      "name": "Erstarren",
-      "trigger": "TOUCH",
-      "conditions": {
-        "source": "WATER",
-        "target": "LAVA",
-        "target_state": "MOLTEN"
-      },
-      "effect": {
-        "target_state": "COOLED",
-        "spawn_object": "STONE",
-        "source_consume": 2
-      },
-      "world": 4
-    },
-    {
-      "id": "lava_boils_water",
-      "name": "Verdampfen",
-      "trigger": "TOUCH",
-      "conditions": {
-        "source": "LAVA",
-        "target": "WATER"
-      },
-      "effect": {
-        "spawn_object": "STEAM",
-        "spawn_amount": 2,
-        "target_consume": 1
-      },
-      "world": 4
-    },
-    {
-      "id": "heat_ignites_oil",
-      "name": "Ölbrand",
-      "trigger": "TOUCH",
-      "conditions": {
-        "source_hot": true,
-        "target": "OIL",
-        "target_state": "LIQUID"
-      },
-      "effect": {
-        "target_state": "BURNING"
-      },
-      "world": 4
-    },
-    {
-      "id": "water_soaks_sand",
-      "name": "Aufsaugen",
-      "trigger": "TOUCH",
-      "conditions": {
-        "source": "WATER",
-        "target": "SAND",
-        "target_state": "DRY"
-      },
-      "effect": {
-        "target_state": "WET",
-        "source_consume": 4
-      },
-      "world": 4
-    }
-  ]
+ "types": [
+  {
+   "type": "WATER",
+   "name": "Wasser",
+   "default_state": "LIQUID",
+   "properties": {
+    "liquid": true,
+    "capacity": 8,
+    "density": 10,
+    "weight": 2
+   },
+   "vanish_states": [],
+   "state_names": {
+    "LIQUID": "flüssig"
+   },
+   "description": "Fließt nach unten, füllt Mulden und löscht Feuer. Lässt Samen keimen.",
+   "world": 1
+  },
+  {
+   "type": "STEAM",
+   "name": "Dampf",
+   "default_state": "GAS",
+   "properties": {
+    "gas": true,
+    "capacity": 8,
+    "condense": "CLOUD",
+    "condense_ratio": 2
+   },
+   "vanish_states": [],
+   "state_names": {
+    "GAS": "steigt"
+   },
+   "description": "Steigt auf. Sammelt sich genug davon unter einem Hindernis, wird daraus eine Wolke.",
+   "world": 1
+  },
+  {
+   "type": "CLOUD",
+   "name": "Wolke",
+   "default_state": "GATHERING",
+   "properties": {
+    "cloud": true,
+    "capacity": 8,
+    "rain": "WATER",
+    "rain_state": "RAINING"
+   },
+   "vanish_states": [],
+   "state_names": {
+    "GATHERING": "sammelt sich",
+    "RAINING": "regnet"
+   },
+   "description": "Schwebt, nimmt Dampf auf und treibt mit dem Wind. Voll geworden, regnet sie ab.",
+   "world": 1
+  },
+  {
+   "type": "FIRE",
+   "name": "Flamme",
+   "default_state": "ACTIVE",
+   "properties": {
+    "gravity": true,
+    "density": 15,
+    "weight": 10,
+    "heat": 4,
+    "heat_state": "ACTIVE",
+    "flame": true
+   },
+   "vanish_states": [
+    "OUT"
+   ],
+   "state_names": {
+    "ACTIVE": "brennt",
+    "OUT": "erloschen"
+   },
+   "description": "Eine kleine Flamme. Schmilzt Eis und entzündet Holz, aber Wasser löscht sie sofort.",
+   "world": 1
+  },
+  {
+   "type": "BIG_FIRE",
+   "name": "Großes Feuer",
+   "default_state": "ACTIVE",
+   "properties": {
+    "gravity": true,
+    "density": 15,
+    "weight": 20,
+    "heat": 7,
+    "heat_state": "ACTIVE",
+    "heat_radius": 2,
+    "flame": true
+   },
+   "vanish_states": [
+    "OUT"
+   ],
+   "state_names": {
+    "ACTIVE": "lodert",
+    "OUT": "erloschen"
+   },
+   "description": "Zwei Flammen zusammen. Seine Hitze reicht zwei Felder weit und lässt Wasser verdampfen. Nur tiefes Wasser löscht es.",
+   "world": 1
+  },
+  {
+   "type": "WOOD",
+   "name": "Holz",
+   "default_state": "DRY",
+   "properties": {
+    "gravity": true,
+    "density": 6,
+    "weight": 8,
+    "heat": 4,
+    "fuel": 10,
+    "heat_state": "BURNING",
+    "burnt_state": "ASH",
+    "flame": true
+   },
+   "vanish_states": [
+    "ASH"
+   ],
+   "state_names": {
+    "DRY": "trocken",
+    "BURNING": "brennt",
+    "CHARRED": "verkohlt",
+    "ASH": "verbrannt"
+   },
+   "description": "Leicht: schwimmt. Fängt Feuer und brennt eine Weile.",
+   "world": 1
+  },
+  {
+   "type": "WOOD_PILE",
+   "name": "Holzstapel",
+   "default_state": "DRY",
+   "properties": {
+    "gravity": true,
+    "density": 7,
+    "weight": 16,
+    "heat": 6,
+    "fuel": 30,
+    "heat_state": "BURNING",
+    "burnt_state": "ASH",
+    "flame": true
+   },
+   "vanish_states": [
+    "ASH"
+   ],
+   "state_names": {
+    "DRY": "trocken",
+    "BURNING": "brennt",
+    "CHARRED": "verkohlt",
+    "ASH": "verbrannt"
+   },
+   "description": "Zwei Hölzer zusammen. Brennt dreimal so lange und so heiß, dass Wasser daneben verdampft. Nur tiefes Wasser löscht ihn.",
+   "world": 1
+  },
+  {
+   "type": "ICE",
+   "name": "Eis",
+   "default_state": "SOLID",
+   "properties": {
+    "gravity": true,
+    "density": 9,
+    "weight": 14
+   },
+   "vanish_states": [
+    "MELTED"
+   ],
+   "state_names": {
+    "SOLID": "fest",
+    "MELTED": "geschmolzen"
+   },
+   "description": "Schwimmt und schmilzt bei Hitze zu einem Feld Wasser.",
+   "world": 1
+  },
+  {
+   "type": "STONE",
+   "name": "Stein",
+   "default_state": "SOLID",
+   "properties": {
+    "gravity": true,
+    "density": 25,
+    "weight": 40
+   },
+   "vanish_states": [],
+   "state_names": {
+    "SOLID": "fest"
+   },
+   "description": "Schwer. Sinkt im Wasser und hebt so den Wasserspiegel.",
+   "world": 1
+  },
+  {
+   "type": "SEED",
+   "name": "Samen",
+   "default_state": "SEED",
+   "properties": {
+    "gravity": true,
+    "density": 5,
+    "weight": 2
+   },
+   "vanish_states": [
+    "BURNT"
+   ],
+   "state_names": {
+    "SEED": "ruht",
+    "SPROUTED": "keimt",
+    "BURNT": "verbrannt",
+    "WITHERED": "versalzen"
+   },
+   "description": "Keimt, sobald Süßwasser ihn berührt. Hitze verbrennt ihn.",
+   "world": 1
+  },
+  {
+   "type": "TREE",
+   "name": "Baum",
+   "default_state": "GREEN",
+   "properties": {
+    "heat": 5,
+    "fuel": 16,
+    "heat_state": "BURNING",
+    "burnt_state": "ASH",
+    "flame": true
+   },
+   "vanish_states": [
+    "ASH"
+   ],
+   "state_names": {
+    "GREEN": "grün",
+    "BURNING": "brennt",
+    "CHARRED": "verkohlt",
+    "ASH": "verbrannt"
+   },
+   "description": "Steht fest. Fängt Feuer und gibt es an Nachbarn weiter.",
+   "world": 1
+  },
+  {
+   "type": "SEAWATER",
+   "name": "Meerwasser",
+   "default_state": "LIQUID",
+   "properties": {
+    "liquid": true,
+    "capacity": 8,
+    "density": 11,
+    "weight": 2
+   },
+   "vanish_states": [],
+   "state_names": {
+    "LIQUID": "flüssig"
+   },
+   "description": "Salzig und schwerer als Süßwasser: sinkt darunter. Löscht Feuer, aber nichts wächst davon.",
+   "world": 2
+  },
+  {
+   "type": "SAND",
+   "name": "Sand",
+   "default_state": "DRY",
+   "properties": {
+    "gravity": true,
+    "density": 20,
+    "weight": 20,
+    "granular": true,
+    "granular_state": "DRY"
+   },
+   "vanish_states": [],
+   "state_names": {
+    "DRY": "trocken",
+    "WET": "nass",
+    "GLASS": "Glas"
+   },
+   "description": "Rieselt zur Seite. Nass klebt er zusammen und hält Wasser auf; Hitze trocknet ihn wieder.",
+   "world": 2
+  },
+  {
+   "type": "LAVA",
+   "name": "Lava",
+   "default_state": "MOLTEN",
+   "properties": {
+    "liquid": true,
+    "capacity": 8,
+    "density": 30,
+    "weight": 6,
+    "heat": 8,
+    "heat_state": "MOLTEN"
+   },
+   "vanish_states": [
+    "COOLED"
+   ],
+   "state_names": {
+    "MOLTEN": "glüht",
+    "COOLED": "erstarrt"
+   },
+   "description": "Glühend, zäh und schwer. Lässt Wasser verdampfen, entzündet alles und erstarrt an Wasser zu Stein.",
+   "world": 3
+  },
+  {
+   "type": "EMBER_ROCK",
+   "name": "Glutfels",
+   "default_state": "HOT",
+   "properties": {
+    "heat": 7,
+    "heat_state": "HOT"
+   },
+   "vanish_states": [],
+   "state_names": {
+    "HOT": "glüht"
+   },
+   "description": "Heißes Gestein aus der Tiefe. Erlischt nie und bringt Wasser darauf zum Kochen.",
+   "world": 3
+  },
+  {
+   "type": "PUMICE",
+   "name": "Bimsstein",
+   "default_state": "SOLID",
+   "properties": {
+    "gravity": true,
+    "density": 8,
+    "weight": 12
+   },
+   "vanish_states": [],
+   "state_names": {
+    "SOLID": "fest"
+   },
+   "description": "Ein Stein voller Luftlöcher: er schwimmt.",
+   "world": 3
+  },
+  {
+   "type": "FROST",
+   "name": "Frostkristall",
+   "default_state": "COLD",
+   "properties": {},
+   "vanish_states": [],
+   "state_names": {
+    "COLD": "eisig"
+   },
+   "description": "Ewiges Eis. Lässt ein volles Feld Süßwasser daneben zu Eis gefrieren – Meerwasser nicht.",
+   "world": 4
+  },
+  {
+   "type": "SNOW",
+   "name": "Schnee",
+   "default_state": "POWDER",
+   "properties": {
+    "gravity": true,
+    "density": 4,
+    "weight": 3,
+    "granular": true,
+    "granular_state": "POWDER"
+   },
+   "vanish_states": [
+    "MELTED"
+   ],
+   "state_names": {
+    "POWDER": "pulvrig",
+    "MELTED": "geschmolzen"
+   },
+   "description": "Rieselt wie Sand, ist aber federleicht. Schmilzt bei Hitze zu wenig Wasser.",
+   "world": 4
+  },
+  {
+   "type": "SALT",
+   "name": "Salz",
+   "default_state": "CRYSTAL",
+   "properties": {
+    "gravity": true,
+    "density": 18,
+    "weight": 10
+   },
+   "vanish_states": [
+    "DISSOLVED"
+   ],
+   "state_names": {
+    "CRYSTAL": "Kristall",
+    "DISSOLVED": "gelöst"
+   },
+   "description": "Taut Eis und Schnee. Löst sich in Wasser und macht daraus Meerwasser.",
+   "world": 4
+  }
+ ],
+ "rules": [
+  {
+   "id": "heat_melts_ice",
+   "name": "Schmelzen",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source_hot": true,
+    "target": "ICE",
+    "target_state": "SOLID"
+   },
+   "effect": {
+    "target_state": "MELTED",
+    "spawn_object": "WATER"
+   },
+   "world": 1,
+   "sound": "melt"
+  },
+  {
+   "id": "water_douses_fire",
+   "name": "Löschen",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source": "WATER",
+    "target": "FIRE",
+    "target_state": "ACTIVE"
+   },
+   "effect": {
+    "target_state": "OUT",
+    "spawn_object": "STEAM",
+    "spawn_amount": 4,
+    "source_consume": 2
+   },
+   "world": 1,
+   "sound": "hiss"
+  },
+  {
+   "id": "heat_boils_water",
+   "name": "Verdampfen",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source_hot": true,
+    "min_heat": 6,
+    "target": "WATER"
+   },
+   "effect": {
+    "spawn_object": "STEAM",
+    "spawn_amount": 2,
+    "target_consume": 1
+   },
+   "world": 1,
+   "sound": "boil"
+  },
+  {
+   "id": "water_douses_big_fire",
+   "name": "Ersticken",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source": "WATER",
+    "source_min_amount": 6,
+    "target": "BIG_FIRE",
+    "target_state": "ACTIVE"
+   },
+   "effect": {
+    "target_state": "OUT",
+    "spawn_object": "STEAM",
+    "spawn_amount": 6,
+    "source_consume": 3
+   },
+   "world": 1,
+   "sound": "hiss"
+  },
+  {
+   "id": "steam_melts_ice",
+   "name": "Tauen",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source": "STEAM",
+    "target": "ICE",
+    "target_state": "SOLID"
+   },
+   "effect": {
+    "target_state": "MELTED",
+    "spawn_object": "WATER",
+    "source_consume": 4
+   },
+   "world": 1,
+   "sound": "melt"
+  },
+  {
+   "id": "heat_ignites_wood",
+   "name": "Entzünden (Holz)",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source_hot": true,
+    "target": "WOOD",
+    "target_state": "DRY"
+   },
+   "effect": {
+    "target_state": "BURNING"
+   },
+   "world": 1,
+   "sound": "crackle"
+  },
+  {
+   "id": "heat_ignites_wood_pile",
+   "name": "Entzünden (Stapel)",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source_hot": true,
+    "target": "WOOD_PILE",
+    "target_state": "DRY"
+   },
+   "effect": {
+    "target_state": "BURNING"
+   },
+   "world": 1,
+   "sound": "crackle"
+  },
+  {
+   "id": "heat_ignites_tree",
+   "name": "Entzünden (Baum)",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source_hot": true,
+    "target": "TREE",
+    "target_state": "GREEN"
+   },
+   "effect": {
+    "target_state": "BURNING"
+   },
+   "world": 1,
+   "sound": "crackle"
+  },
+  {
+   "id": "water_douses_wood",
+   "name": "Ablöschen",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source": "WATER",
+    "target": "WOOD",
+    "target_state": "BURNING"
+   },
+   "effect": {
+    "target_state": "CHARRED",
+    "spawn_object": "STEAM",
+    "spawn_amount": 4,
+    "source_consume": 2
+   },
+   "world": 1,
+   "sound": "hiss"
+  },
+  {
+   "id": "water_douses_wood_pile",
+   "name": "Ablöschen",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source": "WATER",
+    "target": "WOOD_PILE",
+    "target_state": "BURNING",
+    "source_min_amount": 6
+   },
+   "effect": {
+    "target_state": "CHARRED",
+    "spawn_object": "STEAM",
+    "spawn_amount": 4,
+    "source_consume": 2
+   },
+   "world": 1,
+   "sound": "hiss"
+  },
+  {
+   "id": "water_douses_tree",
+   "name": "Ablöschen",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source": "WATER",
+    "target": "TREE",
+    "target_state": "BURNING"
+   },
+   "effect": {
+    "target_state": "CHARRED",
+    "spawn_object": "STEAM",
+    "spawn_amount": 4,
+    "source_consume": 2
+   },
+   "world": 1,
+   "sound": "hiss"
+  },
+  {
+   "id": "water_sprouts_seed",
+   "name": "Keimen",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source": "WATER",
+    "target": "SEED",
+    "target_state": "SEED"
+   },
+   "effect": {
+    "target_state": "SPROUTED"
+   },
+   "world": 1,
+   "sound": "sprout"
+  },
+  {
+   "id": "heat_burns_seed",
+   "name": "Verkohlen",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source_hot": true,
+    "target": "SEED"
+   },
+   "effect": {
+    "target_state": "BURNT"
+   },
+   "world": 1,
+   "sound": "crackle"
+  },
+  {
+   "id": "sea_douses_fire",
+   "name": "Löschen (Meer)",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source": "SEAWATER",
+    "target": "FIRE",
+    "target_state": "ACTIVE"
+   },
+   "effect": {
+    "target_state": "OUT",
+    "spawn_object": "STEAM",
+    "spawn_amount": 4,
+    "source_consume": 2
+   },
+   "world": 2,
+   "sound": "hiss"
+  },
+  {
+   "id": "heat_boils_sea",
+   "name": "Verdunsten",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source_hot": true,
+    "min_heat": 6,
+    "target": "SEAWATER"
+   },
+   "effect": {
+    "spawn_object": "STEAM",
+    "spawn_amount": 2,
+    "target_consume": 1
+   },
+   "world": 2,
+   "sound": "boil"
+  },
+  {
+   "id": "sea_douses_big_fire",
+   "name": "Ersticken (Meer)",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source": "SEAWATER",
+    "source_min_amount": 6,
+    "target": "BIG_FIRE",
+    "target_state": "ACTIVE"
+   },
+   "effect": {
+    "target_state": "OUT",
+    "spawn_object": "STEAM",
+    "spawn_amount": 6,
+    "source_consume": 3
+   },
+   "world": 2,
+   "sound": "hiss"
+  },
+  {
+   "id": "sea_douses_wood",
+   "name": "Ablöschen (Meer)",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source": "SEAWATER",
+    "target": "WOOD",
+    "target_state": "BURNING"
+   },
+   "effect": {
+    "target_state": "CHARRED",
+    "spawn_object": "STEAM",
+    "spawn_amount": 4,
+    "source_consume": 2
+   },
+   "world": 2,
+   "sound": "hiss"
+  },
+  {
+   "id": "sea_douses_wood_pile",
+   "name": "Ablöschen (Meer)",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source": "SEAWATER",
+    "target": "WOOD_PILE",
+    "target_state": "BURNING",
+    "source_min_amount": 6
+   },
+   "effect": {
+    "target_state": "CHARRED",
+    "spawn_object": "STEAM",
+    "spawn_amount": 4,
+    "source_consume": 2
+   },
+   "world": 2,
+   "sound": "hiss"
+  },
+  {
+   "id": "sea_douses_tree",
+   "name": "Ablöschen (Meer)",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source": "SEAWATER",
+    "target": "TREE",
+    "target_state": "BURNING"
+   },
+   "effect": {
+    "target_state": "CHARRED",
+    "spawn_object": "STEAM",
+    "spawn_amount": 4,
+    "source_consume": 2
+   },
+   "world": 2,
+   "sound": "hiss"
+  },
+  {
+   "id": "sea_withers_seed",
+   "name": "Versalzen",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source": "SEAWATER",
+    "target": "SEED",
+    "target_state": "SEED"
+   },
+   "effect": {
+    "target_state": "WITHERED"
+   },
+   "world": 2,
+   "sound": "soak"
+  },
+  {
+   "id": "water_wets_sand",
+   "name": "Durchnässen",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source": "WATER",
+    "target": "SAND",
+    "target_state": "DRY"
+   },
+   "effect": {
+    "target_state": "WET",
+    "source_consume": 4
+   },
+   "world": 2,
+   "sound": "soak"
+  },
+  {
+   "id": "seawater_wets_sand",
+   "name": "Durchnässen (Meer)",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source": "SEAWATER",
+    "target": "SAND",
+    "target_state": "DRY"
+   },
+   "effect": {
+    "target_state": "WET",
+    "source_consume": 4
+   },
+   "world": 2,
+   "sound": "soak"
+  },
+  {
+   "id": "heat_dries_sand",
+   "name": "Trocknen",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source_hot": true,
+    "target": "SAND",
+    "target_state": "WET"
+   },
+   "effect": {
+    "target_state": "DRY"
+   },
+   "world": 2,
+   "sound": "sizzle"
+  },
+  {
+   "id": "water_cools_lava",
+   "name": "Erstarren",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source": "WATER",
+    "target": "LAVA",
+    "target_state": "MOLTEN"
+   },
+   "effect": {
+    "target_state": "COOLED",
+    "spawn_object": "STONE",
+    "source_consume": 2
+   },
+   "world": 3,
+   "sound": "hiss"
+  },
+  {
+   "id": "seawater_cools_lava",
+   "name": "Erstarren (Meer)",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source": "SEAWATER",
+    "target": "LAVA",
+    "target_state": "MOLTEN"
+   },
+   "effect": {
+    "target_state": "COOLED",
+    "spawn_object": "STONE",
+    "source_consume": 2
+   },
+   "world": 3,
+   "sound": "hiss"
+  },
+  {
+   "id": "lava_melts_sand",
+   "name": "Glas",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source_hot": true,
+    "min_heat": 8,
+    "target": "SAND",
+    "target_state": "DRY"
+   },
+   "effect": {
+    "target_state": "GLASS"
+   },
+   "world": 3,
+   "sound": "sizzle"
+  },
+  {
+   "id": "frost_freezes_water",
+   "name": "Gefrieren",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source": "FROST",
+    "target": "WATER",
+    "target_min_amount": 8
+   },
+   "effect": {
+    "transform": "ICE"
+   },
+   "world": 4,
+   "sound": "freeze"
+  },
+  {
+   "id": "heat_melts_snow",
+   "name": "Tauwetter",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source_hot": true,
+    "target": "SNOW",
+    "target_state": "POWDER"
+   },
+   "effect": {
+    "target_state": "MELTED",
+    "spawn_object": "WATER",
+    "spawn_amount": 3
+   },
+   "world": 4,
+   "sound": "melt"
+  },
+  {
+   "id": "salt_melts_ice",
+   "name": "Streusalz",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source": "SALT",
+    "target": "ICE",
+    "target_state": "SOLID"
+   },
+   "effect": {
+    "target_state": "MELTED",
+    "spawn_object": "WATER",
+    "source_state": "DISSOLVED"
+   },
+   "world": 4,
+   "sound": "melt"
+  },
+  {
+   "id": "salt_melts_snow",
+   "name": "Streusalz (Schnee)",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source": "SALT",
+    "target": "SNOW",
+    "target_state": "POWDER"
+   },
+   "effect": {
+    "target_state": "MELTED",
+    "spawn_object": "WATER",
+    "spawn_amount": 3,
+    "source_state": "DISSOLVED"
+   },
+   "world": 4,
+   "sound": "melt"
+  },
+  {
+   "id": "salt_dissolves",
+   "name": "Lösen",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source": "SALT",
+    "target": "WATER"
+   },
+   "effect": {
+    "transform": "SEAWATER",
+    "source_state": "DISSOLVED"
+   },
+   "world": 4,
+   "sound": "soak"
+  }
+ ],
+ "merges": [
+  {
+   "id": "flames_merge",
+   "name": "Großes Feuer",
+   "a": "FIRE",
+   "b": "FIRE",
+   "result": "BIG_FIRE",
+   "sound": "whoosh",
+   "world": 1
+  },
+  {
+   "id": "logs_merge",
+   "name": "Holzstapel",
+   "a": "WOOD",
+   "b": "WOOD",
+   "result": "WOOD_PILE",
+   "sound": "thud",
+   "world": 1
+  },
+  {
+   "id": "water_merge",
+   "name": "Tiefes Wasser",
+   "a": "WATER",
+   "b": "WATER",
+   "result": "WATER",
+   "sound": "splash",
+   "world": 1
+  },
+  {
+   "id": "sea_merge",
+   "name": "Tiefes Meerwasser",
+   "a": "SEAWATER",
+   "b": "SEAWATER",
+   "result": "SEAWATER",
+   "sound": "splash",
+   "world": 2
+  }
+ ]
 }

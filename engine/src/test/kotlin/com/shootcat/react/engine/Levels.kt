@@ -4,7 +4,6 @@ import com.shootcat.react.engine.model.Catalog
 import com.shootcat.react.engine.model.GameState
 import com.shootcat.react.engine.model.LevelData
 import com.shootcat.react.engine.model.Position
-import com.shootcat.react.engine.model.SolutionKind
 import com.shootcat.react.engine.model.WorldData
 import java.io.File
 
@@ -29,12 +28,14 @@ object Levels {
 
     fun level(id: String): LevelData = LevelLoader.parseLevel(read(id), world(id))
 
-    fun simulate(level: LevelData, setup: GameState): SimulationResult =
-        Simulator(level, RuleEngine(catalog.types, level.rules)).run(setup)
+    fun engine(level: LevelData): RuleEngine = RuleEngine(catalog.types, level.rules, wind = level.wind)
 
-    fun live(level: LevelData): LiveSimulation = LiveSimulation(level, RuleEngine(catalog.types, level.rules))
+    fun simulate(level: LevelData, setup: GameState): SimulationResult = Simulator(level, engine(level)).run(setup)
 
-    class Attempt(val run: Run, val steps: Int, val solutions: Set<SolutionKind>) {
+    fun live(level: LevelData): LiveSimulation = LiveSimulation(level, engine(level))
+
+    /** [achieved]: indices of the optional goals met when the level was solved. */
+    class Attempt(val run: Run, val steps: Int, val achieved: Set<Int>) {
         val solved: Boolean get() = run.outcome == Outcome.SUCCESS
         val rules: Set<String> get() = run.events.map { it.ruleId }.toSet()
     }
@@ -52,7 +53,6 @@ object Levels {
                 steps++
             }
         }
-        val kinds = SolutionClassifier.classify(level, run).map { it.kind }.toSet()
-        return Attempt(run, steps, kinds)
+        return Attempt(run, steps, run.achieved)
     }
 }

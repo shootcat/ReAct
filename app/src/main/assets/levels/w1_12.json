@@ -1,64 +1,49 @@
 {
-  "id": "w1_12",
-  "title": "Pegel",
-  "world": 1,
-  "intro": "",
-  "map": [
-    "############",
-    "#..........#",
-    "#S.O.F...###",
-    "#########.##",
-    "#########.B#",
-    "#########.##",
-    "#########W##",
-    "#########W#D",
-    "############"
-  ],
-  "legend": {
-    "B": {
-      "type": "BUTTON",
-      "properties": {
-        "channel": "A"
-      }
-    },
-    "D": {
-      "type": "DOOR",
-      "id": "door_1",
-      "properties": {
-        "channel": "A"
-      }
-    },
-    "F": {
-      "type": "FIRE",
-      "movable": true
-    },
-    "O": {
-      "type": "WOOD",
-      "movable": true
-    },
-    "S": {
-      "type": "STONE",
-      "movable": true
-    },
-    "W": {
-      "type": "WATER"
-    }
+ "id": "w1_12",
+ "title": "Wolkenfutter",
+ "world": 1,
+ "intro": "",
+ "map": [
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  ".....o.....",
+  "...........",
+  ".....e.....",
+  "....%%.....",
+  "...........",
+  ".F........F",
+  "###~~~~####",
+  "###~~~~####",
+  "###########",
+  "###########"
+ ],
+ "legend": {
+  "F": {
+   "type": "FIRE",
+   "isMovable": true
   },
-  "goals": [
-    {
-      "object_id": "door_1",
-      "required_state": "UNLOCKED"
-    }
-  ],
-  "solutions": [
-    {
-      "id": "standard",
-      "kind": "STANDARD",
-      "requires": [
-        {
-          "rule": "water_triggers_button"
-        }
-      ]
-    }
-  ]
+  "e": {
+   "type": "SEED"
+  },
+  "o": {
+   "type": "CLOUD",
+   "amount": 4
+  },
+  "~": {
+   "type": "WATER"
+  }
+ },
+ "goals": [
+  {
+   "type": "state",
+   "object": "seed_5_9",
+   "state": "SPROUTED",
+   "text": "Lass den Samen keimen"
+  }
+ ]
 }

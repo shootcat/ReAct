@@ -1,6 +1,6 @@
 package com.shootcat.react.engine
 
-import com.shootcat.react.engine.model.Goal
+import com.shootcat.react.engine.model.TargetState
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -16,7 +16,7 @@ class DeterminismTest {
             "##P###B##",
             "#########",
         )
-        val goals = listOf(Goal("door_x", "UNLOCKED"))
+        val goals = listOf(TargetState("door_x", "UNLOCKED", vanishes = false, text = "Tür auf"))
         val a = Simulator(TestWorld.engine(), goals, 100).run(start)
         val b = Simulator(TestWorld.engine(), goals, 100).run(start)
         assertEquals(a, b)
@@ -27,7 +27,7 @@ class DeterminismTest {
         for (id in Levels.allLevelIds) {
             val level = Levels.level(id)
             val setups = listOf(level.initialState()) + level.initialState().objects
-                .filter { it.movable }
+                .filter { it.isMovable }
                 .flatMap { o ->
                     (0 until level.width).flatMap { x -> (0 until level.height).map { y -> o.id to com.shootcat.react.engine.model.Position(x, y) } }
                 }

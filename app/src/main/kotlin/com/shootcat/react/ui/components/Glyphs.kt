@@ -22,7 +22,7 @@ import kotlin.math.sin
 
 /** Small vector glyphs drawn by hand, so the app needs no icon library and no emoji fonts. */
 enum class Glyph {
-    PLAY, UNDO, REDO, RESET, BACK, NEXT, LOG, CHECK, LOCK, GEAR, SPARK, BOLT, MINIMAL, TARGET, PLUS, ARROW,
+    PLAY, UNDO, REDO, RESET, BACK, NEXT, LOG, CHECK, LOCK, GEAR, SPARK, BOLT, MINIMAL, TARGET, PLUS, ARROW, STAR, STAR_OUTLINE, HAND, MAP,
 }
 
 @Composable
@@ -169,6 +169,48 @@ fun DrawScope.drawGlyph(glyph: Glyph, color: Color) {
                 close()
             }
             drawPath(bolt, color)
+        }
+        Glyph.STAR, Glyph.STAR_OUTLINE -> {
+            val star = Path().apply {
+                for (i in 0 until 10) {
+                    val r = if (i % 2 == 0) w * 0.44f else w * 0.19f
+                    val a = -PI.toFloat() / 2 + i * PI.toFloat() / 5
+                    val p = Offset(w / 2 + cos(a) * r, h * 0.53f + sin(a) * r)
+                    if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y)
+                }
+                close()
+            }
+            if (glyph == Glyph.STAR) {
+                drawPath(star, color)
+            } else {
+                drawPath(star, color, style = Stroke(width = w * 0.08f, join = StrokeJoin.Round))
+            }
+        }
+        Glyph.HAND -> {
+            // A fingertip touching down, with a short drag trail.
+            drawCircle(color, w * 0.16f, Offset(w * 0.62f, h * 0.36f))
+            drawCircle(color, w * 0.28f, Offset(w * 0.62f, h * 0.36f), style = Stroke(width = w * 0.06f))
+            for (i in 0..2) {
+                drawCircle(color, w * (0.05f - i * 0.012f), Offset(w * (0.42f - i * 0.12f), h * (0.56f + i * 0.12f)))
+            }
+        }
+        Glyph.MAP -> {
+            val map = Path().apply {
+                moveTo(w * 0.12f, h * 0.24f)
+                lineTo(w * 0.38f, h * 0.14f)
+                lineTo(w * 0.62f, h * 0.24f)
+                lineTo(w * 0.88f, h * 0.14f)
+                lineTo(w * 0.88f, h * 0.76f)
+                lineTo(w * 0.62f, h * 0.86f)
+                lineTo(w * 0.38f, h * 0.76f)
+                lineTo(w * 0.12f, h * 0.86f)
+                close()
+                moveTo(w * 0.38f, h * 0.14f)
+                lineTo(w * 0.38f, h * 0.76f)
+                moveTo(w * 0.62f, h * 0.24f)
+                lineTo(w * 0.62f, h * 0.86f)
+            }
+            drawPath(map, color, style = Stroke(width = w * 0.08f, join = StrokeJoin.Round))
         }
         Glyph.MINIMAL -> {
             drawCircle(color, w * 0.36f, Offset(w / 2, h / 2), style = Stroke(width = w * 0.08f))

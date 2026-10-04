@@ -4,6 +4,7 @@ import com.shootcat.react.engine.model.GameObject
 import com.shootcat.react.engine.model.Position
 import com.shootcat.react.engine.model.Props
 import com.shootcat.react.engine.model.TypeCatalog
+import com.shootcat.react.engine.model.WindZone
 import kotlin.math.max
 import kotlin.math.min
 
@@ -15,12 +16,15 @@ import kotlin.math.min
  * 2. Solids lighter than the liquid float up through it (buoyancy).
  * 3. Gases ([Props.GAS]) are volumes that behave like an upside-down liquid: they rise, bubble up
  *    through liquids, run along ceilings towards openings and fill closed chambers from the top.
- * 4. Liquids ([Props.LIQUID]) fall, run off towards nearby edges and pits and otherwise level out.
+ *    Gas that rises out of the top of the map escapes into the open sky.
+ * 4. Clouds form where enough gas gathers under an obstacle, drift with the wind, take up more gas
+ *    and rain once they are full ([Props.CLOUD]).
+ * 5. Liquids ([Props.LIQUID]) fall, run off towards nearby edges and pits and otherwise level out.
  *    Different liquids layer by density (oil floats on water, water sinks below it).
- * 5. Gas pressure pushes barriers ([Props.PUSHABLE]): every connected body of air has a pressure
+ * 6. Gas pressure pushes barriers ([Props.PUSHABLE]): every connected body of air has a pressure
  *    (gas per cell), and a barrier between two bodies moves away from the higher one.
- * 6. Heat flows through conductors ([Props.CONDUCTS]), losing one degree per cell.
- * 7. Burning things use up their fuel ([Props.FUEL]).
+ * 7. Heat flows through conductors ([Props.CONDUCTS]), losing one degree per cell.
+ * 8. Burning things use up their fuel ([Props.FUEL]).
  *
  * Flows are computed from one snapshot so left and right are treated alike; ties go left.
  */
@@ -30,12 +34,17 @@ internal object Physics {
     private val topDown = compareBy<GameObject> { it.position.y }.thenBy { it.position.x }.thenBy { it.id }
     private val readingOrder = compareBy<Position>({ it.y }, { it.x })
 
-    fun apply(world: MutableWorld, types: TypeCatalog) {
+    fun apply(world: MutableWorld, types: TypeCatalog, wind: List<WindZone> = emptyList()) {
         val moved = HashSet<String>()
         solids(world, moved)
         floaters(world, moved)
+        feedClouds(world)
         fluids(world, types, gas = true)
+        condense(world, types)
+        drift(world, wind)
         fluids(world, types, gas = false)
+        // Rain last: a fresh drop sits where it fell until the next step, so it touches what it lands on.
+        rain(world, types)
         pressure(world)
         heat(world)
         combustion(world, types)
@@ -51,7 +60,7 @@ internal object Physics {
                 continue
             }
             val b = world.at(below)
-            if (b != null && ((b.isLiquid && o.density > b.density) || b.isGas)) {
+            if (b != null && ((b.isLiquid && o.density > b.density) || b.isAiry)) {
                 world.swap(o.id, b.id)
                 moved += o.id
                 moved += b.id
@@ -99,6 +108,11 @@ internal object Physics {
         for (candidate in world.all().filter(::isKind).sortedWith(if (gas) topDown else bottomUp)) {
             val o = world.byId(candidate.id) ?: continue
             val next = Position(o.position.x, o.position.y + dy)
+            if (gas && next.y < 0) {
+                // Out into the open sky: it is gone. Only an obstacle above keeps gas together.
+                world.remove(o.id)
+                continue
+            }
             if (world.isFree(next)) {
                 world.move(o.id, next)
                 continue
@@ -113,6 +127,9 @@ internal object Physics {
                 world.swap(o.id, n.id)
             } else if (!gas && n.isLiquid && o.density > n.density) {
                 // Layering: the denser liquid sinks below the lighter one (water under oil).
+                world.swap(o.id, n.id)
+            } else if (!gas && n.isCloud) {
+                // Water falls through a cloud.
                 world.swap(o.id, n.id)
             }
         }
@@ -232,7 +249,161 @@ internal object Physics {
         return when {
             n.type == o.type -> n.amount >= n.capacity
             o.isGas && n.isLiquid -> false
+            o.isLiquid && n.isCloud -> false
             else -> true
+        }
+    }
+
+    // ---------------------------------------------------------------- clouds, wind and rain
+
+    private fun condensable(o: GameObject?) = o != null && o.isGas && o.string(Props.CONDENSE) != null
+
+    /**
+     * A cloud takes up the gas that condenses into it ([Props.CONDENSE]) from around it: everything
+     * connected to it through gas within [FEED_RANGE] cells, so thin wisps under the rock join it too.
+     * [Props.CONDENSE_RATIO] units of gas make one unit of cloud; a remainder stays behind as gas.
+     */
+    private fun feedClouds(world: MutableWorld) {
+        for (candidate in world.all().filter { it.isCloud }.sortedWith(topDown)) {
+            val cloud = world.byId(candidate.id) ?: continue
+            if (cloud.amount >= cloud.capacity) continue
+            val gas = mutableListOf<GameObject>()
+            val seen = hashSetOf(cloud.position)
+            var frontier = listOf(cloud.position)
+            repeat(FEED_RANGE) {
+                val next = mutableListOf<Position>()
+                for (p in frontier) {
+                    for (n in p.neighbours()) {
+                        if (!seen.add(n)) continue
+                        val o = world.at(n)
+                        if (condensable(o) && o!!.string(Props.CONDENSE) == cloud.type) {
+                            gas += o
+                            next += n
+                        }
+                    }
+                }
+                frontier = next
+            }
+            if (gas.isEmpty()) continue
+            val ratio = gas.first().int(Props.CONDENSE_RATIO, 2)
+            val total = gas.sumOf { it.amount }
+            val units = min(total / ratio, cloud.capacity - cloud.amount)
+            if (units <= 0) continue
+            var take = units * ratio
+            for (g in gas) {
+                if (take <= 0) break
+                val t = min(g.amount, take)
+                world.setAmount(g.id, g.amount - t)
+                take -= t
+            }
+            world.setAmount(cloud.id, cloud.amount + units)
+        }
+    }
+
+    /**
+     * Where enough gas gathers in one row under an obstacle (rock, a tree, a full cloud), that row
+     * condenses into a cloud in its middle. The open sky is no obstacle: there the gas escapes.
+     */
+    private fun condense(world: MutableWorld, types: TypeCatalog) {
+        if (world.all().none { condensable(it) }) return
+        fun underObstacle(o: GameObject): Boolean {
+            val above = o.position.up()
+            if (!world.inBounds(above)) return false
+            if (world.isWall(above)) return true
+            val a = world.at(above) ?: return false
+            return !a.isFluid
+        }
+        val done = HashSet<String>()
+        for (start in world.all().filter { condensable(it) && underObstacle(it) }.sortedWith(topDown)) {
+            if (start.id in done || world.byId(start.id) == null) continue
+            fun member(p: Position): GameObject? =
+                world.at(p)?.takeIf { condensable(it) && it.type == start.type && underObstacle(it) }
+            val row = mutableListOf(start)
+            var x = start.position.x - 1
+            while (true) row += member(Position(x--, start.position.y)) ?: break
+            x = start.position.x + 1
+            while (true) row += member(Position(x++, start.position.y)) ?: break
+            row.forEach { done += it.id }
+            val total = row.sumOf { it.amount }
+            if (total < start.int(Props.CONDENSE_AT, start.capacity)) continue
+
+            val cloudType = start.string(Props.CONDENSE)!!
+            val ratio = start.int(Props.CONDENSE_RATIO, 2)
+            val units = min(total / ratio, world.fluidCapacity(cloudType, types))
+            val sorted = row.sortedBy { it.position.x }
+            val middle = sorted[(sorted.size - 1) / 2]
+            row.forEach { world.remove(it.id) }
+            world.spawn(cloudType, middle.position, types, amount = units)
+            val leftover = total - units * ratio
+            val beside = sorted.firstOrNull { it.id != middle.id }
+            if (leftover > 0 && beside != null) world.spawn(start.type, beside.position, types, amount = leftover)
+            world.cue("condense", middle.position)
+        }
+    }
+
+    /** Wind carries clouds one cell per step; a cloud that drifts into another of its kind joins it. */
+    private fun drift(world: MutableWorld, wind: List<WindZone>) {
+        if (wind.isEmpty()) return
+        val moved = HashSet<String>()
+        for (zone in wind) {
+            val dx = zone.dx.coerceIn(-1, 1)
+            if (dx == 0) continue
+            val inZone = world.all().filter { it.isCloud && it.position in zone.area && it.id !in moved }
+            // The leading cloud moves first so a whole bank drifts together.
+            for (candidate in inZone.sortedWith(compareBy<GameObject>({ -dx * it.position.x }, { it.position.y }))) {
+                val c = world.byId(candidate.id) ?: continue
+                val to = Position(c.position.x + dx, c.position.y)
+                if (!world.inBounds(to) || world.isWall(to)) continue
+                val there = world.at(to)
+                when {
+                    there == null -> world.move(c.id, to)
+                    there.isGas -> world.swap(c.id, there.id)
+                    there.type == c.type && there.amount < there.capacity -> {
+                        val transfer = min(c.amount, there.capacity - there.amount)
+                        world.setAmount(there.id, there.amount + transfer)
+                        world.setAmount(c.id, c.amount - transfer)
+                    }
+                    else -> continue
+                }
+                moved += c.id
+            }
+        }
+    }
+
+    /**
+     * A full cloud starts to rain ([Props.RAIN_STATE]) and lets one unit of its [Props.RAIN] liquid fall
+     * per step, through any gas below it, until it is empty and gone.
+     */
+    private fun rain(world: MutableWorld, types: TypeCatalog) {
+        for (candidate in world.all().filter { it.isCloud }.sortedWith(topDown)) {
+            val c = world.byId(candidate.id) ?: continue
+            val rainState = c.string(Props.RAIN_STATE) ?: continue
+            val liquid = c.string(Props.RAIN) ?: continue
+            if (c.state != rainState) {
+                if (c.amount < c.capacity) continue
+                world.setState(c.id, rainState)
+                world.cue("rain", c.position)
+            }
+            // The drop falls through gas below the cloud; if something solid lies beneath that gas,
+            // the drop condenses in the last gas cell and lands on top of it.
+            var below = c.position.down()
+            var lastGas: GameObject? = null
+            while (world.at(below)?.isGas == true) {
+                lastGas = world.at(below)
+                below = below.down()
+            }
+            val b = if (world.inBounds(below) && !world.isWall(below)) world.at(below) else null
+            val open = world.inBounds(below) && !world.isWall(below)
+            when {
+                open && b == null -> world.spawn(liquid, below, types, amount = 1)
+                b != null && b.type == liquid && b.amount < b.capacity -> world.setAmount(b.id, b.amount + 1)
+                lastGas != null -> {
+                    world.remove(lastGas.id)
+                    world.spawn(liquid, lastGas.position, types, amount = 1)
+                }
+                else -> continue
+            }
+            world.setAmount(c.id, c.amount - 1)
         }
     }
 
@@ -384,4 +555,7 @@ internal object Physics {
 
     /** How far along a row a fluid notices an edge (an opening) it can run off to. */
     private const val DRAIN_RANGE = 8
+
+    /** How far (through gas) a cloud gathers the steam around it. */
+    private const val FEED_RANGE = 3
 }

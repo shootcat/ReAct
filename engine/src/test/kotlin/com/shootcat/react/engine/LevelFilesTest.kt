@@ -1,12 +1,11 @@
 package com.shootcat.react.engine
 
-import com.shootcat.react.engine.model.Position
+import com.shootcat.react.engine.model.Terrain
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LevelFilesTest {
@@ -23,13 +22,15 @@ class LevelFilesTest {
     }
 
     @Test
-    fun `every level loads and has goals, solution classes and something to experiment with`() {
+    fun `every level has a clear task, loose things to move and a portrait landscape`() {
         for (id in Levels.allLevelIds) {
             val level = Levels.level(id)
             assertEquals(id, level.id)
-            assertTrue(level.goals.isNotEmpty(), "$id has goals")
-            assertTrue(level.solutions.isNotEmpty(), "$id has solution classes")
-            assertTrue(level.objects.any { it.movable }, "$id has movable objects")
+            assertTrue(level.mainGoals.isNotEmpty(), "$id has a main goal")
+            assertTrue(level.goals.all { it.text.isNotBlank() }, "$id: every goal has a text")
+            assertTrue(level.objects.any { it.isMovable }, "$id has movable objects")
+            assertTrue(level.height >= level.width, "$id is laid out for portrait (${level.width}x${level.height})")
+            assertEquals(level.walls, level.terrain.keys, "$id: every wall is earth or rock")
         }
     }
 
@@ -38,7 +39,7 @@ class LevelFilesTest {
         for (id in Levels.allLevelIds) {
             val level = Levels.level(id)
             val start = level.initialState()
-            val step = RuleEngine(Levels.catalog.types, level.rules).step(start)
+            val step = Levels.engine(level).step(start)
             assertEquals(start.objects, step.state.objects, "$id must not change by itself")
         }
     }
@@ -52,56 +53,65 @@ class LevelFilesTest {
     }
 
     @Test
-    fun `objects cannot be dropped onto walls, other objects or closed areas`() {
-        val l1 = Levels.level("w1_01").initialState()
-        assertNull(l1.withObjectMoved("fire_2_3", Position(0, 0)))
-        assertNull(l1.withObjectMoved("fire_2_3", Position(6, 3)), "the ice is there")
-        assertNull(l1.withObjectMoved("ice_6_3", Position(3, 3)), "fixed ice cannot be moved")
-        val l2 = Levels.level("w1_02").initialState()
-        assertNull(l2.withObjectMoved("fire_6_3", Position(4, 5)), "the shaft interior is closed")
-    }
-
-    private fun withLevel(edit: (String) -> String) = edit(Levels.read("w1_01"))
-
-    @Test
-    fun `invalid level files are rejected with a clear error`() {
-        val world = Levels.world("w1_01")
-        assertFailsWith<LevelFormatException> {
-            LevelLoader.parseLevel(withLevel { it.replace("\"type\": \"FIRE\"", "\"type\": \"LAVA2\"") }, world)
-        }
-        assertFailsWith<LevelFormatException> {
-            LevelLoader.parseLevel(withLevel { it.replace("\"#.F...i#\"", "\"#.F...Z#\"") }, world)
-        }
-        assertFailsWith<LevelFormatException> {
-            LevelLoader.parseLevel(withLevel { it.replace("\"######B#\"", "\"######B\"") }, world)
-        }
-        assertFailsWith<LevelFormatException> {
-            LevelLoader.parseLevel(withLevel { it.replace("\"object_id\": \"door_1\"", "\"object_id\": \"door_9\"") }, world)
-        }
-        assertFailsWith<LevelFormatException> {
-            LevelLoader.parseLevel(withLevel { it.replace("\"title\"", "\"titel\"") }, world)
-        }
-    }
-
-    @Test
-    fun `every reaction reads naturally and belongs to a world`() {
-        val texts = Levels.catalog.rules.associate { it.id to Reactions.describe(it, Levels.catalog.types).text }
+    fun `reactions and merges read naturally`() {
+        val types = Levels.catalog.types
+        val texts = Levels.catalog.rules.associate { it.id to Reactions.describe(it, types).text }
         assertEquals("Hitze + Eis → Wasser", texts["heat_melts_ice"])
         assertEquals("Wasser + Feuer → Dampf", texts["water_douses_fire"])
-        assertEquals("Strom + Lampe → Lampe an", texts["power_lights_lamp"])
-        assertEquals("Wasser + Lava → Stein", texts["water_cools_lava"])
         assertTrue(Levels.catalog.rules.all { it.world in 1..4 })
         assertTrue(Levels.catalog.types.all.all { it.world in 1..4 })
+        val flames = Levels.catalog.merges.single { it.id == "flames_merge" }
+        assertEquals("BIG_FIRE", flames.result)
     }
 
     @Test
     fun `every element appears in a level of its world or later`() {
         val used = Levels.allLevelIds.flatMap { id -> Levels.level(id).objects.map { it.type to Levels.world(id).world } }
+        // Things the world itself creates do not need to be placed.
+        val created = (Levels.catalog.rules.mapNotNull { it.effect.spawnObject } + Levels.catalog.merges.map { it.result } +
+            Levels.catalog.types.all.mapNotNull { it.properties["condense"] }).toSet()
         for (type in Levels.catalog.types.all) {
+            if (type.id in created) continue
             val worlds = used.filter { it.first == type.id }.map { it.second }
-            if (type.id == "STEAM") continue
             assertTrue(worlds.isNotEmpty(), "${type.id} is used somewhere")
             assertTrue(worlds.min() >= type.world, "${type.id} appears before its world ${type.world}")
         }
+    }
+
+    private val world by lazy { Levels.worlds.first() }
+
+    private fun level(map: String = "\"#....#\", \"#.F..#\", \"######\"", goals: String = DEFAULT_GOALS, legend: String = DEFAULT_LEGEND) = """
+        {"id": "x", "title": "X", "world": 1, "map": [$map], "legend": {$legend}, "goals": [$goals]}
+    """.trimIndent()
+
+    @Test
+    fun `a minimal level loads with its landscape and movable flags`() {
+        val l = LevelLoader.parseLevel(level(map = "\"%....#\", \"#.F..#\", \"######\""), world)
+        assertEquals(Terrain.ROCK, l.terrain[com.shootcat.react.engine.model.Position(0, 0)])
+        assertEquals(Terrain.EARTH, l.terrain[com.shootcat.react.engine.model.Position(5, 0)])
+        assertTrue(l.objects.single().isMovable)
+        assertEquals(1, l.mainGoals.size)
+    }
+
+    @Test
+    fun `invalid level files are rejected with a clear error`() {
+        assertFailsWith<LevelFormatException> { LevelLoader.parseLevel(level(legend = "\"F\": {\"type\": \"LAVA2\"}"), world) }
+        assertFailsWith<LevelFormatException> { LevelLoader.parseLevel(level(map = "\"#..Z.#\", \"#.F..#\", \"######\""), world) }
+        assertFailsWith<LevelFormatException> { LevelLoader.parseLevel(level(map = "\"#....\", \"#.F..#\", \"######\""), world) }
+        assertFailsWith<LevelFormatException> {
+            LevelLoader.parseLevel(level(goals = "{\"type\": \"state\", \"object\": \"fire_9_9\", \"state\": \"OUT\", \"text\": \"aus\"}"), world)
+        }
+        assertFailsWith<LevelFormatException> {
+            LevelLoader.parseLevel(level(goals = "{\"type\": \"fill\", \"area\": [1, 1, 9, 9], \"min\": 8, \"text\": \"voll\"}"), world)
+        }
+        assertFailsWith<LevelFormatException> {
+            LevelLoader.parseLevel(level(goals = "{\"type\": \"max_moves\", \"moves\": 2, \"text\": \"zwei\", \"optional\": true}"), world)
+        }
+        assertFailsWith<LevelFormatException> { LevelLoader.parseLevel(level().replace("\"title\"", "\"titel\""), world) }
+    }
+
+    private companion object {
+        const val DEFAULT_LEGEND = "\"F\": {\"type\": \"FIRE\", \"isMovable\": true}"
+        const val DEFAULT_GOALS = "{\"type\": \"extinguish\", \"text\": \"Lösche das Feuer\"}"
     }
 }

@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -94,7 +95,7 @@ fun WorldMapScreen(
 
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         TopBar(title = world.title, overline = "Welt ${world.world}", onBack = onBack) {
-            DiscoveryBadge(progress.discoveries.size, content.allRules.size, onOpenLog)
+            DiscoveryBadge(progress.discoveries.size, content.allRules.size + content.merges.size, onOpenLog)
             RoundIconButton(Glyph.GEAR, "Einstellungen", onOpenSettings, size = 40.dp)
         }
         BoxWithConstraints(
@@ -134,7 +135,7 @@ fun WorldMapScreen(
                             types = world.types,
                             unlocked = isUnlocked(level.id),
                             completed = level.id in progress.completed,
-                            found = progress.solutionsFor(level.id).size,
+                            found = progress.extrasFor(level.id).size,
                             pulse = time,
                             onClick = { onOpenLevel(level.id) },
                             modifier = Modifier.offset(
@@ -218,16 +219,21 @@ private fun MapNodeView(
             letterSpacing = 1.sp,
             color = if (unlocked) Palette.text else Palette.textDim,
             textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 6.dp),
+            maxLines = 2,
+            modifier = Modifier
+                .padding(top = 4.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(Palette.background.copy(alpha = 0.6f))
+                .padding(horizontal = 6.dp, vertical = 2.dp),
         )
-        if (level.solutions.isNotEmpty() && unlocked) {
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(top = 4.dp)) {
-                for (i in level.solutions.indices) {
-                    Box(
-                        Modifier
-                            .size(7.dp)
-                            .clip(CircleShape)
-                            .background(if (i < found) Palette.accent else Palette.outline),
+        if (level.optionalGoals.isNotEmpty() && unlocked) {
+            // One star per optional task.
+            Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.padding(top = 2.dp)) {
+                for (i in level.optionalGoals.indices) {
+                    GlyphIcon(
+                        if (i < found) Glyph.STAR else Glyph.STAR_OUTLINE,
+                        color = if (i < found) Palette.accent else Palette.textDim,
+                        size = 14.dp,
                     )
                 }
             }
@@ -235,103 +241,28 @@ private fun MapNodeView(
     }
 }
 
-/** Colours and features of a world's backdrop. */
-private class Scenery(
-    val sky: List<Color>,
-    val peaksTop: Color,
-    val peaksBottom: Color,
-    val caps: Color,
-    val pool: Color,
-    val particles: Color,
-)
-
-private fun scenery(world: Int): Scenery = when (world) {
-    2 -> Scenery(
-        listOf(Color(0xFF232027), Color(0xFF17161B), Color(0xFF121214)),
-        Color(0xFF3A3540), Color(0xFF1E1C23), Palette.steam, Palette.metal, Palette.steam,
-    )
-    3 -> Scenery(
-        listOf(Color(0xFF141A2E), Color(0xFF0E1324), Color(0xFF0A0F1A)),
-        Color(0xFF26304E), Color(0xFF141B30), Palette.signal, Palette.power, Palette.power,
-    )
-    4 -> Scenery(
-        listOf(Color(0xFF2A1612), Color(0xFF1B0F0D), Color(0xFF140B09)),
-        Color(0xFF3E2219), Color(0xFF22120E), Palette.lava, Palette.lava, Palette.fire,
-    )
-    else -> Scenery(
-        listOf(Color(0xFF1A2232), Color(0xFF111821), Color(0xFF0E1814)),
-        Color(0xFF2A3850), Color(0xFF172030), Palette.ice, Palette.water, Palette.fire,
-    )
-}
-
-/** A small, slightly mysterious diorama per world: peaks, a glowing pool, drifting particles and fog. */
+/**
+ * The world's landscape, painted down the whole map in pieces as wide as they are tall; every second
+ * piece is mirrored so the land does not look stamped.
+ */
 private fun DrawScope.drawLandscape(world: Int, time: Float) {
     val w = size.width
-    val h = size.height
-    val look = scenery(world)
-    drawRect(Brush.verticalGradient(look.sky))
-
-    val peaks = Path().apply {
-        moveTo(0f, h * 0.24f)
-        lineTo(w * 0.14f, h * 0.12f)
-        lineTo(w * 0.28f, h * 0.22f)
-        lineTo(w * 0.46f, h * 0.07f)
-        lineTo(w * 0.66f, h * 0.21f)
-        lineTo(w * 0.82f, h * 0.1f)
-        lineTo(w, h * 0.2f)
-        lineTo(w, h * 0.32f)
-        lineTo(0f, h * 0.32f)
-        close()
+    val piece = w * 1.15f
+    var top = 0f
+    var k = 0
+    while (top < size.height) {
+        if (k % 2 == 1) {
+            scale(-1f, 1f, pivot = Offset(w / 2, top)) { drawWorldBand(world, top, piece, w, time) }
+        } else {
+            drawWorldBand(world, top, piece, w, time)
+        }
+        top += piece
+        k++
+        // A soft seam between two pieces.
+        drawRect(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.18f), Color.Transparent), top - w * 0.08f, top + w * 0.08f), Offset(0f, top - w * 0.08f), Size(w, w * 0.16f))
     }
-    drawPath(peaks, Brush.verticalGradient(listOf(look.peaksTop, look.peaksBottom), h * 0.06f, h * 0.32f))
-    val caps = Path().apply {
-        moveTo(w * 0.41f, h * 0.1f)
-        lineTo(w * 0.46f, h * 0.07f)
-        lineTo(w * 0.51f, h * 0.1f)
-        close()
-        moveTo(w * 0.78f, h * 0.125f)
-        lineTo(w * 0.82f, h * 0.1f)
-        lineTo(w * 0.86f, h * 0.125f)
-        close()
-        moveTo(w * 0.1f, h * 0.145f)
-        lineTo(w * 0.14f, h * 0.12f)
-        lineTo(w * 0.18f, h * 0.145f)
-        close()
-    }
-    drawPath(caps, look.caps, alpha = 0.75f)
-    if (world == 4) {
-        // A smoking crater on the highest peak.
-        val crater = Offset(w * 0.46f, h * 0.07f)
-        drawCircle(
-            Brush.radialGradient(listOf(Palette.lava.copy(alpha = 0.6f), Color.Transparent), crater, w * 0.12f),
-            w * 0.12f,
-            crater,
-        )
-    }
-
-    // Fog over the unexplored regions.
-    drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.07f), Color.Transparent), 0f, h * 0.12f))
-
-    // A pool (lake, molten metal, light, lava) with a slow shimmer.
-    val poolCenter = Offset(w * 0.8f, h * 0.86f)
-    drawOval(
-        brush = Brush.radialGradient(listOf(look.pool.copy(alpha = 0.5f), Color.Transparent), poolCenter, w * 0.32f),
-        topLeft = Offset(w * 0.5f, h * 0.78f),
-        size = Size(w * 0.6f, h * 0.16f),
-    )
-    for (i in 0 until 3) {
-        val x = w * (0.66f + 0.1f * i) + w * 0.02f * sin(time * TAU + i)
-        drawLine(Color.White, Offset(x, h * (0.84f + 0.02f * i)), Offset(x + w * 0.05f, h * (0.84f + 0.02f * i)), strokeWidth = 2f, alpha = 0.25f)
-    }
-
-    // Drifting particles: embers, steam puffs, sparks, ash.
-    for (i in 0 until 9) {
-        val phase = (time + i / 9f) % 1f
-        val x = w * (0.06f + 0.11f * i) + w * 0.02f * sin(phase * TAU * 2f + i)
-        val y = h * (0.98f - 0.5f * phase)
-        val r = if (world == 2) w * 0.014f else w * 0.006f
-        drawCircle(look.particles, r, Offset(x, y), alpha = (if (world == 2) 0.25f else 0.55f) * (1f - phase))
-    }
+    // A light veil keeps the route and the labels readable.
+    drawRect(Color.Black.copy(alpha = 0.18f))
 }
 
 private fun DrawScope.drawRoute(nodes: List<MapNode>, progress: Progress, bonusId: String?) {

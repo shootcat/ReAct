@@ -1,81 +1,55 @@
 {
-  "id": "w1_13",
-  "title": "Falltür",
-  "world": 1,
-  "intro": "",
-  "map": [
-    "##############",
-    "#............D",
-    "#.F.....#s...#",
-    "#####.##Ixxxx#",
-    "#####W###:####",
-    "#####h###:####",
-    "#####:###:####",
-    "#####B###p####",
-    "##############"
-  ],
-  "legend": {
-    "B": {
-      "type": "BUTTON",
-      "properties": {
-        "channel": "A"
-      }
-    },
-    "D": {
-      "type": "DOOR",
-      "id": "door_1",
-      "properties": {
-        "channel": "A"
-      }
-    },
-    "F": {
-      "type": "FIRE",
-      "movable": true
-    },
-    "I": {
-      "type": "ICE",
-      "movable": true
-    },
-    "W": {
-      "type": "WATER"
-    },
-    "h": {
-      "type": "HATCH",
-      "properties": {
-        "channel": "B"
-      }
-    },
-    "p": {
-      "type": "PLATE",
-      "properties": {
-        "channel": "B"
-      }
-    },
-    "s": {
-      "type": "STONE"
-    },
-    "x": {
-      "type": "WOOD",
-      "properties": {
-        "gravity": false
-      }
-    }
+ "id": "w1_13",
+ "title": "Zwillingswolken",
+ "world": 1,
+ "intro": "",
+ "map": [
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...o...o...",
+  "...........",
+  "...e...e...",
+  "..%%...%%..",
+  "...........",
+  "F.........F",
+  "###~~%~~###",
+  "###~~%~~###",
+  "###########",
+  "###########"
+ ],
+ "legend": {
+  "F": {
+   "type": "FIRE",
+   "isMovable": true
   },
-  "goals": [
-    {
-      "object_id": "door_1",
-      "required_state": "UNLOCKED"
-    }
-  ],
-  "solutions": [
-    {
-      "id": "standard",
-      "kind": "STANDARD",
-      "requires": [
-        {
-          "rule": "water_triggers_button"
-        }
-      ]
-    }
-  ]
+  "e": {
+   "type": "SEED"
+  },
+  "o": {
+   "type": "CLOUD",
+   "amount": 4
+  },
+  "~": {
+   "type": "WATER"
+  }
+ },
+ "goals": [
+  {
+   "type": "state",
+   "object": "seed_3_9",
+   "state": "SPROUTED",
+   "text": "Lass den linken Samen keimen"
+  },
+  {
+   "type": "state",
+   "object": "seed_7_9",
+   "state": "SPROUTED",
+   "text": "Lass den rechten Samen keimen"
+  }
+ ]
 }

@@ -1,60 +1,48 @@
 {
-  "id": "w1_03",
-  "title": "Gewicht",
-  "world": 1,
-  "intro": "",
-  "map": [
-    "##########",
-    "#........#",
-    "#.S..I.O.D",
-    "####.#####",
-    "####:#####",
-    "####P#####",
-    "##########"
-  ],
-  "legend": {
-    "D": {
-      "type": "DOOR",
-      "id": "door_1",
-      "properties": {
-        "channel": "A"
-      }
-    },
-    "I": {
-      "type": "ICE",
-      "movable": true
-    },
-    "O": {
-      "type": "WOOD",
-      "movable": true
-    },
-    "P": {
-      "type": "PLATE",
-      "properties": {
-        "channel": "A"
-      }
-    },
-    "S": {
-      "type": "STONE",
-      "movable": true
-    }
+ "id": "w1_03",
+ "title": "Steinwurf",
+ "world": 1,
+ "intro": "",
+ "map": [
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  ".S.........",
+  "####......t",
+  "#~~~~####..",
+  "#~~~~####..",
+  "#########.e",
+  "###########",
+  "###########"
+ ],
+ "legend": {
+  "S": {
+   "type": "STONE",
+   "isMovable": true
   },
-  "goals": [
-    {
-      "object_id": "door_1",
-      "required_state": "UNLOCKED"
-    }
-  ],
-  "solutions": [
-    {
-      "id": "standard",
-      "kind": "STANDARD",
-      "requires": [
-        {
-          "rule": "weight_presses_plate",
-          "source": "STONE"
-        }
-      ]
-    }
-  ]
+  "e": {
+   "type": "SEED"
+  },
+  "t": {
+   "type": "TREE"
+  },
+  "~": {
+   "type": "WATER"
+  }
+ },
+ "goals": [
+  {
+   "type": "state",
+   "object": "seed_10_14",
+   "state": "SPROUTED",
+   "text": "Lass den Samen keimen"
+  }
+ ]
 }

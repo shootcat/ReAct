@@ -1,5 +1,6 @@
 package com.shootcat.react.ui.level
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -10,104 +11,122 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemGestures
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import com.shootcat.react.engine.Reactions
+import com.shootcat.react.engine.Drop
+import com.shootcat.react.engine.model.Area
 import com.shootcat.react.engine.model.GameObject
 import com.shootcat.react.engine.model.GameState
+import com.shootcat.react.engine.model.LevelData
+import com.shootcat.react.engine.model.LevelGoal
 import com.shootcat.react.engine.model.Position
 import com.shootcat.react.engine.model.Props
-import com.shootcat.react.engine.model.Rule
-import com.shootcat.react.engine.model.Trigger
+import com.shootcat.react.engine.model.TargetCleared
+import com.shootcat.react.engine.model.TargetContainerFilled
+import com.shootcat.react.engine.model.TargetExtinguished
+import com.shootcat.react.engine.model.TargetPreserved
+import com.shootcat.react.engine.model.TargetRainTriggered
+import com.shootcat.react.engine.model.TargetState
 import com.shootcat.react.engine.model.TypeCatalog
 import com.shootcat.react.ui.components.ObjectInfo
 import com.shootcat.react.ui.components.drawGameObject
 import com.shootcat.react.ui.theme.Palette
+import com.shootcat.react.ui.theme.WorldLooks
+import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.floor
 import kotlin.math.hypot
 import kotlin.math.max
-import kotlin.math.min
 import kotlin.math.sin
 
-/**
- * The part of the grid worth showing: every open cell plus a thin rim of wall. Outer rows and
- * columns that are only wall are cut away, so the playing field gets as much of the screen as possible.
- */
-internal data class Viewport(val left: Float, val top: Float, val width: Float, val height: Float) {
-    companion object {
-        private const val RIM = 0.3f
+private const val TAU = (2 * PI).toFloat()
 
-        fun of(state: GameState): Viewport {
-            var minX = state.width
-            var maxX = -1
-            var minY = state.height
-            var maxY = -1
-            for (y in 0 until state.height) {
-                for (x in 0 until state.width) {
-                    if (state.isWall(Position(x, y))) continue
-                    minX = min(minX, x)
-                    maxX = max(maxX, x)
-                    minY = min(minY, y)
-                    maxY = max(maxY, y)
-                }
-            }
-            if (maxX < 0) return Viewport(0f, 0f, state.width.toFloat(), state.height.toFloat())
-            val left = max(0f, minX - RIM)
-            val top = max(0f, minY - RIM)
-            val right = min(state.width.toFloat(), maxX + 1 + RIM)
-            val bottom = min(state.height.toFloat(), maxY + 1 + RIM)
-            return Viewport(left, top, right - left, bottom - top)
+/** Minimum clearance around the grid, so no object lies at the screen edge or in a system gesture zone. */
+private val EDGE = 20.dp
+
+/**
+ * Where the grid lies on the canvas: cells of [cell] pixels, its top-left corner at [origin]. The grid
+ * is as large as fits; spare room above becomes more sky, spare room below more ground.
+ */
+internal data class BoardLayout(val cell: Float, val origin: Offset) {
+    fun cellAt(offset: Offset) = Position(floor((offset.x - origin.x) / cell).toInt(), floor((offset.y - origin.y) / cell).toInt())
+
+    companion object {
+        /** The share of spare height that goes to the sky above the grid. */
+        private const val SKY_SHARE = 0.6f
+
+        fun of(width: Float, height: Float, columns: Int, rows: Int): BoardLayout {
+            val cell = minOf(width / columns, height / rows)
+            return BoardLayout(cell, Offset((width - cell * columns) / 2f, (height - cell * rows) * SKY_SHARE))
         }
     }
 }
 
 /** A dragged object: [grab] keeps the finger where it touched the object, so it does not jump. */
-private data class DragState(val objectId: String, val type: String, val pointer: Offset, val grab: Offset, val hover: Position)
+private data class DragState(val objectId: String, val pointer: Offset, val grab: Offset, val hover: Position)
 
 /**
- * The playing field, drawn with a Compose Canvas.
+ * The playing field: a cut through the ground of the level's world, drawn with a Compose Canvas.
  *
- * While [interactive], movable objects can be dragged (or tapped, then a target cell tapped). Touches
- * do not have to be exact: the nearest movable object within a finger's reach is picked.
+ * The grid keeps at least [EDGE] from every side (more where the system's back gesture reaches further
+ * in) and scales to the largest cell size that fits inside, so it uses as much of the screen's height
+ * and width as it can.
+ *
+ * While [interactive], movable objects (they sit on a soft shadow inside a light frame) can be dragged,
+ * or tapped and then a target cell tapped. Touches do not have to be exact: the nearest movable object
+ * within a finger's reach is picked. While dragging, the target cell shows what the drop would do
+ * ([previewDrop]): place it, merge it, let it react next to its partner – or bounce it off.
  * [previous] and [progress] interpolate movement between two simulation steps.
  */
 @Composable
 fun Board(
+    level: LevelData,
     state: GameState,
     previous: GameState?,
     progress: Float,
-    rules: List<Rule>,
     types: TypeCatalog,
     interactive: Boolean,
     overload: Boolean,
+    goalsMet: List<Boolean>,
+    previewDrop: (String, Position) -> Drop?,
     onMove: (String, Position) -> Unit,
+    onBounce: (String) -> Unit,
     modifier: Modifier = Modifier,
     showMarkers: Boolean = true,
     showPreview: Boolean = true,
@@ -121,10 +140,22 @@ fun Board(
         animationSpec = infiniteRepeatable(tween(2400, easing = LinearEasing), RepeatMode.Restart),
         label = "time",
     )
+    // A slow clock for drifting scenery (snow, ash, fireflies).
+    val slow by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(48_000, easing = LinearEasing), RepeatMode.Restart),
+        label = "slow",
+    )
     var drag by remember { mutableStateOf<DragState?>(null) }
     var selected by remember { mutableStateOf<String?>(null) }
+    val shake = remember { Animatable(0f) }
+    var shaking by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
     val currentState by rememberUpdatedState(state)
     val currentOnMove by rememberUpdatedState(onMove)
+    val currentOnBounce by rememberUpdatedState(onBounce)
+    val currentPreview by rememberUpdatedState(previewDrop)
     val currentHaptics by rememberUpdatedState(haptics)
 
     LaunchedEffect(interactive) {
@@ -132,52 +163,73 @@ fun Board(
         selected = null
     }
     // A selected object that melted, burnt or was undone away is no longer selected.
-    val shownSelection = selected?.takeIf { state.objectById(it)?.movable == true }
+    val shownSelection = selected?.takeIf { state.objectById(it)?.isMovable == true }
 
-    val thresholds = remember(rules) {
-        rules.filter { it.trigger == Trigger.LOAD }.associate { it.conditions.target to it.conditions.minLoad }
+    val landscape = remember(state.width, state.height, state.walls, level.id) {
+        Landscape(state, level.terrain, level.world, WorldLooks.of(level.world))
     }
-    val signalRules = remember(rules) { rules.filter { it.trigger == Trigger.SIGNAL } }
-    val electric = remember(rules) { rules.filter { it.trigger == Trigger.POWER }.map { it.conditions.target }.toSet() }
-    val view = remember(state.width, state.height, state.walls) { Viewport.of(state) }
+    val hover = drag?.let { it.objectId to it.hover }
+    val dropPreview = remember(hover, state) { hover?.let { (id, p) -> previewDrop(id, p) } }
 
-    BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
-        val cellDp = minOf(maxWidth / view.width, maxHeight / view.height)
+    /** Drops [id] on [to]; if it would bounce off, it shakes in its place instead. */
+    fun release(id: String, to: Position) {
+        val obj = currentState.objectById(id) ?: return
+        if (obj.position == to) return
+        if (currentPreview(id, to) != null) {
+            if (currentHaptics) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            currentOnMove(id, to)
+        } else {
+            if (currentHaptics) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            currentOnBounce(id)
+            shaking = id
+            scope.launch {
+                shake.snapTo(1f)
+                shake.animateTo(0f, tween(480, easing = LinearEasing))
+            }
+        }
+    }
+
+    val gestures = WindowInsets.systemGestures.asPaddingValues()
+    val direction = LocalLayoutDirection.current
+    val edges = PaddingValues(
+        start = maxOf(EDGE, gestures.calculateStartPadding(direction)),
+        end = maxOf(EDGE, gestures.calculateEndPadding(direction)),
+        top = EDGE,
+        bottom = EDGE,
+    )
+
+    BoxWithConstraints(modifier.padding(edges), contentAlignment = Alignment.Center) {
         Canvas(
             Modifier
-                .size(cellDp * view.width, cellDp * view.height)
-                .clipToBounds()
+                .size(maxWidth, maxHeight)
+                .clip(RoundedCornerShape(18.dp))
                 .testTag("board")
                 .pointerInput(interactive) {
                     if (!interactive) return@pointerInput
                     detectDragGestures(
                         onDragStart = { offset ->
-                            val cell = size.width.toFloat() / view.width
-                            val obj = pickMovable(currentState, view, offset, cell, exactFirst = true)
+                            val layout = layoutOf(currentState)
+                            val at = offset - layout.origin
+                            val obj = pickMovable(currentState, at, layout.cell, exactFirst = true)
                             if (obj != null) {
                                 selected = null
-                                val center = cellCenter(obj.position, view, cell)
-                                drag = DragState(obj.id, obj.type, offset, center - offset, obj.position)
+                                val center = cellCenter(obj.position, layout.cell)
+                                drag = DragState(obj.id, at, center - at, obj.position)
                             }
                         },
                         onDrag = { change, amount ->
                             val d = drag
                             if (d != null) {
                                 change.consume()
-                                val cell = size.width.toFloat() / view.width
+                                val cell = layoutOf(currentState).cell
                                 val pointer = d.pointer + amount
-                                drag = d.copy(pointer = pointer, hover = cellAt(dragCenter(pointer, d.grab, cell), view, cell))
+                                drag = d.copy(pointer = pointer, hover = cellAt(dragCenter(pointer, d.grab, cell), cell))
                             }
                         },
                         onDragEnd = {
                             val d = drag
                             drag = null
-                            if (d != null) {
-                                if (currentHaptics && currentState.isBuildable(d.hover)) {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                }
-                                currentOnMove(d.objectId, d.hover)
-                            }
+                            if (d != null) release(d.objectId, d.hover)
                         },
                         onDragCancel = { drag = null },
                     )
@@ -185,19 +237,26 @@ fun Board(
                 .pointerInput(interactive) {
                     if (!interactive) return@pointerInput
                     detectTapGestures(
-                        onTap = { offset ->
-                            val cell = size.width.toFloat() / view.width
-                            val p = cellAt(offset, view, cell)
-                            val exact = currentState.objectAt(p)?.takeIf { it.movable }
-                            val sel = selected?.takeIf { currentState.objectById(it)?.movable == true }
+                        onTap = { tap ->
+                            val layout = layoutOf(currentState)
+                            val offset = tap - layout.origin
+                            val cell = layout.cell
+                            val p = cellAt(offset, cell)
+                            val exact = currentState.objectAt(p)?.takeIf { it.isMovable }
+                            val sel = selected?.takeIf { currentState.objectById(it)?.isMovable == true }
                             when {
-                                exact != null -> selected = if (sel == exact.id) null else exact.id
-                                sel != null && currentState.isBuildable(p) -> {
-                                    currentOnMove(sel, p)
+                                sel != null && exact?.id == sel -> selected = null
+                                sel != null && currentPreview(sel, p) != null -> {
+                                    release(sel, p)
+                                    selected = null
+                                }
+                                exact != null -> selected = exact.id
+                                sel != null && currentState.inBounds(p) && !currentState.isWall(p) -> {
+                                    release(sel, p)
                                     selected = null
                                 }
                                 else -> {
-                                    val near = pickMovable(currentState, view, offset, cell, exactFirst = false)
+                                    val near = pickMovable(currentState, offset, cell, exactFirst = false)
                                     selected = if (near == null || near.id == sel) null else near.id
                                 }
                             }
@@ -205,44 +264,55 @@ fun Board(
                     )
                 },
         ) {
-            val cell = size.width / view.width
+            val layout = BoardLayout.of(size.width, size.height, state.width, state.height)
+            val cell = layout.cell
             if (cell <= 0f) return@Canvas
             val d = drag
             val placing = d != null || shownSelection != null
-            translate(-view.left * cell, -view.top * cell) {
-                drawBackground(state, cell, showGrid = interactive && placing)
-                drawWires(state, signalRules, cell, time)
+            // Everything below is drawn in grid coordinates.
+            translate(layout.origin.x, layout.origin.y) {
+                landscape.drawSurroundings(this, cell, -layout.origin.x, -layout.origin.y, size.width - layout.origin.x, size.height - layout.origin.y)
+                landscape.drawSky(this, cell, time, slow)
+                landscape.drawCaves(this, cell)
+                landscape.drawGround(this, cell, time)
+                drawNoBuild(state, cell, strong = interactive && placing)
+                drawWind(level, cell, time)
+                drawGoalAreas(level.goals, goalsMet, state, cell, time)
+                if (interactive && placing) drawFreeCells(state, cell)
 
+                // Movable things rest on a soft shadow.
+                for (o in state.objects) {
+                    if (!o.isMovable || o.isAiry || o.id == d?.objectId) continue
+                    drawShadow(objectOffset(o, previous, progress), cell)
+                }
                 drawLiquids(state, previous, progress, cell, time)
-                drawLiveLiquid(state, cell, time)
                 for (o in state.objects) {
                     if (o.isLiquid) continue
                     val prev = previous?.objectById(o.id)
-                    val from = prev?.position ?: o.position
-                    val x = from.x + (o.position.x - from.x) * progress
-                    val y = from.y + (o.position.y - from.y) * progress
                     val appearing = previous != null && prev == null
                     val alpha = when {
-                        o.id == d?.objectId -> 0.25f
+                        o.id == d?.objectId -> 0.3f
                         appearing -> progress
                         else -> 1f
                     }
-                    drawGameObject(o, Offset(x * cell, y * cell), cell, alpha, time, infoFor(o, state, thresholds, electric))
+                    var at = objectOffset(o, previous, progress)
+                    if (o.id == shaking) at += Offset(sin(shake.value * TAU * 3f) * 0.14f * shake.value, 0f)
+                    drawGameObject(o, at * cell, cell, alpha, time, infoFor(o, state))
                 }
                 if (previous != null) {
                     for (gone in previous.objects.filter { !it.isLiquid && state.objectById(it.id) == null }) {
                         val tl = Offset(gone.position.x * cell, gone.position.y * cell)
-                        drawGameObject(gone, tl, cell, 1f - progress, time, infoFor(gone, previous, thresholds, electric))
+                        drawGameObject(gone, tl, cell, 1f - progress, time, infoFor(gone, previous))
                     }
                 }
 
                 if (interactive) {
-                    drawMovableHints(state, cell, shownSelection, d?.objectId, time, showMarkers)
-                    if (d != null) drawDrag(d, view, state, rules, types, cell, time, showPreview)
+                    drawMovableFrames(state, previous, progress, cell, shownSelection, d?.objectId, time, showMarkers)
+                    if (d != null) drawDrag(d, dropPreview, state, types, cell, time, showPreview)
                 }
             }
             drawVignette()
-            if (overload) drawOverload(cell, time)
+            if (overload) drawOverload(time)
         }
     }
 }
@@ -253,234 +323,240 @@ private const val LIFT = 0.6f
 private const val REACH = 0.95f
 private const val MIN_REACH_DP = 30
 
-private fun cellCenter(p: Position, view: Viewport, cell: Float) =
-    Offset((p.x + 0.5f - view.left) * cell, (p.y + 0.5f - view.top) * cell)
+private fun PointerInputScope.layoutOf(state: GameState) =
+    BoardLayout.of(size.width.toFloat(), size.height.toFloat(), state.width, state.height)
 
-private fun cellAt(offset: Offset, view: Viewport, cell: Float) =
-    Position(floor(offset.x / cell + view.left).toInt(), floor(offset.y / cell + view.top).toInt())
+private fun cellCenter(p: Position, cell: Float) = Offset((p.x + 0.5f) * cell, (p.y + 0.5f) * cell)
+
+private fun cellAt(offset: Offset, cell: Float) = Position(floor(offset.x / cell).toInt(), floor(offset.y / cell).toInt())
 
 /** Where a dragged object's centre is drawn: at the finger plus its grab offset, lifted above the fingertip. */
 private fun dragCenter(pointer: Offset, grab: Offset, cell: Float) = pointer + grab - Offset(0f, cell * LIFT)
 
+/** The object's top-left corner in cells, between its last and its current position. */
+private fun objectOffset(o: GameObject, previous: GameState?, progress: Float): Offset {
+    val from = previous?.objectById(o.id)?.position ?: o.position
+    return Offset(from.x + (o.position.x - from.x) * progress, from.y + (o.position.y - from.y) * progress)
+}
+
 /** The movable object under the finger, or else the nearest one within reach of it. */
-private fun PointerInputScope.pickMovable(
-    state: GameState,
-    view: Viewport,
-    offset: Offset,
-    cell: Float,
-    exactFirst: Boolean,
-): GameObject? {
+private fun PointerInputScope.pickMovable(state: GameState, offset: Offset, cell: Float, exactFirst: Boolean): GameObject? {
     if (exactFirst) {
-        state.objectAt(cellAt(offset, view, cell))?.takeIf { it.movable }?.let { return it }
+        state.objectAt(cellAt(offset, cell))?.takeIf { it.isMovable }?.let { return it }
     }
     val reach = max(cell * REACH, MIN_REACH_DP.dp.toPx())
     return state.objects
-        .filter { it.movable }
-        .map { it to (cellCenter(it.position, view, cell) - offset).let { d -> hypot(d.x, d.y) } }
+        .filter { it.isMovable }
+        .map { it to (cellCenter(it.position, cell) - offset).let { d -> hypot(d.x, d.y) } }
         .filter { it.second <= reach }
         .minByOrNull { it.second }
         ?.first
 }
 
-private fun infoFor(o: GameObject, state: GameState, thresholds: Map<String, Int>, electric: Set<String>): ObjectInfo {
-    val threshold = thresholds[o.type]
-    if (threshold != null) {
-        return ObjectInfo(load = state.loadStack(o.position).sumOf { it.load }, threshold = threshold)
-    }
+/** Sand and snow form one heap with their neighbours of the same kind. */
+private fun infoFor(o: GameObject, state: GameState): ObjectInfo {
+    if (!o.flag(Props.GRANULAR) && !o.isFluid) return ObjectInfo()
     val p = o.position
-    val wired = o.flag(Props.WIRE) || o.flag(Props.POWER) || o.type in electric
-    val powered = wired && state.isPowered(p)
-    if (o.type == "CABLE") {
-        // Cables run towards everything electrical next to them.
-        fun live(n: Position): Boolean {
-            val other = state.objectAt(n) ?: return false
-            return !other.isFluid && (other.flag(Props.WIRE) || other.flag(Props.POWER) || other.type in electric)
-        }
-        return ObjectInfo(joinLeft = live(p.left()), joinRight = live(p.right()), joinBelow = live(p.down()), joinAbove = live(p.up()), powered = powered)
-    }
-    if (!o.isFluid && !o.conducts && !o.flag(Props.GRANULAR)) return ObjectInfo(powered = powered)
-    // Fluids, metal rods and sand merge visually with neighbouring cells of the same kind.
     fun same(n: Position) = state.objectAt(n)?.type == o.type
-    return ObjectInfo(
-        joinLeft = same(p.left()),
-        joinRight = same(p.right()),
-        joinBelow = same(p.down()),
-        joinAbove = same(p.up()),
-        powered = powered,
+    return ObjectInfo(joinLeft = same(p.left()), joinRight = same(p.right()), joinBelow = same(p.down()), joinAbove = same(p.up()))
+}
+
+private operator fun Offset.times(cell: Float) = Offset(x * cell, y * cell)
+
+private fun DrawScope.drawShadow(at: Offset, cell: Float) {
+    val center = Offset((at.x + 0.5f) * cell, (at.y + 0.95f) * cell)
+    drawOval(
+        Brush.radialGradient(listOf(Color.Black.copy(alpha = 0.45f), Color.Transparent), center, cell * 0.42f),
+        Offset(center.x - cell * 0.42f, center.y - cell * 0.1f),
+        Size(cell * 0.84f, cell * 0.2f),
     )
 }
 
-/** Live water crackles: small sparks dance over every liquid cell that carries current. */
-private fun DrawScope.drawLiveLiquid(state: GameState, cell: Float, time: Float) {
-    for (p in state.powered) {
-        val o = state.objectAt(p) ?: continue
-        if (!o.isLiquid) continue
-        val top = p.y * cell + cell * (1f - (o.amount.toFloat() / o.capacity).coerceIn(0f, 1f))
-        val phase = (time * 4f + p.x * 0.37f + p.y * 0.61f) % 1f
-        val x = p.x * cell + cell * (0.2f + 0.6f * phase)
-        val y = top + cell * 0.15f
-        val bolt = Path().apply {
-            moveTo(x - cell * 0.08f, y)
-            lineTo(x, y + cell * 0.08f)
-            lineTo(x - cell * 0.02f, y + cell * 0.12f)
-            lineTo(x + cell * 0.08f, y + cell * 0.22f)
+/** Cells the player may not drop anything into, faintly hatched (clearer while placing). */
+private fun DrawScope.drawNoBuild(state: GameState, cell: Float, strong: Boolean) {
+    for (p in state.noBuild) {
+        if (state.isWall(p)) continue
+        val tl = Offset(p.x * cell, p.y * cell)
+        for (k in 0..2) {
+            val o = cell * (k / 3f)
+            drawLine(Color.Black, Offset(tl.x + o, tl.y + cell), Offset(tl.x + cell, tl.y + o), strokeWidth = cell * 0.03f, alpha = if (strong) 0.28f else 0.1f)
         }
-        drawPath(bolt, Palette.power, alpha = 0.8f * (1f - phase * 0.6f), style = Stroke(width = cell * 0.035f, cap = StrokeCap.Round))
     }
 }
 
-private fun DrawScope.drawBackground(state: GameState, cell: Float, showGrid: Boolean) {
-    drawRect(
-        Brush.verticalGradient(listOf(Palette.backgroundTop, Palette.background)),
-        Offset.Zero,
-        Size(state.width * cell, state.height * cell),
-    )
+private fun DrawScope.drawFreeCells(state: GameState, cell: Float) {
     for (y in 0 until state.height) {
         for (x in 0 until state.width) {
             val p = Position(x, y)
-            val tl = Offset(x * cell, y * cell)
-            if (state.isWall(p)) {
-                drawRect(if ((x * 7 + y * 3) % 4 == 0) Palette.wallAlt else Palette.wall, tl, Size(cell + 0.5f, cell + 0.5f))
-                val above = p.up()
-                if (state.inBounds(above) && !state.isWall(above)) {
-                    drawRect(Palette.wallTop, tl, Size(cell + 0.5f, cell * 0.1f))
-                }
-                val below = p.down()
-                if (state.inBounds(below) && !state.isWall(below)) {
-                    drawRect(Palette.wallShadow, Offset(tl.x, tl.y + cell * 0.92f), Size(cell + 0.5f, cell * 0.08f))
-                }
-            } else if (showGrid && p in state.noBuild) {
-                // Closed areas: the player cannot drop anything here.
-                for (k in 0..2) {
-                    val o = cell * (k / 3f)
-                    drawLine(Color.Black, Offset(tl.x + o, tl.y + cell), Offset(tl.x + cell, tl.y + o), strokeWidth = cell * 0.03f, alpha = 0.22f)
-                }
-            } else if (showGrid && state.objectAt(p) == null) {
-                drawCircle(Color.White, cell * 0.035f, tl + Offset(cell / 2, cell / 2), alpha = 0.1f)
+            if (state.isBuildable(p)) drawCircle(Color.White, cell * 0.035f, cellCenter(p, cell), alpha = 0.16f)
+        }
+    }
+}
+
+/** Streaks blowing through windy areas, in the wind's direction. */
+private fun DrawScope.drawWind(level: LevelData, cell: Float, time: Float) {
+    for (zone in level.wind) {
+        val a = zone.area
+        val width = (a.x1 - a.x0 + 1) * cell
+        val dir = if (zone.dx >= 0) 1f else -1f
+        for (y in a.y0..a.y1) {
+            for (k in 0 until 2) {
+                val phase = (time * 1.5f + k * 0.5f + y * 0.37f) % 1f
+                val x = a.x0 * cell + width * (if (dir > 0) phase else 1f - phase)
+                val yy = (y + 0.3f + 0.4f * k) * cell + cell * 0.06f * sin((phase + y) * TAU)
+                val len = cell * 0.7f
+                val fade = sin(phase * PI.toFloat())
+                drawLine(Color.White, Offset(x - dir * len, yy), Offset(x, yy), strokeWidth = cell * 0.035f, cap = StrokeCap.Round, alpha = 0.35f * fade)
             }
         }
     }
 }
 
-/** Darkened edges give the board a small diorama feel. */
-private fun DrawScope.drawVignette() {
-    val r = size.maxDimension * 0.75f
-    drawRect(
-        brush = Brush.radialGradient(
-            listOf(Color.Transparent, Color.Black.copy(alpha = 0.32f)),
-            center = Offset(size.width / 2, size.height / 2),
-            radius = r,
-        ),
+/** Outlines one area along its border. */
+private fun DrawScope.drawAreaOutline(area: Area, cell: Float, color: Color, alpha: Float, fill: Boolean) {
+    val tl = Offset(area.x0 * cell, area.y0 * cell)
+    val size = Size((area.x1 - area.x0 + 1) * cell, (area.y1 - area.y0 + 1) * cell)
+    if (fill) drawRoundRect(color, tl, size, CornerRadius(cell * 0.2f), alpha = alpha * 0.12f)
+    drawRoundRect(
+        color,
+        tl + Offset(cell * 0.04f, cell * 0.04f),
+        Size(size.width - cell * 0.08f, size.height - cell * 0.08f),
+        CornerRadius(cell * 0.2f),
+        style = Stroke(width = cell * 0.045f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(cell * 0.16f, cell * 0.1f))),
+        alpha = alpha,
     )
 }
 
-/** Dashed lines between signal sources and the objects they drive; bright while the signal is on. */
-private fun DrawScope.drawWires(state: GameState, signalRules: List<Rule>, cell: Float, time: Float) {
-    for (rule in signalRules) {
-        val c = rule.conditions
-        for (target in state.objects.filter { it.type == c.target }) {
-            val channel = target.string(Props.CHANNEL) ?: continue
-            for (source in state.objects.filter { it.type == c.source && it.string(Props.CHANNEL) == channel }) {
-                val active = c.sourceState == null || source.state == c.sourceState
-                val start = Offset((source.position.x + 0.5f) * cell, (source.position.y + 0.5f) * cell)
-                val end = Offset((target.position.x + 0.5f) * cell, (target.position.y + 0.5f) * cell)
-                val dash = cell * 0.14f
-                drawLine(
-                    color = if (active) Palette.signal else Palette.textDim,
-                    start = start,
-                    end = end,
-                    strokeWidth = cell * (if (active) 0.06f else 0.035f),
-                    cap = StrokeCap.Round,
-                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(dash, dash), if (active) -time * dash * 8 else 0f),
-                    alpha = if (active) 0.85f else 0.22f,
+/** Where the tasks are: the basin to fill, the area to put out, the seed to wake. Green once done. */
+private fun DrawScope.drawGoalAreas(goals: List<LevelGoal>, met: List<Boolean>, state: GameState, cell: Float, time: Float) {
+    val pulse = 0.6f + 0.4f * sin(time * TAU)
+    goals.forEachIndexed { i, goal ->
+        val done = met.getOrElse(i) { false }
+        val alpha = if (goal.optional) 0.45f else 0.75f
+        when (goal) {
+            is TargetContainerFilled -> drawAreaOutline(goal.area, cell, if (done) Palette.success else Palette.waterLight, alpha, fill = true)
+            is TargetExtinguished -> goal.area?.let { drawAreaOutline(it, cell, if (done) Palette.success else Palette.fire, alpha, fill = false) }
+            is TargetRainTriggered -> goal.area?.let { drawAreaOutline(it, cell, if (done) Palette.success else Palette.rain, alpha, fill = false) }
+            is TargetCleared -> goal.area?.let { drawAreaOutline(it, cell, if (done) Palette.success else Palette.ice, alpha, fill = false) }
+            is TargetState, is TargetPreserved -> {
+                val id = if (goal is TargetState) goal.objectId else (goal as TargetPreserved).objectId
+                val o = state.objectById(id) ?: return@forEachIndexed
+                val center = Offset((o.position.x + 0.5f) * cell, (o.position.y + 0.9f) * cell)
+                val color = if (done) Palette.success else Palette.accent
+                drawOval(
+                    color,
+                    Offset(center.x - cell * 0.45f, center.y - cell * 0.12f),
+                    Size(cell * 0.9f, cell * 0.24f),
+                    style = Stroke(width = cell * 0.04f),
+                    alpha = alpha * (if (done) 1f else pulse),
                 )
             }
+            else -> Unit
         }
     }
 }
 
-private fun DrawScope.drawMovableHints(
+/** A light frame around everything the player may move; the selected object glows. */
+private fun DrawScope.drawMovableFrames(
     state: GameState,
+    previous: GameState?,
+    progress: Float,
     cell: Float,
     selected: String?,
     dragged: String?,
     time: Float,
     showMarkers: Boolean,
 ) {
-    val pulse = 0.5f + 0.5f * sin(time * 2f * PI.toFloat() * 2f)
-    for (o in state.objects.filter { it.movable && it.id != dragged }) {
+    val pulse = 0.5f + 0.5f * sin(time * TAU * 2f)
+    for (o in state.objects.filter { it.isMovable && it.id != dragged }) {
         if (!showMarkers && o.id != selected) continue
-        val inset = cell * 0.02f
-        val tl = Offset(o.position.x * cell + inset, o.position.y * cell + inset)
+        val at = objectOffset(o, previous, progress) * cell
+        val inset = cell * 0.04f
+        val tl = at + Offset(inset, inset)
         val s = Size(cell - 2 * inset, cell - 2 * inset)
         if (o.id == selected) {
-            drawRoundRect(Palette.accent, tl, s, CornerRadius(cell * 0.14f), style = Stroke(width = cell * 0.06f), alpha = 0.6f + 0.4f * pulse)
+            drawRoundRect(Palette.accent, tl, s, CornerRadius(cell * 0.18f), style = Stroke(width = cell * 0.06f), alpha = 0.6f + 0.4f * pulse)
         } else {
-            drawRoundRect(
-                Palette.accent,
-                tl,
-                s,
-                CornerRadius(cell * 0.14f),
-                style = Stroke(width = cell * 0.03f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(cell * 0.1f, cell * 0.08f))),
-                alpha = 0.45f,
-            )
+            drawRoundRect(Color.White, tl, s, CornerRadius(cell * 0.18f), style = Stroke(width = cell * 0.05f), alpha = 0.1f)
+            drawRoundRect(Color(0xFFFFF4DC), tl, s, CornerRadius(cell * 0.18f), style = Stroke(width = cell * 0.022f), alpha = 0.42f)
         }
     }
 }
 
+/** The target cell says what the drop would do; the object hangs under the finger. */
 private fun DrawScope.drawDrag(
     d: DragState,
-    view: Viewport,
+    drop: Drop?,
     state: GameState,
-    rules: List<Rule>,
     types: TypeCatalog,
     cell: Float,
     time: Float,
     showPreview: Boolean,
 ) {
+    val obj = state.objectById(d.objectId) ?: return
     val target = Offset(d.hover.x * cell, d.hover.y * cell)
-    val free = state.isBuildable(d.hover) || state.objectById(d.objectId)?.position == d.hover
-    if (state.inBounds(d.hover)) {
-        drawRoundRect(
-            if (free) Palette.success else Palette.danger,
-            target,
-            Size(cell, cell),
-            CornerRadius(cell * 0.14f),
-            style = Stroke(width = cell * 0.05f),
-            alpha = 0.8f,
-        )
-    }
-    // Subtle reaction preview: hint that something *could* happen here, never what.
-    if (free && showPreview) {
-        val partners = Reactions.touchPartners(d.type, rules, types)
-        val glow = 0.25f + 0.2f * sin(time * 2f * PI.toFloat() * 3f)
-        for (n in d.hover.neighbours()) {
-            val other = state.objectAt(n) ?: continue
-            if (other.id == d.objectId || other.type !in partners) continue
-            val center = Offset((n.x + 0.5f) * cell, (n.y + 0.5f) * cell)
-            drawCircle(
-                brush = Brush.radialGradient(listOf(Palette.accent.copy(alpha = glow), Color.Transparent), center, cell * 0.8f),
-                radius = cell * 0.8f,
-                center = center,
-            )
+    val home = obj.position == d.hover
+    val glow = 0.6f + 0.4f * sin(time * TAU * 3f)
+    if (state.inBounds(d.hover) && !home) {
+        val color = when {
+            drop == null -> Palette.danger
+            drop is Drop.Merged && showPreview -> Palette.accent
+            drop is Drop.NextTo && showPreview -> Palette.fire
+            else -> Palette.success
+        }
+        drawRoundRect(color, target, Size(cell, cell), CornerRadius(cell * 0.18f), style = Stroke(width = cell * 0.06f), alpha = 0.85f)
+        if (drop == null) {
+            val c = target + Offset(cell / 2, cell / 2)
+            val r = cell * 0.18f
+            drawLine(Palette.danger, c - Offset(r, r), c + Offset(r, r), strokeWidth = cell * 0.06f, cap = StrokeCap.Round, alpha = 0.85f)
+            drawLine(Palette.danger, c + Offset(r, -r), c + Offset(-r, r), strokeWidth = cell * 0.06f, cap = StrokeCap.Round, alpha = 0.85f)
         }
     }
-    val obj = state.objectById(d.objectId) ?: return
-    // The pointer is in canvas coordinates; this scope is shifted by the viewport.
-    val center = dragCenter(d.pointer, d.grab, cell) + Offset(view.left * cell, view.top * cell)
-    drawGameObject(obj, center - Offset(cell / 2, cell / 2), cell, 0.9f, time)
+    if (showPreview && drop is Drop.Merged) {
+        // What the two become, floating over the target.
+        val result = types.create("preview", drop.rule.result, d.hover)
+        val center = target + Offset(cell / 2, -cell * 0.35f)
+        drawCircle(Brush.radialGradient(listOf(Palette.accent.copy(alpha = 0.45f * glow), Color.Transparent), center, cell * 0.6f), cell * 0.6f, center)
+        scale(0.6f, center) {
+            drawGameObject(result, center - Offset(cell / 2, cell / 2), cell, 0.95f, time)
+        }
+    }
+    if (showPreview && drop is Drop.NextTo) {
+        // It will land next to what it reacts with.
+        val partner = state.objectById(drop.partnerId)
+        if (partner != null) {
+            val pc = cellCenter(partner.position, cell)
+            drawCircle(Brush.radialGradient(listOf(Palette.fire.copy(alpha = 0.35f * glow), Color.Transparent), pc, cell * 0.9f), cell * 0.9f, pc)
+        }
+        val landing = Offset(drop.landing.x * cell, drop.landing.y * cell)
+        drawRoundRect(
+            Palette.fire,
+            landing,
+            Size(cell, cell),
+            CornerRadius(cell * 0.18f),
+            style = Stroke(width = cell * 0.04f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(cell * 0.12f, cell * 0.08f))),
+            alpha = 0.8f,
+        )
+        drawGameObject(obj, landing, cell, 0.35f, time)
+    }
+    val center = dragCenter(d.pointer, d.grab, cell)
+    drawShadow(Offset(center.x / cell - 0.5f, center.y / cell - 0.5f + 0.25f), cell)
+    drawGameObject(obj, center - Offset(cell / 2, cell / 2), cell, 0.95f, time, infoFor(obj, state))
 }
 
-/** Short-circuit flash when the cascade protection stopped the simulation. */
-private fun DrawScope.drawOverload(cell: Float, time: Float) {
-    drawRect(Palette.danger, alpha = 0.16f + 0.08f * sin(time * 2f * PI.toFloat() * 4f))
-    val bolt = Path().apply {
-        val w = size.width
-        val h = size.height
-        moveTo(w * 0.55f, h * 0.1f)
-        lineTo(w * 0.4f, h * 0.45f)
-        lineTo(w * 0.55f, h * 0.45f)
-        lineTo(w * 0.42f, h * 0.9f)
-    }
-    drawPath(bolt, Palette.danger, alpha = 0.8f, style = Stroke(width = cell * 0.12f, cap = StrokeCap.Round))
+/** Darkened edges give the board a small diorama feel. */
+private fun DrawScope.drawVignette() {
+    val r = size.maxDimension * 0.8f
+    drawRect(
+        brush = Brush.radialGradient(
+            listOf(Color.Transparent, Color.Black.copy(alpha = 0.28f)),
+            center = Offset(size.width / 2, size.height / 2),
+            radius = r,
+        ),
+    )
+}
+
+/** A red pulse when the cascade protection stopped a world that would not come to rest. */
+private fun DrawScope.drawOverload(time: Float) {
+    drawRect(Palette.danger, alpha = 0.16f + 0.08f * sin(time * TAU * 4f))
 }

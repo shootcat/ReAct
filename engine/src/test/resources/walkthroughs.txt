@@ -1,180 +1,45 @@
-# Welt 1
 w1_01 min=1
-w1_01 [STANDARD] fire_2_3@5,3
+w1_01 [1] fire_1_11@7,9
+w1_01 [] fire_1_11@9,9
 w1_02 min=1
-w1_02 [STANDARD] fire_6_3@11,2
+w1_02 [] fire_9_14@5,11
 w1_03 min=1
-w1_03 [STANDARD] stone_2_2@4,2
-w1_05 min=1
-w1_05 [STANDARD] fire_2_3@5,3
+w1_03 [] stone_1_10@2,12
 w1_04 min=1
-w1_04 [STANDARD] fire_2_2@6,2
+w1_04 [] fire_10_9@6,11
+w1_05 min=1
+w1_05 [] ice_0_9@5,11
 w1_06 min=1
-w1_06 [STANDARD] stone_2_2@5,2
-w1_07 min=1
-w1_07 [STANDARD] wood_4_2@2,2
-w1_10 min=2
-w1_10 [STANDARD] stone_9_2@3,2 fire_7_2@2,1
+w1_06 [] ice_1_10@6,13
+w1_07 min=2
+w1_07 [] fire_1_11@9,11 fire_9_11@5,11
 w1_08 min=1
-w1_08 [STANDARD] fire_2_4@8,4
-w1_11 min=2
-w1_11 [STANDARD] fire_6_2@10,2 fire_6_2@2,1
-w1_16 min=3
-w1_16 [STANDARD] ice_2_2@4,3 wood_5_2@4,3 fire_9_2@4,3
-w1_16 [STANDARD,OVERRIDE] ice_2_2@4,3 fire_9_2@4,3 wood_5_2@4,3 wood_7_2@4,2
-w1_13 min=2
-w1_13 [STANDARD] ice_8_3@6,2 fire_2_2@12,2
-w1_12 min=2
-w1_12 [STANDARD] stone_1_2@9,3 fire_5_2@9,3
-w1_14 min=2
-w1_14 [STANDARD] ice_9_4@5,4 fire_11_4@6,4
+w1_08 [] fire_10_10@5,10
 w1_09 min=1
-w1_09 [STANDARD] stone_11_2@3,2 fire_7_2@2,1
-w1_09 [STANDARD,MINIMAL] fire_7_2@3,2
-w1_15 min=2
-w1_15 [STANDARD] fire_2_2@13,2 fire_2_2@7,7
-w1_19 min=3
-w1_19 [STANDARD] fire_7_2@12,1 ice_2_2@5,2 wood_4_2@5,2 fire_7_2@5,1
-w1_19 [STANDARD,MINIMAL] ice_2_2@5,2 ice_11_2@6,1 fire_7_2@5,2
-w1_18 min=3
-w1_18 [STANDARD] fire_14_4@13,4 ice_9_4@5,4 fire_14_4@6,4
+w1_09 [] ice_10_11@5,12
+w1_10 min=2
+w1_10 [] wood_0_10@4,12 wood_10_10@3,12
+w1_11 min=2
+w1_11 [] fire_1_11@9,11 fire_9_11@3,11
+w1_12 min=2
+w1_12 [] fire_1_12@10,12 fire_10_12@7,12
+w1_13 min=2
+w1_13 [] fire_0_12@10,12 fire_10_12@5,12
+w1_14 min=2
+w1_14 [] fire_9_12@1,12 fire_1_12@2,12
+w1_15 min=3
+w1_15 [] wood_0_12@10,12 wood_10_12@4,12 fire_2_12@4,12
+w1_16 min=3
+w1_16 [] fire_1_11@2,14 stone_8_14@7,11 fire_2_14@6,11
+w1_16 [] stone_8_14@7,11 fire_1_11@2,14 fire_2_14@6,11
 w1_17 min=3
-w1_17 [STANDARD] fire_6_2@7,2 ice_2_2@8,2 wood_4_2@8,1
-w1_20 min=3
-w1_20 [STANDARD] fire_14_4@13,4 ice_9_4@5,4 fire_14_4@6,4 wood_4_4@12,3
-w1_20 [STANDARD,MINIMAL] fire_14_4@13,3 ice_9_4@3,3 fire_14_4@3,3
+w1_17 [] fire_0_7@0,8 stone_10_8@1,12 fire_0_8@2,12
+w1_18 min=4
+w1_18 [] wood_5_13@10,13 stone_0_13@5,13 fire_1_13@3,13 fire_3_13@4,13
+w1_19 min=4
+w1_19 [] wood_2_12@8,11 stone_9_8@1,12 fire_1_8@0,8 fire_0_8@2,12
+w1_20 min=5
+w1_20 [] wood_2_12@8,11 stone_9_8@1,12 ice_10_8@3,13 fire_1_8@0,8 fire_0_8@2,12
 w1_bonus min=4
-w1_bonus [STANDARD] fire_14_4@13,4 ice_9_4@5,4 fire_14_4@6,4 fire_14_4@12,3 wood_4_4@12,3
-w1_bonus [STANDARD,MINIMAL] wood_4_4@8,3 fire_14_4@13,3 fire_14_4@8,3 fire_14_4@12,3
-# Welt 2
-w2_01 min=1
-w2_01 [STANDARD] fire_1_5@4,5
-w2_02 min=1
-w2_02 [STANDARD] fire_2_2@4,2
-w2_02 [STANDARD,OVERRIDE] metal_7_2@3,2 metal_8_2@4,2
-w2_05 min=1
-w2_05 [STANDARD] fire_2_2@3,2
-w2_06 min=1
-w2_06 [STANDARD] fire_1_7@4,7
-w2_07 min=1
-w2_07 [STANDARD] fire_2_2@4,4
-w2_11 min=2
-w2_11 [STANDARD] fire_9_2@5,4 stone_2_2@2,4
-w2_09 min=2
-w2_09 [STANDARD] fire_2_2@4,5 fire_8_2@3,4
-w2_08 min=2
-w2_08 [STANDARD] metal_1_2@4,3 metal_6_2@5,3
-w2_10 min=2
-w2_10 [STANDARD] ice_9_5@4,3 fire_1_5@4,5
-w2_13 min=2
-w2_13 [STANDARD] fire_1_5@4,5 fire_1_5@9,3
-w2_04 min=1
-w2_04 [STANDARD] fire_1_7@4,7
-w2_12 min=2
-w2_12 [STANDARD] wood_8_2@3,4 fire_2_2@4,4
-w2_12 [OVERRIDE] fire_2_2@4,4 wood_8_2@3,4
-w2_15 min=3
-w2_15 [STANDARD] ice_6_5@4,3 fire_1_5@4,5 fire_1_5@9,3
-w2_18 min=3
-w2_18 [STANDARD] stone_2_2@5,5 stone_4_2@6,5 fire_10_2@2,8
-w2_16 min=3
-w2_16 [STANDARD] fire_1_5@3,5 ice_11_5@8,3 fire_1_5@8,5
-w2_17 min=3
-w2_17 [STANDARD] ice_7_7@4,3 fire_1_5@4,5 fire_1_5@10,4
-w2_03 min=1
-w2_03 [STANDARD] fire_2_2@5,3
-w2_14 min=2
-w2_14 [STANDARD] fire_1_5@4,5 fire_1_5@7,5
-w2_19 min=4
-w2_19 [STANDARD] stone_2_2@5,5 stone_4_2@6,5 fire_10_2@2,8 fire_10_2@17,2
-w2_20 min=4
-w2_20 [STANDARD] ice_8_5@4,3 fire_1_5@4,5 fire_1_5@17,2 fire_1_5@10,4
-w2_bonus min=6
-w2_bonus [STANDARD] stone_2_2@5,5 stone_4_2@6,5 fire_10_2@2,8 ice_15_2@11,7 fire_10_2@11,9 fire_10_2@17,2
-# Welt 3
-w3_01 min=1
-w3_01 [STANDARD] battery_2_2@6,2
-w3_02 min=1
-w3_02 [STANDARD] metal_5_2@4,3
-w3_03 min=1
-w3_03 [STANDARD] fire_2_2@7,2
-w3_05 min=1
-w3_05 [STANDARD] coil_10_2@6,3
-w3_07 min=1
-w3_07 [STANDARD] coil_2_2@4,4
-w3_06 min=1
-w3_06 [STANDARD] stone_2_2@4,3
-w3_08 min=1
-w3_08 [STANDARD] fire_1_6@4,6
-w3_04 min=1
-w3_04 [STANDARD] fire_2_2@4,2
-w3_09 min=2
-w3_09 [STANDARD] battery_2_2@5,2 fire_12_2@10,2
-w3_13 min=2
-w3_13 [STANDARD] fire_1_6@4,6 ice_12_6@10,1
-w3_10 min=2
-w3_10 [STANDARD] stone_2_2@4,3 stone_9_2@7,3
-w3_12 min=2
-w3_12 [STANDARD] battery_2_2@4,2 coil_5_2@8,3
-w3_15 min=3
-w3_15 [STANDARD] metal_2_2@8,1 ice_7_6@4,4 fire_1_6@4,3
-w3_11 min=2
-w3_11 [STANDARD] fire_1_1@4,1 stone_3_1@14,1
-w3_17 min=3
-w3_17 [STANDARD] metal_8_6@10,1 ice_6_6@12,3 fire_1_6@4,6
-w3_14 min=2
-w3_14 [STANDARD] metal_5_2@4,2 fire_2_2@10,1
-w3_16 min=3
-w3_16 [STANDARD] stone_8_2@5,2 stone_9_2@6,1 battery_2_2@5,2
-w3_18 min=3
-w3_18 [STANDARD] battery_2_2@4,2 coil_5_2@8,3 stone_6_9@4,10
-w3_19 min=4
-w3_19 [STANDARD] metal_2_2@8,1 ice_7_6@4,4 fire_1_6@4,3 stone_6_9@4,10
-w3_20 min=4
-w3_20 [STANDARD] fire_1_6@16,6 ice_7_6@4,4 fire_1_6@4,3 coil_9_6@12,1
-w3_bonus min=5
-w3_bonus [STANDARD] fire_1_6@16,6 ice_7_6@4,4 fire_1_6@4,3 coil_9_6@12,1 fire_11_6@6,7
-# Welt 4
-w4_01 min=1
-w4_01 [STANDARD] stone_3_2@9,1
-w4_02 min=1
-w4_02 [STANDARD] stone_3_2@10,1
-w4_03 min=1
-w4_03 [STANDARD] fire_2_2@1,3
-w4_04 min=1
-w4_04 [STANDARD] fire_7_3@5,3
-w4_05 min=1
-w4_05 [STANDARD] stone_3_2@10,1
-w4_06 min=1
-w4_06 [STANDARD] stone_3_2@4,1
-w4_07 min=1
-w4_07 [STANDARD] fire_5_2@8,2
-w4_08 min=1
-w4_08 [STANDARD] stone_3_2@10,1
-w4_09 min=2
-w4_09 [STANDARD] fire_7_3@5,3 fire_7_3@1,10
-w4_10 min=2
-w4_10 [STANDARD] stone_3_2@10,1 fire_1_11@4,11
-w4_11 min=2
-w4_11 [STANDARD] fire_7_3@5,3 fire_7_3@6,9
-w4_12 min=2
-w4_12 [STANDARD] fire_2_2@1,3 stone_3_9@9,8
-w4_12 [STANDARD,OVERRIDE] fire_2_2@1,3 stone_3_9@4,9
-w4_13 min=3
-w4_13 [STANDARD] fire_7_3@5,3 fire_7_3@1,10 stone_3_16@9,15
-w4_14 min=3
-w4_14 [STANDARD] fire_1_12@5,3 fire_1_12@4,12 fire_1_12@6,15
-w4_15 min=4
-w4_15 [STANDARD] fire_7_3@5,3 ice_2_9@4,10 wood_5_9@4,10 fire_7_3@4,10
-w4_16 min=4
-w4_16 [STANDARD] stone_2_2@5,5 stone_4_2@6,5 fire_10_2@2,8 fire_10_2@6,11
-w4_17 min=4
-w4_17 [STANDARD] stone_8_2@5,2 stone_9_2@6,1 stone_3_9@5,1 battery_2_2@6,1
-w4_18 min=4
-w4_18 [STANDARD] fire_1_12@5,3 ice_7_12@4,10 fire_1_12@4,12 fire_1_12@1,16
-w4_19 min=5
-w4_19 [STANDARD] stone_2_2@5,5 stone_4_2@6,5 fire_10_2@2,8 fire_10_2@5,12 fire_10_2@6,18
-w4_20 min=5
-w4_20 [STANDARD] fire_2_2@4,19 fire_2_2@1,3 ice_2_9@4,10 wood_5_9@4,10 fire_2_2@4,10
-w4_bonus min=7
-w4_bonus [STANDARD] stone_2_2@5,5 stone_4_2@6,5 fire_10_2@2,8 fire_10_2@1,19 ice_2_11@4,12 wood_5_11@4,12 fire_10_2@4,12
+w1_bonus [2,3] wood_2_12@8,11 stone_3_12@1,12 fire_1_8@0,8 fire_0_8@2,12
+w1_bonus [3] wood_2_12@8,11 stone_3_12@1,12 fire_1_8@0,8 fire_0_8@9,8 fire_0_8@2,12

@@ -1,70 +1,58 @@
 {
-  "id": "w1_16",
-  "title": "Waage",
-  "world": 1,
-  "intro": "",
-  "map": [
-    "############",
-    "#..........#",
-    "#.I..O.O.F.#",
-    "####.#######",
-    "####:#######",
-    "####:#######",
-    "####P######D",
-    "############"
-  ],
-  "legend": {
-    "D": {
-      "type": "DOOR",
-      "id": "door_1",
-      "properties": {
-        "channel": "A"
-      }
-    },
-    "F": {
-      "type": "FIRE",
-      "movable": true
-    },
-    "I": {
-      "type": "ICE",
-      "movable": true
-    },
-    "O": {
-      "type": "WOOD",
-      "movable": true
-    },
-    "P": {
-      "type": "PLATE",
-      "properties": {
-        "channel": "A"
-      }
-    }
+ "id": "w1_16",
+ "title": "Hitzeschild",
+ "world": 1,
+ "intro": "",
+ "map": [
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "..%%%%%%%..",
+  "..%%%%j%%..",
+  ".....:::...",
+  ".F......e..",
+  "####.######",
+  "####.######",
+  "##F.....S..",
+  "###########",
+  "###########"
+ ],
+ "legend": {
+  "F": {
+   "type": "FIRE",
+   "isMovable": true
   },
-  "goals": [
-    {
-      "object_id": "door_1",
-      "required_state": "UNLOCKED"
-    }
-  ],
-  "solutions": [
-    {
-      "id": "standard",
-      "kind": "STANDARD",
-      "requires": [
-        {
-          "rule": "weight_presses_plate"
-        }
-      ]
-    },
-    {
-      "id": "override",
-      "kind": "OVERRIDE",
-      "requires": [
-        {
-          "rule": "weight_presses_plate",
-          "source": "WATER"
-        }
-      ]
-    }
-  ]
+  "S": {
+   "type": "STONE",
+   "isMovable": true
+  },
+  "e": {
+   "type": "SEED"
+  },
+  "j": {
+   "type": "ICE",
+   "properties": {
+    "gravity": false
+   }
+  }
+ },
+ "goals": [
+  {
+   "type": "clear",
+   "types": [
+    "ICE"
+   ],
+   "text": "Schmilz den Eiszapfen"
+  },
+  {
+   "type": "preserve",
+   "object": "seed_8_11",
+   "text": "Der Samen darf nicht verbrennen"
+  }
+ ]
 }

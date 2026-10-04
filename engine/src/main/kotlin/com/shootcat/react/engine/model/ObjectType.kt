@@ -36,11 +36,11 @@ class TypeCatalog(types: List<ObjectType>) {
         position: Position,
         state: String? = null,
         properties: Map<String, String> = emptyMap(),
-        movable: Boolean = false,
+        isMovable: Boolean = false,
         amount: Int? = null,
     ): GameObject {
         val t = require(type)
-        val o = GameObject(id, type, state ?: t.defaultState, position, t.properties + properties, movable)
-        return if (o.isFluid) o.copy(amount = (amount ?: o.capacity).coerceIn(1, o.capacity)) else o
+        val o = GameObject(id, type, state ?: t.defaultState, position, t.properties + properties, isMovable)
+        return if (o.hasAmount) o.copy(amount = (amount ?: o.capacity).coerceIn(1, o.capacity)) else o
     }
 }

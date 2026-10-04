@@ -4,28 +4,30 @@ import android.content.Context
 
 data class Progress(
     val completed: Set<String> = emptySet(),
-    /** Found solution classes as "levelId/solutionId". */
-    val solutions: Set<String> = emptySet(),
+    /** Optional tasks the player has managed, as "levelId/goalIndex". */
+    val extras: Set<String> = emptySet(),
     /** Ids of rules the player has seen in action. */
     val discoveries: Set<String> = emptySet(),
 ) {
-    fun solutionsFor(levelId: String): Set<String> =
-        solutions.filter { it.startsWith("$levelId/") }.map { it.substringAfter('/') }.toSet()
+    /** Indices of the optional goals of [levelId] that were achieved at least once. */
+    fun extrasFor(levelId: String): Set<Int> =
+        extras.filter { it.startsWith("$levelId/") }.mapNotNull { it.substringAfter('/').toIntOrNull() }.toSet()
 }
 
 class ProgressStore(context: Context) {
-    private val prefs = context.getSharedPreferences("react_progress", Context.MODE_PRIVATE)
+    // A new file: progress of the earlier level sets does not fit the new worlds.
+    private val prefs = context.getSharedPreferences("react_progress_v2", Context.MODE_PRIVATE)
 
     fun load(): Progress = Progress(
         completed = read(KEY_COMPLETED),
-        solutions = read(KEY_SOLUTIONS),
+        extras = read(KEY_EXTRAS),
         discoveries = read(KEY_DISCOVERIES),
     )
 
     fun save(progress: Progress) {
         prefs.edit()
             .putStringSet(KEY_COMPLETED, progress.completed)
-            .putStringSet(KEY_SOLUTIONS, progress.solutions)
+            .putStringSet(KEY_EXTRAS, progress.extras)
             .putStringSet(KEY_DISCOVERIES, progress.discoveries)
             .apply()
     }
@@ -38,7 +40,7 @@ class ProgressStore(context: Context) {
 
     private companion object {
         const val KEY_COMPLETED = "completed"
-        const val KEY_SOLUTIONS = "solutions"
+        const val KEY_EXTRAS = "extras"
         const val KEY_DISCOVERIES = "discoveries"
     }
 }

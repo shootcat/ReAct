@@ -1,6 +1,7 @@
 package com.shootcat.react.engine
 
 import com.shootcat.react.engine.model.LoadDirection
+import com.shootcat.react.engine.model.MergeRule
 import com.shootcat.react.engine.model.Phase
 import com.shootcat.react.engine.model.Props
 import com.shootcat.react.engine.model.Rule
@@ -34,12 +35,16 @@ data class Reaction(
 
 object Reactions {
 
+    /** From this much heat on, a source counts as "große Hitze" (a big fire, lava). */
+    private const val STRONG_HEAT = 6
+
     fun describe(rule: Rule, types: TypeCatalog): Reaction {
         val c = rule.conditions
         val target = types[c.target]
         val targetName = target?.name ?: c.target
         val resultState = rule.effect.targetState
         val output = when {
+            rule.effect.transform != null -> ReactionToken(types.name(rule.effect.transform), rule.effect.transform)
             rule.effect.spawnObject != null -> ReactionToken(types.name(rule.effect.spawnObject), rule.effect.spawnObject)
             resultState != null -> ReactionToken("$targetName ${target?.stateName(resultState) ?: resultState}", c.target, resultState)
             else -> ReactionToken(targetName, c.target)
@@ -64,8 +69,19 @@ object Reactions {
         return Reaction(rule.id, rule.name, rule.phase, inputs, output)
     }
 
+    /** A merge in the same form, e.g. "Flamme + Flamme → Großes Feuer". */
+    fun describeMerge(merge: MergeRule, types: TypeCatalog): Reaction = Reaction(
+        ruleId = merge.id,
+        name = merge.name,
+        phase = Phase.STATE,
+        inputs = listOf(ReactionToken(types.name(merge.a), merge.a), ReactionToken(types.name(merge.b), merge.b)),
+        output = ReactionToken(merge.name, merge.result),
+    )
+
     private fun sourceToken(rule: Rule, types: TypeCatalog): ReactionToken {
-        if (rule.conditions.sourceHot && rule.conditions.source == null) return ReactionToken("Hitze", symbol = ReactionSymbol.HEAT)
+        if (rule.conditions.sourceHot && rule.conditions.source == null) {
+            return ReactionToken(if (rule.conditions.minHeat >= STRONG_HEAT) "Große Hitze" else "Hitze", symbol = ReactionSymbol.HEAT)
+        }
         val source = rule.conditions.source ?: return ReactionToken("?")
         return ReactionToken(types.name(source), source, rule.conditions.sourceState)
     }

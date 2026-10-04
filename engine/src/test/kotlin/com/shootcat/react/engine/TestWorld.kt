@@ -15,7 +15,20 @@ import com.shootcat.react.engine.model.TypeCatalog
 object TestWorld {
     val types = TypeCatalog(
         listOf(
-            ObjectType("FIRE", "Feuer", "ACTIVE", mapOf("gravity" to "true", "density" to "15", "weight" to "10", "heat" to "6", "heat_state" to "ACTIVE")),
+            ObjectType(
+                "FIRE", "Feuer", "ACTIVE",
+                mapOf("gravity" to "true", "density" to "15", "weight" to "10", "heat" to "6", "heat_state" to "ACTIVE", "flame" to "true"),
+            ),
+            ObjectType(
+                "BIG_FIRE", "Großes Feuer", "ACTIVE",
+                mapOf(
+                    "gravity" to "true", "density" to "15", "weight" to "20", "heat" to "7", "heat_state" to "ACTIVE",
+                    "heat_radius" to "2", "flame" to "true",
+                ),
+                vanishStates = setOf("OUT"),
+            ),
+            ObjectType("VAPOR", "Wasserdampf", "GAS", mapOf("gas" to "true", "capacity" to "8", "condense" to "CLOUD")),
+            ObjectType("CLOUD", "Wolke", "GATHERING", mapOf("cloud" to "true", "capacity" to "8", "rain" to "WATER", "rain_state" to "RAINING")),
             ObjectType("ICE", "Eis", "SOLID", mapOf("gravity" to "true", "density" to "9", "weight" to "14"), vanishStates = setOf("MELTED")),
             ObjectType("WATER", "Wasser", "LIQUID", mapOf("liquid" to "true", "capacity" to "8", "density" to "10", "weight" to "2", "wire" to "true")),
             ObjectType("STEAM", "Dampf", "GAS", mapOf("gas" to "true", "capacity" to "8", "lift" to "1")),
@@ -194,13 +207,15 @@ object TestWorld {
         'B' to "BUTTON", 'P' to "PLATE", 'K' to "PISTON", 'H' to "HATCH", 'D' to "DOOR",
         '+' to "BATTERY", '-' to "CABLE", 'L' to "LAMP", 'Z' to "COIL", 'R' to "RELAY", 'T' to "TURBINE",
         'A' to "LAVA", 'Q' to "OIL", ',' to "SAND",
+        'X' to "BIG_FIRE", 'U' to "VAPOR", 'C' to "CLOUD",
     )
 
     /**
      * Builds a state from ASCII rows: '#' wall, '.' empty, F fire, I ice, W full water, '1'-'7' partial
      * water, V full steam, 'a'-'g' partial steam (1-7), S stone, O wood, M fixed metal, m loose metal,
      * G gate, B button, P plate, K piston, H hatch, D door, + battery, - cable, L lamp, Z coil, R relay,
-     * T turbine, A lava, Q oil, ',' sand. Sensors and actuators share channel "A".
+     * T turbine, A lava, Q oil, ',' sand, X big fire, U full vapor (condenses into clouds), C full cloud.
+     * Sensors and actuators share channel "A".
      * Ids are "<type>_<x>_<y>".
      */
     fun state(vararg rows: String): GameState {
@@ -221,7 +236,7 @@ object TestWorld {
                             c == 'M' -> mapOf("gravity" to "false")
                             else -> emptyMap()
                         }
-                        objects += types.create("${type.lowercase()}_${x}_$y", type, p, properties = props, movable = true)
+                        objects += types.create("${type.lowercase()}_${x}_$y", type, p, properties = props, isMovable = true)
                     }
                 }
             }
@@ -230,6 +245,9 @@ object TestWorld {
     }
 
     fun GameState.typeAt(x: Int, y: Int): String? = objectAt(Position(x, y))?.type
+
+    /** The same state with [o] added (e.g. a partly filled cloud). */
+    fun GameState.with(o: GameObject): GameState = copy(objects = (objects.filter { it.position != o.position } + o).sortedBy { it.id })
 
     fun GameState.amountAt(x: Int, y: Int): Int = objectAt(Position(x, y))?.takeIf { it.isLiquid }?.amount ?: 0
 
