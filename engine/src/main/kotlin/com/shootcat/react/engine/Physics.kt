@@ -261,7 +261,7 @@ internal object Physics {
 
     /**
      * A cloud takes up the gas that condenses into it ([Props.CONDENSE]) from around it: everything
-     * connected to it through gas within [FEED_RANGE] cells, so thin wisps under the rock join it too.
+     * within [FEED_RANGE] cells through gas or open air, so thin wisps under the rock join it too.
      * [Props.CONDENSE_RATIO] units of gas make one unit of cloud; a remainder stays behind as gas.
      */
     private fun feedClouds(world: MutableWorld) {
@@ -279,6 +279,9 @@ internal object Physics {
                         val o = world.at(n)
                         if (condensable(o) && o!!.string(Props.CONDENSE) == cloud.type) {
                             gas += o
+                            next += n
+                        } else if (world.isFree(n)) {
+                            // Steam drifts across a little open air to the cloud.
                             next += n
                         }
                     }

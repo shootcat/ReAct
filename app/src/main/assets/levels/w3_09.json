@@ -1,0 +1,56 @@
+{
+ "id": "w3_09",
+ "title": "Lavaflut",
+ "world": 3,
+ "intro": "",
+ "map": [
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "....%rS....",
+  "....%%%....",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  ".#.#====%%%",
+  "f#e#====%%%",
+  "###########",
+  "###########",
+  "###########"
+ ],
+ "legend": {
+  "=": {
+   "type": "SEAWATER"
+  },
+  "S": {
+   "type": "STONE",
+   "isMovable": true
+  },
+  "e": {
+   "type": "SEED"
+  },
+  "f": {
+   "type": "FIRE"
+  },
+  "r": {
+   "type": "LAVA",
+   "amount": 2
+  }
+ },
+ "goals": [
+  {
+   "type": "extinguish",
+   "text": "Lösche das Feuer"
+  },
+  {
+   "type": "state",
+   "object": "seed_2_13",
+   "state": "SEED",
+   "text": "Der Samen darf nicht versalzen"
+  }
+ ]
+}

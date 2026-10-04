@@ -1,0 +1,59 @@
+{
+ "id": "w3_07",
+ "title": "Meer und Glut",
+ "world": 3,
+ "intro": "",
+ "map": [
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  ".......S.D.",
+  "......%%%%%",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  ".#.#====%%%",
+  "A#e#====%%%",
+  "###########",
+  "###########",
+  "###########"
+ ],
+ "legend": {
+  "=": {
+   "type": "SEAWATER"
+  },
+  "A": {
+   "type": "LAVA"
+  },
+  "D": {
+   "type": "SAND",
+   "isMovable": true
+  },
+  "S": {
+   "type": "STONE",
+   "isMovable": true
+  },
+  "e": {
+   "type": "SEED"
+  }
+ },
+ "goals": [
+  {
+   "type": "clear",
+   "types": [
+    "LAVA"
+   ],
+   "text": "Lass die Lava erstarren"
+  },
+  {
+   "type": "state",
+   "object": "seed_2_13",
+   "state": "SEED",
+   "text": "Der Samen darf nicht versalzen"
+  }
+ ]
+}
