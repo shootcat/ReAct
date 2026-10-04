@@ -81,7 +81,19 @@ Pro Schritt sind höchstens **100 Regel-Transformationen** erlaubt; darüber bri
 
 Es gibt keine Level-Sonderfälle im Code: alles kommt aus den JSON-Dateien. Elemente werden über Eigenschaften beschrieben (`gravity`, `liquid`, `gas`, `density`, `heat`, `heat_radius`, `fuel`, `granular`, `condense`, `cloud` …). Level sind ASCII-Landschaften mit Legende: `#` Erde, `%` Fels, `.` frei, `:` frei, aber nicht bebaubar, `+` Ablagefeld; Großbuchstaben sind bewegliche Dinge (`isMovable`), Kleinbuchstaben gehören zur Landschaft. Ziele: `fill`, `extinguish`, `rain`, `state`, `preserve`, `clear` und `max_moves`, jeweils optional als Stern.
 
-Die Musterlösungen aller Level stehen in `engine/src/test/resources/walkthroughs.txt` (`w4_02 min=2`, `w1_01 [1] fire_1_11@7,9` – in Klammern die erreichten optionalen Aufgaben). Der Test spielt jede Lösung durch, prüft die Sterne und beweist per Breitensuche, dass es keine kürzere Lösung gibt.
+Die Musterlösungen aller Level stehen in `engine/src/test/resources/walkthroughs.txt` (`w4_02 min=2`, `w1_01 [1] fire_1_11@7,9` – in Klammern die erreichten optionalen Aufgaben). Der Test spielt jede Lösung durch, prüft die Sterne und beweist per Breitensuche, dass es keine kürzere Lösung gibt (vollständig bei Leveln mit Ablagefeldern, sonst bis zwei Züge tief).
+
+## Schwierigkeit
+
+Für Level mit Ablagefeldern misst `DifficultyReportTest` per vollständiger Suche (`LevelAnalysis`, jeder Zug gefolgt vom Einschwingen der Welt, Züge mit gleichem Ergebnis zählen einmal):
+
+1. **Mindestzüge**, bewiesen durch Breitensuche.
+2. **Lösungen**: Anzahl verschiedener Lösungen in Mindestlänge; Reihenfolge-Varianten zählen einzeln.
+3. **Sackgassen**: Anteil der möglichen ersten Züge, nach denen das Level nicht mehr lösbar ist (Suche bis Mindestzüge plus zwei).
+4. **Naheliegender Zug**: ein bewegliches Objekt auf das Ablagefeld, das dem Hauptziel am nächsten liegt. Ab Level 3 darf er keine Mindestlösung beginnen.
+5. **Köder**: bewegliche Objekte, die in keiner Mindestlösung vorkommen oder dort nie auf ihrem naheliegenden Feld landen. Ab Level 5 Pflicht.
+
+Der Test prüft die Kurve je Levelnummer (1–2: 2–3 Züge; 3–4: 3–4 Züge, mindestens 30 % Sackgassen; 5–7: 4–6 Züge, 40 %; 8–10: 6–8 Züge, 50 %) und schreibt die Tabelle nach `engine/build/difficulty.md`. Für Level mit Ablagefeldern beweist `WalkthroughTest` die Mindestzugzahl vollständig, für alte Level ohne Ablagefelder nur bis zwei Züge tief.
 
 ## Bauen und testen
 

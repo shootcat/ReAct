@@ -1,5 +1,6 @@
 package com.shootcat.react.engine
 
+import com.shootcat.react.engine.analysis.LevelAnalysis
 import com.shootcat.react.engine.model.GameObject
 import com.shootcat.react.engine.model.LevelData
 import com.shootcat.react.engine.model.Position
@@ -77,12 +78,22 @@ class WalkthroughTest {
         }
     }
 
+    /**
+     * With marked placement the search is complete up to the declared minimum; levels that may be built on
+     * anywhere are only searched [PROOF_DEPTH] moves deep.
+     */
     @Test
     fun `no level can be solved with fewer moves than declared`() {
         for ((id, min) in minimum) {
-            val depth = minOf(min - 1, PROOF_DEPTH)
+            val level = Levels.level(id)
+            val complete = level.placement != null
+            val depth = if (complete) min - 1 else minOf(min - 1, PROOF_DEPTH)
             if (depth < 1) continue
-            val shortcut = shortestSolution(Levels.level(id), depth)
+            val shortcut = if (complete) {
+                LevelAnalysis(level, Levels.engine(level)).shortest(depth)?.map { it.objectId to it.to }
+            } else {
+                shortestSolution(level, depth)
+            }
             if (shortcut != null) fail("$id can be solved in ${shortcut.size} moves: $shortcut (declared $min)")
         }
     }
