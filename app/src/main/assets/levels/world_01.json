@@ -3,7 +3,8 @@
   "title": "Prüfung",
   "icon": "FIRE",
   "levels": [
-    "p_01"
+    "p_01",
+    "p_02"
   ],
   "bonus": null,
   "map": [
@@ -12,6 +13,12 @@
       "x": 0.5,
       "y": 0.94,
       "icon": "CLOUD"
+    },
+    {
+      "level": "p_02",
+      "x": 0.76,
+      "y": 0.08,
+      "icon": "WATER"
     }
   ]
 }

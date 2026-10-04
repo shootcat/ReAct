@@ -1,0 +1,53 @@
+{
+ "id": "p_02",
+ "title": "Zu wenig",
+ "world": 1,
+ "intro": "",
+ "look": 1,
+ "placement": "marked",
+ "map": [
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  ".%Q%...%R%.",
+  ".%%%...%%%.",
+  "...+...+...",
+  "....%+%....",
+  "....%%%....",
+  "...........",
+  "f+.....+b..",
+  "%%%%%%%%%%%"
+ ],
+ "legend": {
+  "Q": {
+   "type": "WATER",
+   "isMovable": true,
+   "amount": 4
+  },
+  "R": {
+   "type": "WATER",
+   "isMovable": true,
+   "amount": 3
+  },
+  "b": {
+   "type": "BIG_FIRE"
+  },
+  "f": {
+   "type": "FIRE"
+  }
+ },
+ "goals": [
+  {
+   "type": "extinguish",
+   "text": "Lösche das große Feuer",
+   "area": [
+    8,
+    11,
+    8,
+    11
+   ]
+  }
+ ]
+}
