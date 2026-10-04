@@ -10,7 +10,6 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.click
-import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -19,7 +18,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.core.app.ActivityScenario
@@ -41,9 +39,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 
 /**
- * Starts the real app on the JVM and plays levels of all four worlds through the UI like a player
- * would: every move sets the world in motion right away, undo and redo step through the history, and
- * once the tasks hold the "Aufgabe erfüllt" card appears.
+ * Starts the real app on the JVM and plays the first levels of the exam world through the UI like a
+ * player would: every move sets the world in motion right away, undo and redo step through the history,
+ * and once the tasks hold the "Aufgabe erfüllt" card appears. Then every level is opened once.
  * Screenshots of every screen end up in app/build/screenshots (and in each CI release).
  */
 @RunWith(RobolectricTestRunner::class)
@@ -71,32 +69,27 @@ class AppSmokeTest {
         return scenario
     }
 
-    /** The main levels 1..[upTo] of [world]. */
-    private fun mains(world: Int, upTo: Int = 20) = (1..upTo).map { "w${world}_%02d".format(it) }
-
     @Test
     fun playFirstLevelsLive(): Unit = launch().use {
         compose.onNodeWithText("REACT").assertExists()
         shot("01_titel")
         compose.onNodeWithText("Spielen").performClick()
         compose.waitForIdle()
-        // Only the forest is open at the start.
-        compose.onNodeWithTag("world_1").assertIsEnabled()
-        compose.onNodeWithTag("world_2").assertIsNotEnabled()
-        shot("02_weltkarte")
-        openWorld(1)
-        shot("03_wald")
+        // A single world: "Spielen" opens its map right away, only the first level is open.
+        compose.onNodeWithTag("level_p_01").assertIsEnabled()
+        compose.onNodeWithTag("level_p_02").assertIsNotEnabled()
+        shot("02_pruefung_karte")
 
-        // Level 1: the tasks are on top, every move counts at once.
-        openLevel("w1_01")
+        // p_01: the tasks are on top, every move counts at once.
+        openLevel("p_01")
         compose.onNodeWithContentDescription("Aufgaben").assertExists()
-        compose.onNodeWithText("Fülle die Mulde mit Wasser").assertExists()
-        compose.onNodeWithTag("task_1").assertExists()
+        compose.onNodeWithText("Lass den Samen keimen").assertExists()
+        compose.onNodeWithTag("task_0").assertExists()
         compose.onNodeWithContentDescription("Rückgängig").assertIsNotEnabled()
-        shot("04_tauwetter_start")
+        shot("03_umweg_start")
 
-        // A harmless move, undone and redone.
-        moveOnBoard("w1_01", from = 1 to 11, to = 2 to 11)
+        // A harmless move onto a placement field (the flame drops to the floor), undone and redone.
+        moveOnBoard("p_01", from = 1 to 8, to = 6 to 9)
         advance(millis = 600)
         compose.onNodeWithContentDescription("Rückgängig").assertIsEnabled().performClick()
         advance(millis = 300)
@@ -104,14 +97,14 @@ class AppSmokeTest {
         advance(millis = 300)
         compose.onNodeWithContentDescription("Wiederholen").assertIsNotEnabled()
 
-        // Next to the ice: it melts, the water runs down into the hollow – and the tree stays green.
-        moveOnBoard("w1_01", from = 2 to 11, to = 7 to 9)
-        advance(millis = 900)
-        shot("05_tauwetter_schmilzt")
+        // Both flames become a big fire; laid on the wall by the pond it boils the water into a cloud.
+        moveOnBoard("p_01", from = 6 to 11, to = 2 to 8)
+        advance(millis = 600)
+        moveOnBoard("p_01", from = 2 to 8, to = 4 to 9)
+        advance(millis = 3000)
+        shot("04_umweg_dampf")
         awaitText("Aufgabe erfüllt")
-        // The optional task (the tree stays green) is listed on the card as well.
-        compose.onAllNodesWithText("Der Baum bleibt grün").assertCountEquals(2)
-        shot("06_aufgabe_erfuellt")
+        shot("05_aufgabe_erfuellt")
 
         compose.onNodeWithText("Nochmal").performClick()
         advance(millis = 300)
@@ -121,122 +114,72 @@ class AppSmokeTest {
 
         compose.onNodeWithTag("discoveries").performClick()
         compose.waitForIdle()
-        compose.onNodeWithText("Hitze + Eis → Wasser").assertExists()
-        shot("07_entdeckungen")
+        compose.onNodeWithText("Flamme + Flamme → Großes Feuer").assertExists()
+        shot("06_entdeckungen")
 
-        // Back to the level, to the map, and into level 2.
+        // Back to the level, to the map, and into p_02.
         compose.onNodeWithTag("back").performClick()
         compose.waitForIdle()
         compose.onNodeWithTag("back").performClick()
         compose.waitForIdle()
-        openLevel("w1_02")
-        shot("08_keimling_start")
+        openLevel("p_02")
+        shot("07_zu_wenig_start")
 
-        // Level 2: the flame melts the ice from the side, the water reaches the seed – the flame does not.
-        moveOnBoard("w1_02", from = 9 to 14, to = 5 to 11)
-        advance(millis = 900)
-        shot("09_keimling_live")
+        // p_02: one puddle into the hollow, the other onto it, then all of it to the big fire.
+        moveOnBoard("p_02", from = 2 to 5, to = 5 to 8)
+        advance(millis = 1500)
+        moveOnBoard("p_02", from = 8 to 5, to = 5 to 8)
+        advance(millis = 1500)
+        shot("08_zu_wenig_gesammelt")
+        moveOnBoard("p_02", from = 5 to 8, to = 8 to 11)
         awaitText("Aufgabe erfüllt")
 
         compose.onNodeWithText("Weiter").performClick()
         compose.waitForIdle()
-        compose.onNodeWithText("Steinwurf").assertExists()
-        shot("10_steinwurf_start")
+        compose.onNodeWithText("Verdrängung").assertExists()
+        shot("09_verdraengung_start")
 
-        // Level 3: the stone sinks into the pond, the water spills over to the seed.
-        moveOnBoard("w1_03", from = 1 to 10, to = 2 to 12)
+        // p_03: the pumice shields the heat, then both stones lift the pond into the hollow.
+        moveOnBoard("p_03", from = 2 to 4, to = 8 to 7)
         advance(millis = 900)
-        shot("11_steinwurf_ueberlauf")
+        moveOnBoard("p_03", from = 0 to 4, to = 3 to 7)
+        advance(millis = 2000)
+        moveOnBoard("p_03", from = 1 to 4, to = 4 to 7)
+        advance(millis = 900)
+        shot("10_verdraengung_ueberlauf")
         awaitText("Aufgabe erfüllt")
 
         leaveToMap()
-        shot("12_wald_fortschritt")
+        shot("11_pruefung_fortschritt")
 
         compose.onNodeWithContentDescription("Einstellungen").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("Tempo").assertExists()
-        shot("13_einstellungen")
+        shot("12_einstellungen")
     }
 
     @Test
-    fun allWorlds(): Unit = launch(completed = (mains(1) + mains(2) + mains(3) + mains(4, upTo = 19)).toSet()).use {
+    fun everyLevelOpens(): Unit = launch(completed = levelIds().toSet()).use {
         compose.onNodeWithText("Spielen").performClick()
         compose.waitForIdle()
-        for (world in 1..4) compose.onNodeWithTag("world_$world").assertIsEnabled()
-        shot("20_weltkarte_offen")
-
-        // The forest with its bonus level open.
-        openWorld(1)
-        compose.onNodeWithTag("level_w1_bonus").assertIsEnabled()
-        shot("21_wald_bonus")
-        backToWorlds()
-
-        // Coast: the stone in the sea makes it spill over the fire on the beach.
-        openWorld(2)
-        shot("22_kueste")
-        openLevel("w2_01")
-        shot("23_brandung_start")
-        moveOnBoard("w2_01", from = 1 to 7, to = 3 to 9)
-        advance(millis = 1200)
-        shot("24_brandung_flut")
-        awaitText("Aufgabe erfüllt")
-        leaveToMap()
-        backToWorlds()
-
-        // Volcano: ice dropped onto the lava cools it to stone.
-        openWorld(3)
-        shot("25_vulkan")
-        openLevel("w3_01")
-        moveOnBoard("w3_01", from = 1 to 7, to = 5 to 11)
-        advance(millis = 900)
-        shot("26_erste_glut")
-        awaitText("Aufgabe erfüllt")
-        leaveToMap()
-        backToWorlds()
-
-        // Frost: the overflow freezes at the crystal into a loose block of ice – carried to the big fire.
-        openWorld(4)
-        shot("27_frost")
-        openLevel("w4_02")
-        shot("28_eisblock_start")
-        moveOnBoard("w4_02", from = 1 to 5, to = 2 to 7)
-        advance(millis = 7000)
-        shot("29_eisblock_gefroren")
-        moveOnBoard("w4_02", from = 5 to 10, to = 7 to 12)
-        advance(millis = 900)
-        shot("30_eisblock_loescht")
-        awaitText("Aufgabe erfüllt")
-        leaveToMap()
-
-        // Steam from a doused flame thaws the plug, the water reaches the seed.
-        openLevel("w4_06")
-        moveOnBoard("w4_06", from = 8 to 9, to = 3 to 11)
-        advance(millis = 1500)
-        shot("31_dampftuer")
-        awaitText("Aufgabe erfüllt")
-        leaveToMap()
-
-        // Later levels: a look at the boards.
-        for (id in listOf("w4_14", "w4_20")) {
+        shot("20_pruefung_alle_offen")
+        for ((i, id) in levelIds().withIndex()) {
             openLevel(id)
-            shot("32_${id}_start")
+            shot("%02d_%s_start".format(21 + i, id))
             compose.onNodeWithTag("back").performClick()
             compose.waitForIdle()
         }
-        backToWorlds()
-
         compose.onNodeWithContentDescription("Entdeckungen").performClick()
         compose.waitForIdle()
-        compose.onNodeWithTag("discovery_list").performScrollToNode(hasText("WELT 4 · FROST"))
-        compose.onNodeWithText("WELT 4 · FROST").assertExists()
-        shot("33_entdeckungen_frost")
+        compose.onNodeWithTag("discovery_list").assertExists()
+        shot("39_entdeckungen")
     }
 
-    private fun openWorld(number: Int) {
-        compose.onNodeWithTag("world_$number").performScrollTo()
-        compose.onNodeWithTag("world_$number").assertIsEnabled().performClick()
-        compose.waitForIdle()
-        compose.onNodeWithTag("level_w${number}_01").assertExists("world $number did not open")
+    /** The levels of the exam world, in order. */
+    private fun levelIds(): List<String> {
+        val dir = File("src/main/assets/levels")
+        val catalog = LevelLoader.parseCatalog(File(dir, "elements.json").readText())
+        return LevelLoader.parseWorld(File(dir, "world_01.json").readText(), catalog).levelIds
     }
 
     /** Closes the completion card and goes back from the level to the world's map. */
@@ -246,12 +189,6 @@ class AppSmokeTest {
         compose.onNodeWithTag("back").performClick()
         compose.waitForIdle()
         compose.onNodeWithContentDescription("Rückgängig").assertDoesNotExist()
-    }
-
-    private fun backToWorlds() {
-        compose.onNodeWithTag("back").performClick()
-        compose.waitForIdle()
-        compose.onNodeWithTag("world_1").assertExists()
     }
 
     private fun openLevel(id: String) {
