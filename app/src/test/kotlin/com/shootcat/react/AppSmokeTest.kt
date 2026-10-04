@@ -94,7 +94,8 @@ class AppSmokeTest {
         compose.onNodeWithContentDescription("Rückgängig").assertIsEnabled().performClick()
         advance(millis = 300)
         compose.onNodeWithContentDescription("Wiederholen").assertIsEnabled().performClick()
-        advance(millis = 300)
+        // Redo goes back to just after the drop: the flame falls to the floor once more.
+        advance(millis = 1200)
         compose.onNodeWithContentDescription("Wiederholen").assertIsNotEnabled()
 
         // Both flames become a big fire; laid on the wall by the pond it boils the water into a cloud.
@@ -143,7 +144,8 @@ class AppSmokeTest {
         moveOnBoard("p_03", from = 2 to 4, to = 8 to 7)
         advance(millis = 900)
         moveOnBoard("p_03", from = 0 to 4, to = 3 to 7)
-        advance(millis = 2000)
+        // The stone sinks through the pond for a dozen steps before the next one follows.
+        advance(millis = 4500)
         moveOnBoard("p_03", from = 1 to 4, to = 4 to 7)
         advance(millis = 900)
         shot("10_verdraengung_ueberlauf")
