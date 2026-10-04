@@ -2,7 +2,16 @@
   "world": 1,
   "title": "Prüfung",
   "icon": "FIRE",
-  "levels": [],
+  "levels": [
+    "p_01"
+  ],
   "bonus": null,
-  "map": []
+  "map": [
+    {
+      "level": "p_01",
+      "x": 0.5,
+      "y": 0.94,
+      "icon": "CLOUD"
+    }
+  ]
 }

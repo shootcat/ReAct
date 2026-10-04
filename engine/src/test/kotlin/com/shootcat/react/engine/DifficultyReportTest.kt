@@ -10,7 +10,8 @@ import kotlin.test.assertTrue
  * "Schwierigkeit"): the proven minimum, the number of different minimal solutions, the share of first
  * moves that end in a dead end (searched up to the minimum plus two), whether the obvious move – a
  * movable thing on the placement field next to the main goal – starts a minimal solution, and which things
- * are bait (in no minimal solution, or never where they obviously belong).
+ * are bait: in no minimal solution at all, or listed in [REPURPOSED] because the solution uses them for
+ * something else than their obvious purpose.
  *
  * The thresholds follow the level's number in its world: levels 1–2 take 2–3 moves, 3–4 take 3–4 and need
  * 30 % dead ends, 5–7 take 4–6 with 40 %, 8–10 take 6–8 with 50 %. From level 3 on the obvious move must not
@@ -58,10 +59,13 @@ class DifficultyReportTest {
         val movable = level.objects.filter { it.isMovable }.map { it.id }
         val used = listed.flatten().map { it.objectId }.toSet()
         val unused = movable.filter { it !in used }
-        // Used, but never on the field where it obviously belongs.
-        val misused = movable.filter { id -> id in used && obvious.any { it.objectId == id } &&
-            listed.flatten().none { m -> m.objectId == id && obvious.any { it == m } } }
-        return Report(id, number, min, count, dead, first, obviousWorks, unused + misused)
+        val repurposed = REPURPOSED[id].orEmpty().keys.filter { it in movable }
+        return Report(id, number, min, count, dead, first, obviousWorks, unused + repurposed)
+    }
+
+    private companion object {
+        /** Things a level's solution uses for something else than their obvious purpose, with the reason. */
+        val REPURPOSED: Map<String, Map<String, String>> = mapOf()
     }
 
     @Test

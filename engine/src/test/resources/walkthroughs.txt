@@ -1,1 +1,3 @@
 # Musterlösungen: "<level> min=<n>" und "<level> [<optionale Ziele>] <objekt>@<x>,<y> ..."
+p_01 min=2
+p_01 [] fire_1_8@2,8 fire_2_8@4,9
