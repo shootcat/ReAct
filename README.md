@@ -34,6 +34,15 @@ Alle Builds sind mit demselben Schlüssel signiert und installieren sich als Upd
 5. Oben stehen die **Aufgaben** (Mulde füllen, Feuer löschen, Regen auslösen, Samen keimen lassen …) mit Häkchen und Sternen. Sobald alle Hauptaufgaben erfüllt sind, erscheint **„Aufgabe erfüllt“**.
 6. **↶ Rückgängig** und **↷ Wiederholen** gehen durch die eigenen Züge (jeder Zug speichert den Zustand davor), **↺** startet das Level neu – auch das lässt sich rückgängig machen.
 
+**Ablagefelder:** In Leveln mit `"placement": "marked"` darf man nur auf die markierten Ablagefelder (`+` in der Karte) etwas ablegen; sie leuchten auf, sobald man ein Objekt aufnimmt. Genau gilt:
+
+- **Ablegen** (auf ein freies Feld, eines nur mit Dampf, oder einen Stein in Wasser werfen) geht nur auf ein Ablagefeld.
+- **Verschmelzen** geht mit einem Objekt, das selbst auf einem Ablagefeld oder direkt (waagerecht oder senkrecht) neben einem liegt.
+- **Reagieren** (z. B. eine Flamme auf Eis ziehen) geht nur, wenn direkt neben dem Partner ein freies Ablagefeld liegt; dort landet das Objekt.
+- Aufnehmen darf man jedes bewegliche Objekt, wo immer es liegt. Abgelegtes unterliegt weiter der Physik: ein Stein auf einem hohen Ablagefeld fällt, wenn darunter nichts ist.
+
+Ohne `"placement"` gilt das alte Verhalten: jedes freie, bebaubare Feld.
+
 Das Spielfeld skaliert auf jede Bildschirmgröße und hält ringsum mindestens 20 dp Abstand (mehr, wo die Zurück-Geste des Systems weiter hereinreicht). Überschüssige Höhe wird zu mehr Himmel und mehr Erde.
 
 Das **Entdeckungsbuch** sammelt jede beobachtete Reaktion; unbekannte erscheinen als Silhouette.
@@ -70,7 +79,7 @@ Jeder Simulationsschritt läuft in festen Phasen:
 
 Pro Schritt sind höchstens **100 Regel-Transformationen** erlaubt; darüber bricht die Simulation kontrolliert ab. Gleiche Züge ergeben immer exakt denselben Ablauf.
 
-Es gibt keine Level-Sonderfälle im Code: alles kommt aus den JSON-Dateien. Elemente werden über Eigenschaften beschrieben (`gravity`, `liquid`, `gas`, `density`, `heat`, `heat_radius`, `fuel`, `granular`, `condense`, `cloud` …). Level sind ASCII-Landschaften mit Legende: `#` Erde, `%` Fels, `.` frei, `:` frei, aber nicht bebaubar; Großbuchstaben sind bewegliche Dinge (`isMovable`), Kleinbuchstaben gehören zur Landschaft. Ziele: `fill`, `extinguish`, `rain`, `state`, `preserve`, `clear` und `max_moves`, jeweils optional als Stern.
+Es gibt keine Level-Sonderfälle im Code: alles kommt aus den JSON-Dateien. Elemente werden über Eigenschaften beschrieben (`gravity`, `liquid`, `gas`, `density`, `heat`, `heat_radius`, `fuel`, `granular`, `condense`, `cloud` …). Level sind ASCII-Landschaften mit Legende: `#` Erde, `%` Fels, `.` frei, `:` frei, aber nicht bebaubar, `+` Ablagefeld; Großbuchstaben sind bewegliche Dinge (`isMovable`), Kleinbuchstaben gehören zur Landschaft. Ziele: `fill`, `extinguish`, `rain`, `state`, `preserve`, `clear` und `max_moves`, jeweils optional als Stern.
 
 Die Musterlösungen aller Level stehen in `engine/src/test/resources/walkthroughs.txt` (`w4_02 min=2`, `w1_01 [1] fire_1_11@7,9` – in Klammern die erreichten optionalen Aufgaben). Der Test spielt jede Lösung durch, prüft die Sterne und beweist per Breitensuche, dass es keine kürzere Lösung gibt.
 

@@ -88,7 +88,18 @@ object LevelLoader {
         val height = rows.size
         if (width < 1 || height < 1) fail("$where has an empty map")
 
-        val (terrain, noBuild) = parseLayout(rows, width, height, dto.legend.keys, where)
+        val (terrain, noBuild, fields) = parseLayout(rows, width, height, dto.legend.keys, where)
+        val placement = when (dto.placement) {
+            null -> {
+                if (fields.isNotEmpty()) fail("$where has placement fields ('+') but no \"placement\": \"marked\"")
+                null
+            }
+            "marked" -> {
+                if (fields.isEmpty()) fail("$where: \"placement\": \"marked\" needs placement fields ('+')")
+                fields
+            }
+            else -> fail("$where: placement '${dto.placement}' is not 'marked'")
+        }
         val walls = terrain.keys
         val (mapObjects, legendNoBuild) = objectsFromMap(rows, dto.legend, where)
 
@@ -163,12 +174,15 @@ object LevelLoader {
             terrain = terrain,
             wind = wind,
             merges = world.merges,
+            placement = placement,
         )
     }
 
+    private data class Layout(val terrain: Map<Position, Terrain>, val noBuild: Set<Position>, val placement: Set<Position>)
+
     /**
-     * The landscape: '#' earth, '%' rock, '.' open, ':' open but the player may not drop anything there.
-     * Any [legend] symbol stands for an object on an open cell.
+     * The landscape: '#' earth, '%' rock, '.' open, ':' open but the player may not drop anything there,
+     * '+' open and a placement field. Any [legend] symbol stands for an object on an open cell.
      */
     private fun parseLayout(
         layout: List<String>,
@@ -176,9 +190,10 @@ object LevelLoader {
         height: Int,
         legend: Set<Char>,
         where: String,
-    ): Pair<Map<Position, Terrain>, Set<Position>> {
+    ): Layout {
         val terrain = mutableMapOf<Position, Terrain>()
         val noBuild = mutableSetOf<Position>()
+        val placement = mutableSetOf<Position>()
         layout.forEachIndexed { y, row ->
             if (row.length != width) fail("$where: map row $y has ${row.length} cells, the first row has $width")
             row.forEachIndexed { x, c ->
@@ -187,12 +202,13 @@ object LevelLoader {
                     '%' -> terrain[Position(x, y)] = Terrain.ROCK
                     '.' -> Unit
                     ':' -> noBuild += Position(x, y)
+                    '+' -> placement += Position(x, y)
                     in legend -> Unit
                     else -> fail("$where: unknown map symbol '$c' at ($x,$y)")
                 }
             }
         }
-        return terrain to noBuild
+        return Layout(terrain, noBuild, placement)
     }
 
     private class MapObject(
@@ -401,6 +417,8 @@ object LevelLoader {
         val goals: List<GoalDto>,
         val wind: List<WindDto> = emptyList(),
         @SerialName("max_steps") val maxSteps: Int = 200,
+        /** "marked": things may only be put down on the placement fields ('+'). */
+        val placement: String? = null,
     )
 
     @Serializable

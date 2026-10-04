@@ -296,7 +296,12 @@ fun Board(
                 drawNoBuild(state, cell, strong = interactive && placing)
                 drawWind(level, cell, time)
                 drawGoalAreas(level.goals, goalsMet, state, cell, time)
-                if (interactive && placing) drawFreeCells(state, cell)
+                val fields = state.placement
+                if (fields != null) {
+                    drawPlacementFields(fields, cell, holding = interactive && placing, time = time)
+                } else if (interactive && placing) {
+                    drawFreeCells(state, cell)
+                }
 
                 // Movable things rest on a soft shadow.
                 for (o in state.objects) {
@@ -410,6 +415,37 @@ private fun DrawScope.drawFreeCells(state: GameState, cell: Float) {
             val p = Position(x, y)
             if (state.isBuildable(p)) drawCircle(Color.White, cell * 0.035f, cellCenter(p, cell), alpha = 0.16f)
         }
+    }
+}
+
+/**
+ * The placement fields of a level with marked placement: a faint cross while nothing is held, a soft
+ * glowing square on each field while the player holds something.
+ */
+private fun DrawScope.drawPlacementFields(fields: Set<Position>, cell: Float, holding: Boolean, time: Float) {
+    val pulse = 0.75f + 0.25f * sin(time * TAU * 2f)
+    for (p in fields) {
+        val tl = Offset(p.x * cell, p.y * cell)
+        val inset = cell * 0.08f
+        val box = Size(cell - 2 * inset, cell - 2 * inset)
+        val c = cellCenter(p, cell)
+        val arm = cell * 0.12f
+        if (holding) {
+            drawRoundRect(Palette.accent, tl + Offset(inset, inset), box, CornerRadius(cell * 0.2f), alpha = 0.16f * pulse)
+            drawRoundRect(
+                Palette.accent,
+                tl + Offset(inset, inset),
+                box,
+                CornerRadius(cell * 0.2f),
+                style = Stroke(width = cell * 0.045f),
+                alpha = 0.75f * pulse,
+            )
+        } else {
+            drawRoundRect(Color.White, tl + Offset(inset, inset), box, CornerRadius(cell * 0.2f), style = Stroke(width = cell * 0.02f), alpha = 0.12f)
+        }
+        val alpha = if (holding) 0.8f else 0.28f
+        drawLine(Color.White, c - Offset(arm, 0f), c + Offset(arm, 0f), strokeWidth = cell * 0.035f, cap = StrokeCap.Round, alpha = alpha)
+        drawLine(Color.White, c - Offset(0f, arm), c + Offset(0f, arm), strokeWidth = cell * 0.035f, cap = StrokeCap.Round, alpha = alpha)
     }
 }
 

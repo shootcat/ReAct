@@ -33,6 +33,10 @@ sealed interface Drop {
  * 5. Anything else bounces off: the move is not allowed.
  *
  * Nobody may drop into walls or cells marked as not buildable.
+ *
+ * Levels with marked placement ('+' fields) are stricter: an object may be put down (1, 3) only on a
+ * placement field; it may merge (2) only with something lying on a placement field or right next to
+ * one; and when it reacts (4) it only lands on a placement field next to its partner.
  */
 class Drops(private val types: TypeCatalog, private val rules: List<Rule>, private val merges: List<MergeRule>) {
 
@@ -42,15 +46,18 @@ class Drops(private val types: TypeCatalog, private val rules: List<Rule>, priva
         val obj = state.objectById(objectId) ?: return null
         if (!obj.isMovable || obj.position == to) return null
         if (!state.inBounds(to) || state.isWall(to) || to in state.noBuild) return null
-        val target = state.objectAt(to) ?: return state.withObjectMoved(objectId, to)?.let { Drop.Placed(it) }
+        val field = state.isPlacementField(to)
+        val target = state.objectAt(to)
+        if (target == null) return if (field) state.withObjectMoved(objectId, to)?.let { Drop.Placed(it) } else null
 
         val merge = merges.firstOrNull { it.matches(obj.type, target.type) }
         if (merge != null) {
+            if (!field && to.neighbours().none { state.inBounds(it) && state.placement?.contains(it) == true }) return null
             val into = merged(obj, target, merge)
             return state.withMerged(obj.id, into)?.let { Drop.Merged(it, target.id, merge) }
         }
-        if (target.isGas) return state.withObjectMoved(objectId, to)?.let { Drop.Placed(it) }
-        if (target.isLiquid && !obj.hasAmount) return state.withLiquidDisplaced(objectId, to)?.let { Drop.Placed(it) }
+        if (target.isGas) return if (field) state.withObjectMoved(objectId, to)?.let { Drop.Placed(it) } else null
+        if (target.isLiquid && !obj.hasAmount) return if (field) state.withLiquidDisplaced(objectId, to)?.let { Drop.Placed(it) } else null
         if (reacts(obj, target)) {
             val landing = target.position.neighbours().firstOrNull { it != obj.position && state.canPlace(it) } ?: return null
             return state.withObjectMoved(objectId, landing)?.let { Drop.NextTo(it, landing, target.id) }

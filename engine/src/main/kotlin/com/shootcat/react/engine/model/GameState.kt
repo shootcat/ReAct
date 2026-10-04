@@ -12,6 +12,11 @@ data class GameState(
     val spawnCounter: Int = 0,
     /** Empty cells the player may not drop objects into (e.g. inside closed chambers). */
     val noBuild: Set<Position> = emptySet(),
+    /**
+     * The placement fields of a level with marked placement: the only cells the player may put something
+     * down on. Null means anywhere that is buildable.
+     */
+    val placement: Set<Position>? = null,
 ) {
     private val byPosition: Map<Position, GameObject> by lazy { objects.associateBy { it.position } }
     private val byId: Map<String, GameObject> by lazy { objects.associateBy { it.id } }
@@ -26,11 +31,14 @@ data class GameState(
 
     fun isFree(p: Position): Boolean = inBounds(p) && !isWall(p) && objectAt(p) == null
 
-    fun isBuildable(p: Position): Boolean = isFree(p) && p !in noBuild
+    fun isBuildable(p: Position): Boolean = isFree(p) && p !in noBuild && isPlacementField(p)
+
+    /** Whether the player may put things down on [p] at all (always true without marked placement). */
+    fun isPlacementField(p: Position): Boolean = placement == null || p in placement
 
     /** Where the player may put something down: a buildable cell, or one only filled with gas (it gets pushed aside). */
     fun canPlace(p: Position): Boolean {
-        if (!inBounds(p) || isWall(p) || p in noBuild) return false
+        if (!inBounds(p) || isWall(p) || p in noBuild || !isPlacementField(p)) return false
         val o = objectAt(p) ?: return true
         return o.isGas
     }

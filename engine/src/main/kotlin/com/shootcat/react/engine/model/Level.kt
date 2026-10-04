@@ -148,11 +148,13 @@ data class LevelData(
     val terrain: Map<Position, Terrain> = emptyMap(),
     val wind: List<WindZone> = emptyList(),
     val merges: List<MergeRule> = emptyList(),
+    /** With marked placement: the placement fields ('+'), the only cells things may be put down on. */
+    val placement: Set<Position>? = null,
 ) {
     val mainGoals: List<LevelGoal> get() = goals.filter { !it.optional }
     val optionalGoals: List<LevelGoal> get() = goals.filter { it.optional }
 
-    fun initialState(): GameState = GameState(width, height, walls, objects.sortedBy { it.id }, noBuild = noBuild)
+    fun initialState(): GameState = GameState(width, height, walls, objects.sortedBy { it.id }, noBuild = noBuild, placement = placement)
 }
 
 /** A level's spot on the world map; [icon] is an object type that represents the level. */

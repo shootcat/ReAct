@@ -93,5 +93,5 @@ internal class MutableWorld(private val base: GameState) {
     }
 
     fun snapshot(): GameState =
-        GameState(width, height, walls, objects.values.sortedBy { it.id }, spawnCounter, base.noBuild)
+        GameState(width, height, walls, objects.values.sortedBy { it.id }, spawnCounter, base.noBuild, base.placement)
 }
