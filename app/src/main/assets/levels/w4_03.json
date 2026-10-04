@@ -1,0 +1,57 @@
+{
+ "id": "w4_03",
+ "title": "Streusalz",
+ "world": 4,
+ "intro": "",
+ "map": [
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  ".K.......F.",
+  "%%%......%%",
+  "...........",
+  "...........",
+  "....ti.....",
+  "....%%.....",
+  "...%%%%.e..",
+  "%%%%%%%%%%%",
+  "###########",
+  "###########",
+  "###########"
+ ],
+ "legend": {
+  "F": {
+   "type": "FIRE",
+   "isMovable": true
+  },
+  "K": {
+   "type": "SALT",
+   "isMovable": true
+  },
+  "e": {
+   "type": "SEED"
+  },
+  "i": {
+   "type": "ICE"
+  },
+  "t": {
+   "type": "TREE"
+  }
+ },
+ "goals": [
+  {
+   "type": "state",
+   "object": "seed_8_12",
+   "state": "SPROUTED",
+   "text": "Lass den Samen keimen"
+  },
+  {
+   "type": "preserve",
+   "object": "tree_4_10",
+   "text": "Der Baum darf nicht brennen"
+  }
+ ]
+}

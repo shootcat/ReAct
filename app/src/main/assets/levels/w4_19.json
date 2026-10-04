@@ -1,0 +1,74 @@
+{
+ "id": "w4_19",
+ "title": "Gletscher",
+ "world": 4,
+ "intro": "",
+ "map": [
+  "...%~~~%...",
+  "e..%%j%%...",
+  "%%%%%:%....",
+  "...%e:%....",
+  "...%%:.....",
+  "....%.%%%..",
+  "....%G%%%.X",
+  "%%%%%%%%%%%",
+  ".S.......K.",
+  "%%.......%.",
+  "%~~~%......",
+  "%~~~%...S..",
+  "%%%%%..%%%.",
+  "%%%%%.X%...",
+  "%%%%%%%%...",
+  ".........b.",
+  "%%%%%%%%%%%"
+ ],
+ "legend": {
+  "G": {
+   "type": "EMBER_ROCK"
+  },
+  "K": {
+   "type": "SALT",
+   "isMovable": true
+  },
+  "S": {
+   "type": "STONE",
+   "isMovable": true
+  },
+  "X": {
+   "type": "FROST"
+  },
+  "b": {
+   "type": "BIG_FIRE"
+  },
+  "e": {
+   "type": "SEED"
+  },
+  "j": {
+   "type": "ICE",
+   "properties": {
+    "gravity": false
+   }
+  },
+  "~": {
+   "type": "WATER"
+  }
+ },
+ "goals": [
+  {
+   "type": "state",
+   "object": "seed_4_3",
+   "state": "SPROUTED",
+   "text": "Lass den Samen am Schacht keimen"
+  },
+  {
+   "type": "state",
+   "object": "seed_0_1",
+   "state": "SPROUTED",
+   "text": "Lass den Samen oben keimen"
+  },
+  {
+   "type": "extinguish",
+   "text": "Lösche das große Feuer"
+  }
+ ]
+}

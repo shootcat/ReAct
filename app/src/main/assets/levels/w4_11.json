@@ -1,0 +1,60 @@
+{
+ "id": "w4_11",
+ "title": "Süßer Schnee",
+ "world": 4,
+ "intro": "",
+ "map": [
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  ".N...K.S...",
+  "%%%%%%%%%%%",
+  "...%.......",
+  "...%.......",
+  "...%.......",
+  "#.#%.##====",
+  "#e#%f##====",
+  "###########",
+  "###########",
+  "###########"
+ ],
+ "legend": {
+  "=": {
+   "type": "SEAWATER"
+  },
+  "K": {
+   "type": "SALT",
+   "isMovable": true
+  },
+  "N": {
+   "type": "SNOW",
+   "isMovable": true
+  },
+  "S": {
+   "type": "STONE",
+   "isMovable": true
+  },
+  "e": {
+   "type": "SEED"
+  },
+  "f": {
+   "type": "FIRE"
+  }
+ },
+ "goals": [
+  {
+   "type": "extinguish",
+   "text": "Lösche das Feuer"
+  },
+  {
+   "type": "state",
+   "object": "seed_1_13",
+   "state": "SPROUTED",
+   "text": "Lass den Samen keimen"
+  }
+ ]
+}

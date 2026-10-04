@@ -57,7 +57,7 @@ class LevelFilesTest {
         val types = Levels.catalog.types
         val texts = Levels.catalog.rules.associate { it.id to Reactions.describe(it, types).text }
         assertEquals("Hitze + Eis → Wasser", texts["heat_melts_ice"])
-        assertEquals("Wasser + Feuer → Dampf", texts["water_douses_fire"])
+        assertEquals("Wasser + Flamme → Dampf", texts["water_douses_fire"])
         assertTrue(Levels.catalog.rules.all { it.world in 1..4 })
         assertTrue(Levels.catalog.types.all.all { it.world in 1..4 })
         val flames = Levels.catalog.merges.single { it.id == "flames_merge" }

@@ -1,0 +1,69 @@
+{
+ "id": "w4_17",
+ "title": "Dampfwerk",
+ "world": 4,
+ "intro": "",
+ "map": [
+  "%e..%......",
+  "%%%%%..K...",
+  ".%~~~~%%%..",
+  ".%%%j%%....",
+  "...%:%.....",
+  "...%:%.....",
+  "...%:%.F...",
+  ".%%%.%%%%%.",
+  ".%.........",
+  ".%~~~~~%.X%",
+  ".%%%%%%%%%%",
+  ".S.........",
+  "%%.........",
+  "%~~~%......",
+  "%%%%%.X....",
+  "%%%%%%%..b.",
+  "%%%%%%%%%%%"
+ ],
+ "legend": {
+  "F": {
+   "type": "FIRE",
+   "isMovable": true
+  },
+  "K": {
+   "type": "SALT",
+   "isMovable": true
+  },
+  "S": {
+   "type": "STONE",
+   "isMovable": true
+  },
+  "X": {
+   "type": "FROST"
+  },
+  "b": {
+   "type": "BIG_FIRE"
+  },
+  "e": {
+   "type": "SEED"
+  },
+  "j": {
+   "type": "ICE",
+   "properties": {
+    "gravity": false
+   }
+  },
+  "~": {
+   "type": "WATER"
+  }
+ },
+ "goals": [
+  {
+   "type": "state",
+   "object": "seed_1_0",
+   "state": "SPROUTED",
+   "text": "Lass den Samen keimen"
+  },
+  {
+   "type": "extinguish",
+   "text": "Lösche das große Feuer"
+  }
+ ]
+}

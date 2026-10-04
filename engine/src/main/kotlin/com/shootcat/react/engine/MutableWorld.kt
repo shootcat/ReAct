@@ -85,9 +85,9 @@ internal class MutableWorld(private val base: GameState) {
         if (cues.none { it.sound == sound }) cues += Cue(sound, at)
     }
 
-    fun spawn(type: String, at: Position, types: TypeCatalog, amount: Int? = null): GameObject {
+    fun spawn(type: String, at: Position, types: TypeCatalog, amount: Int? = null, isMovable: Boolean = false): GameObject {
         spawnCounter++
-        val o = types.create(id = "${type.lowercase()}#$spawnCounter", type = type, position = at, amount = amount)
+        val o = types.create(id = "${type.lowercase()}#$spawnCounter", type = type, position = at, amount = amount, isMovable = isMovable)
         put(o)
         return o
     }
