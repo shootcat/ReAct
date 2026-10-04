@@ -1,0 +1,62 @@
+{
+ "id": "w2_17",
+ "title": "Löschflamme",
+ "world": 2,
+ "intro": "",
+ "map": [
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  ".%%%.S..F..",
+  "%%.%%%%%%%.",
+  "%......%...",
+  "%......%...",
+  "%......%..f",
+  "%......%%=%",
+  "%.e....%%=%",
+  "%%%%%==%%%%",
+  "%%%%%==%%%%",
+  "F%%%%%%%%%F",
+  "%%%%%%%%%%%",
+  "###########",
+  "###########"
+ ],
+ "legend": {
+  "=": {
+   "type": "SEAWATER"
+  },
+  "F": {
+   "type": "FIRE",
+   "isMovable": true
+  },
+  "S": {
+   "type": "STONE",
+   "isMovable": true
+  },
+  "e": {
+   "type": "SEED"
+  },
+  "f": {
+   "type": "FIRE"
+  }
+ },
+ "goals": [
+  {
+   "type": "state",
+   "object": "seed_2_10",
+   "state": "SPROUTED",
+   "text": "Lass den Samen keimen"
+  },
+  {
+   "type": "extinguish",
+   "text": "Lösche das Feuer auf der Klippe",
+   "area": [
+    8,
+    6,
+    10,
+    8
+   ]
+  }
+ ]
+}

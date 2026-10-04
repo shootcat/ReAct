@@ -43,3 +43,51 @@ w1_20 [] wood_2_12@8,11 stone_9_8@1,12 ice_10_8@3,13 fire_1_8@0,8 fire_0_8@2,12
 w1_bonus min=4
 w1_bonus [2,3] wood_2_12@8,11 stone_3_12@1,12 fire_1_8@0,8 fire_0_8@2,12
 w1_bonus [3] wood_2_12@8,11 stone_3_12@1,12 fire_1_8@0,8 fire_0_8@9,8 fire_0_8@2,12
+w2_01 min=1
+w2_01 [] stone_1_7@3,9
+w2_02 min=2
+w2_02 [] fire_0_13@10,13 fire_10_13@2,11
+w2_03 min=1
+w2_03 [] fire_0_10@1,7
+w2_04 min=1
+w2_04 [] fire_0_9@3,6
+w2_05 min=2
+w2_05 [] sand_9_6@2,11 stone_7_6@5,10
+w2_05 [] stone_7_6@2,11 sand_9_6@5,10
+w2_06 min=2
+w2_06 [] stone_0_5@2,7 stone_2_5@5,11
+w2_06 [] stone_0_5@5,11 stone_2_5@6,11
+w2_07 min=2
+w2_07 [] fire_2_5@8,5 fire_8_5@4,11
+w2_08 min=2
+w2_08 [] fire_0_5@10,5 fire_10_5@4,11
+w2_09 min=2
+w2_09 [] sand_1_7@2,9 stone_9_7@8,11
+w2_10 min=2
+w2_10 [] fire_0_13@10,13 fire_10_13@6,10
+w2_11 min=3
+w2_11 [] seawater_1_6@5,6 seawater_9_6@5,6 seawater_5_6@4,12
+w2_12 min=3
+w2_12 [] stone_10_10@3,10 fire_0_13@10,13 fire_10_13@4,10
+w2_12 [] fire_0_13@10,13 stone_10_10@3,10 fire_10_13@4,10
+w2_13 min=3
+w2_13 [] sand_8_4@8,12 stone_0_4@2,6 stone_2_4@5,10
+w2_14 min=3
+w2_14 [] wood_0_13@10,13 wood_10_13@5,10 fire_8_4@5,9
+w2_15 min=3
+w2_15 [] stone_5_5@8,7 fire_0_5@10,5 fire_10_5@3,11
+w2_16 min=4
+w2_16 [] fire_0_13@10,13 stone_5_4@3,10 fire_10_13@4,10 sand_8_4@9,7
+w2_16 [] fire_0_13@10,13 sand_8_4@3,10 fire_10_13@4,10 stone_5_4@9,7
+w2_17 min=4
+w2_17 [] fire_0_13@10,13 stone_5_4@3,10 fire_10_13@4,10 fire_8_4@9,9
+w2_18 min=4
+w2_18 [] stone_3_5@8,7 sand_7_5@6,11 fire_0_5@10,5 fire_10_5@5,11
+w2_18 [] sand_7_5@6,11 stone_3_5@8,7 fire_10_5@0,5 fire_0_5@5,11
+w2_19 min=5
+w2_19 [] stone_3_2@8,4 sand_7_2@6,7 fire_0_2@10,2 fire_10_2@5,7 fire_2_12@8,13
+w2_20 min=6
+w2_20 [] stone_3_3@8,5 sand_7_3@6,8 fire_0_3@10,3 fire_10_3@5,8 seawater_1_13@6,13 seawater_6_13@8,14
+w2_bonus min=3
+w2_bonus [2,3] fire_0_10@10,10 stone_5_1@3,7 fire_10_10@4,7 fire_2_13@8,14
+w2_bonus [3] fire_0_10@10,10 fire_10_10@7,7 fire_2_13@8,14

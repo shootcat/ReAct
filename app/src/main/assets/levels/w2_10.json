@@ -1,0 +1,54 @@
+{
+ "id": "w2_10",
+ "title": "Die Mitte",
+ "world": 2,
+ "intro": "",
+ "map": [
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "..%%%......",
+  "%%%.%%%%%%%",
+  "%.........%",
+  "%.........%",
+  "%.........%",
+  "%......i..%",
+  "%..e...%..%",
+  "%%%%==%%..%",
+  "%%%%==%%.e%",
+  "F%%%%%%%%%F",
+  "###########",
+  "###########",
+  "###########"
+ ],
+ "legend": {
+  "=": {
+   "type": "SEAWATER"
+  },
+  "F": {
+   "type": "FIRE",
+   "isMovable": true
+  },
+  "e": {
+   "type": "SEED"
+  },
+  "i": {
+   "type": "ICE"
+  }
+ },
+ "goals": [
+  {
+   "type": "state",
+   "object": "seed_3_10",
+   "state": "SPROUTED",
+   "text": "Lass den Samen unter dem Felsen keimen"
+  },
+  {
+   "type": "state",
+   "object": "seed_9_12",
+   "state": "SPROUTED",
+   "text": "Lass den Samen in der Senke keimen"
+  }
+ ]
+}

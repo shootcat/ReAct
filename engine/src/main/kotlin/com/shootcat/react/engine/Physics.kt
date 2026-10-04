@@ -6,6 +6,7 @@ import com.shootcat.react.engine.model.Props
 import com.shootcat.react.engine.model.TypeCatalog
 import com.shootcat.react.engine.model.WindZone
 import kotlin.math.max
+import kotlin.math.abs
 import kotlin.math.min
 
 /**
@@ -302,7 +303,9 @@ internal object Physics {
 
     /**
      * Where enough gas gathers in one row under an obstacle (rock, a tree, a full cloud), that row
-     * condenses into a cloud in its middle. The open sky is no obstacle: there the gas escapes.
+     * condenses into a cloud in its middle. The open sky is no obstacle: there the gas escapes. Gas
+     * that can still rise further – the row ends beside an opening upwards, like a chimney – keeps
+     * flowing there first, so clouds form at the highest point.
      */
     private fun condense(world: MutableWorld, types: TypeCatalog) {
         if (world.all().none { condensable(it) }) return
@@ -326,8 +329,16 @@ internal object Physics {
             row.forEach { done += it.id }
             val total = row.sumOf { it.amount }
             if (total < start.int(Props.CONDENSE_AT, start.capacity)) continue
-
+            val y = start.position.y
+            if (canRise(world, Position(row.minOf { it.position.x } - 1, y)) || canRise(world, Position(row.maxOf { it.position.x } + 1, y))) continue
+            // A cloud close by that still has room takes the steam in instead.
             val cloudType = start.string(Props.CONDENSE)!!
+            val joins = world.all().any { c ->
+                c.type == cloudType && c.amount < c.capacity &&
+                    row.any { abs(it.position.x - c.position.x) + abs(it.position.y - c.position.y) <= FEED_RANGE }
+            }
+            if (joins) continue
+
             val ratio = start.int(Props.CONDENSE_RATIO, 2)
             val units = min(total / ratio, world.fluidCapacity(cloudType, types))
             val sorted = row.sortedBy { it.position.x }
@@ -339,6 +350,12 @@ internal object Physics {
             if (leftover > 0 && beside != null) world.spawn(start.type, beside.position, types, amount = leftover)
             world.cue("condense", middle.position)
         }
+    }
+
+    /** Gas next to [p] would move on through it and up: [p] is open (or gas) and so is the cell above it. */
+    private fun canRise(world: MutableWorld, p: Position): Boolean {
+        fun open(c: Position) = world.inBounds(c) && !world.isWall(c) && world.at(c).let { it == null || it.isGas }
+        return open(p) && open(p.up())
     }
 
     /** Wind carries clouds one cell per step; a cloud that drifts into another of its kind joins it. */
