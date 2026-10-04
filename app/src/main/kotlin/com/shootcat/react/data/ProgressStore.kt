@@ -12,6 +12,10 @@ data class Progress(
     /** Indices of the optional goals of [levelId] that were achieved at least once. */
     fun extrasFor(levelId: String): Set<Int> =
         extras.filter { it.startsWith("$levelId/") }.mapNotNull { it.substringAfter('/').toIntOrNull() }.toSet()
+
+    /** The progress without levels that no longer exist (an earlier level set); discoveries stay. */
+    fun onlyLevels(levelIds: Set<String>): Progress =
+        copy(completed = completed.filter { it in levelIds }.toSet(), extras = extras.filter { it.substringBefore('/') in levelIds }.toSet())
 }
 
 class ProgressStore(context: Context) {

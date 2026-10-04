@@ -175,6 +175,7 @@ object LevelLoader {
             wind = wind,
             merges = world.merges,
             placement = placement,
+            look = dto.look?.also { if (it !in 1..4) fail("$where: look $it is not 1 to 4") } ?: dto.world,
         )
     }
 
@@ -419,6 +420,8 @@ object LevelLoader {
         @SerialName("max_steps") val maxSteps: Int = 200,
         /** "marked": things may only be put down on the placement fields ('+'). */
         val placement: String? = null,
+        /** The landscape to draw the level in (1–4); the level's world by default. */
+        val look: Int? = null,
     )
 
     @Serializable

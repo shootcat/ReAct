@@ -156,7 +156,12 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun load(app: Application): GameUiState =
         try {
-            GameUiState(content = GameRepository.load(app), progress = store.load(), settings = settingsStore.load())
+            val content = GameRepository.load(app)
+            // Progress in levels that no longer exist is dropped for good.
+            val stored = store.load()
+            val progress = stored.onlyLevels(content.worlds.flatMap { it.allLevelIds }.toSet())
+            if (progress != stored) store.save(progress)
+            GameUiState(content = content, progress = progress, settings = settingsStore.load())
         } catch (e: Exception) {
             GameUiState(loadError = e.message ?: e.toString())
         }
@@ -165,7 +170,17 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         when (event) {
             is GameEvent.OpenLevel -> openLevel(event.levelId)
             GameEvent.OpenTitle -> leaveLevel(Screen.TITLE)
-            GameEvent.OpenWorlds -> leaveLevel(Screen.WORLDS)
+            GameEvent.OpenWorlds -> {
+                // With a single world there is nothing to choose: straight to its map.
+                val only = _state.value.content?.worlds?.singleOrNull()
+                if (only != null) {
+                    leaveLevel(Screen.MAP)
+                    _state.update { it.copy(worldNumber = only.world) }
+                    sound.setTrack(only.world)
+                } else {
+                    leaveLevel(Screen.WORLDS)
+                }
+            }
             is GameEvent.OpenWorld -> {
                 if (_state.value.isWorldUnlocked(event.number)) {
                     leaveLevel(Screen.MAP)
@@ -229,7 +244,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
             st.completion != null -> onEvent(GameEvent.DismissCompletion)
             st.screen == Screen.DISCOVERIES || st.screen == Screen.SETTINGS -> onEvent(GameEvent.CloseOverlay)
             st.screen == Screen.LEVEL -> onEvent(GameEvent.OpenMap)
-            st.screen == Screen.MAP -> onEvent(GameEvent.OpenWorlds)
+            st.screen == Screen.MAP -> onEvent(if (st.content?.worlds?.size == 1) GameEvent.OpenTitle else GameEvent.OpenWorlds)
             st.screen == Screen.WORLDS -> onEvent(GameEvent.OpenTitle)
             else -> Unit
         }
@@ -261,7 +276,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         val sim = LiveSimulation(level, RuleEngine(content.types, level.rules, wind = level.wind))
         live = sim
         val world = content.worldOf(levelId)?.world ?: st.worldNumber
-        sound.setTrack(world)
+        sound.setTrack(level.look)
         _state.update {
             it.copy(screen = Screen.LEVEL, session = LevelSession(level, sim.start()), completion = null, worldNumber = world)
         }

@@ -182,7 +182,7 @@ fun Board(
     }
 
     val landscape = remember(state.width, state.height, state.walls, level.id) {
-        Landscape(state, level.terrain, level.world, WorldLooks.of(level.world))
+        Landscape(state, level.terrain, level.look, WorldLooks.of(level.look))
     }
     val hover = drag?.let { it.objectId to it.hover }
     val dropPreview = remember(hover, state) { hover?.let { (id, p) -> previewDrop(id, p) } }

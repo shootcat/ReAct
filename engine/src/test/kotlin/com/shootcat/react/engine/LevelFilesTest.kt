@@ -11,13 +11,23 @@ import kotlin.test.assertTrue
 class LevelFilesTest {
 
     @Test
-    fun `four worlds with twenty levels and a bonus level each, all on their map`() {
-        assertEquals(listOf(1, 2, 3, 4), Levels.worlds.map { it.world })
-        for (w in Levels.worlds) {
-            assertEquals((1..20).map { "w${w.world}_%02d".format(it) }, w.levelIds, "world ${w.world}")
-            assertEquals("w${w.world}_bonus", w.bonusLevelId)
-            assertEquals(w.allLevelIds.toSet(), w.map.map { it.levelId }.toSet(), "map of world ${w.world}")
-            assertNotNull(w.icon)
+    fun `one world, the exam, with its levels in order and all on its map`() {
+        val w = Levels.worlds.single()
+        assertEquals(1, w.world)
+        assertEquals("Prüfung", w.title)
+        assertTrue(w.levelIds.size <= 10, "at most ten levels")
+        assertEquals(w.levelIds.indices.map { "p_%02d".format(it + 1) }, w.levelIds)
+        assertEquals(null, w.bonusLevelId)
+        assertEquals(w.allLevelIds.toSet(), w.map.map { it.levelId }.toSet())
+        assertNotNull(w.icon)
+    }
+
+    @Test
+    fun `every level of the exam puts things down on placement fields only`() {
+        for (id in Levels.allLevelIds) {
+            val level = Levels.level(id)
+            val fields = assertNotNull(level.placement, "$id uses marked placement")
+            assertTrue(fields.size in 3..12, "$id has ${fields.size} placement fields")
         }
     }
 
@@ -62,20 +72,6 @@ class LevelFilesTest {
         assertTrue(Levels.catalog.types.all.all { it.world in 1..4 })
         val flames = Levels.catalog.merges.single { it.id == "flames_merge" }
         assertEquals("BIG_FIRE", flames.result)
-    }
-
-    @Test
-    fun `every element appears in a level of its world or later`() {
-        val used = Levels.allLevelIds.flatMap { id -> Levels.level(id).objects.map { it.type to Levels.world(id).world } }
-        // Things the world itself creates do not need to be placed.
-        val created = (Levels.catalog.rules.mapNotNull { it.effect.spawnObject } + Levels.catalog.merges.map { it.result } +
-            Levels.catalog.types.all.mapNotNull { it.properties["condense"] }).toSet()
-        for (type in Levels.catalog.types.all) {
-            if (type.id in created) continue
-            val worlds = used.filter { it.first == type.id }.map { it.second }
-            assertTrue(worlds.isNotEmpty(), "${type.id} is used somewhere")
-            assertTrue(worlds.min() >= type.world, "${type.id} appears before its world ${type.world}")
-        }
     }
 
     private val world by lazy { Levels.worlds.first() }

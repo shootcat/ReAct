@@ -42,11 +42,14 @@ class DeterminismTest {
 
     @Test
     fun `undoing and replaying a move in live mode gives the same world`() {
-        val level = Levels.level("w1_01")
+        val level = Levels.inline(
+            listOf("..........", ".F.....i..", "%%%%%%%%..", "..........", "%%%%%%%%%%"),
+            "\"F\": {\"type\": \"FIRE\", \"isMovable\": true}, \"i\": {\"type\": \"ICE\"}",
+        )
         val live = Levels.live(level)
         val start = live.start()
-        val first = live.play(start, "fire_1_11", com.shootcat.react.engine.model.Position(7, 9))!!
-        val again = live.play(start, "fire_1_11", com.shootcat.react.engine.model.Position(7, 9))!!
+        val first = live.play(start, "fire_1_1", com.shootcat.react.engine.model.Position(6, 1))!!
+        val again = live.play(start, "fire_1_1", com.shootcat.react.engine.model.Position(6, 1))!!
         assertEquals(first, again)
     }
 }

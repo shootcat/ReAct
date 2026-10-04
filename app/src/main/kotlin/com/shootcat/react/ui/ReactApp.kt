@@ -103,7 +103,7 @@ fun ReactApp(viewModel: GameViewModel) {
                         onOpenLevel = { onEvent(GameEvent.OpenLevel(it)) },
                         onOpenLog = { onEvent(GameEvent.OpenDiscoveries) },
                         onOpenSettings = { onEvent(GameEvent.OpenSettings) },
-                        onBack = { onEvent(GameEvent.OpenWorlds) },
+                        onBack = { onEvent(GameEvent.Back) },
                     )
                 }
 

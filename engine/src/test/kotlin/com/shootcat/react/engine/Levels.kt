@@ -34,6 +34,22 @@ object Levels {
 
     fun live(level: LevelData): LiveSimulation = LiveSimulation(level, engine(level))
 
+    /**
+     * A small level written right in a test, with the real elements: [map] rows, [legend] as JSON members
+     * ("\"S\": {\"type\": \"STONE\", \"isMovable\": true}"), and [goals] as JSON objects.
+     */
+    fun inline(
+        map: List<String>,
+        legend: String,
+        goals: String = "{\"type\": \"extinguish\", \"text\": \"Lösche das Feuer\"}",
+        extra: String = "",
+    ): LevelData {
+        val rows = map.joinToString(", ") { "\"$it\"" }
+        val world = worlds.first()
+        val json = """{"id": "test", "title": "Test", "world": ${world.world}, "map": [$rows], "legend": {$legend}, "goals": [$goals]$extra}"""
+        return LevelLoader.parseLevel(json, world)
+    }
+
     /** [achieved]: indices of the optional goals met when the level was solved. */
     class Attempt(val run: Run, val steps: Int, val achieved: Set<Int>) {
         val solved: Boolean get() = run.outcome == Outcome.SUCCESS

@@ -78,8 +78,7 @@ fun DiscoveryScreen(
         ) {
             for ((world, list) in byWorld) {
                 item(key = "world_$world") {
-                    val title = content.world(world)?.title
-                    SectionTitle(if (title != null) "Welt $world · $title" else "Welt $world")
+                    SectionTitle(FAMILIES[world] ?: content.world(world)?.title ?: "Weitere")
                 }
                 items(list, key = { it.ruleId }) { reaction ->
                     ReactionCard(reaction, reaction.ruleId in progress.discoveries, types, merge = reaction.ruleId in merges)
@@ -163,3 +162,11 @@ private fun MaterialRow(type: ObjectType, types: TypeCatalog) {
         }
     }
 }
+
+/** The element families the reactions belong to (the "world" a rule was introduced in). */
+private val FAMILIES = mapOf(
+    1 to "Wald · Feuer, Wasser, Holz",
+    2 to "Küste · Meer und Sand",
+    3 to "Vulkan · Lava und Glut",
+    4 to "Frost · Eis, Schnee, Salz",
+)
