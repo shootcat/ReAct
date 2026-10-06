@@ -44,7 +44,16 @@ class LevelAnalysis(private val level: LevelData, engine: RuleEngine) {
     private val canonical = ConcurrentHashMap<Key, Run>()
     private val unsolvableWithin = ConcurrentHashMap<Key, Int>()
 
-    private fun key(run: Run) = Key(run.state.objects, run.latched)
+    private fun key(run: Run) = Key(canonical(run.state.objects), run.latched)
+
+    /**
+     * Things the world made itself (melt water, steam, ice) are numbered in the order they appeared, so the
+     * same world reached in a different order would look different. Their numbers do not matter: drop them.
+     */
+    private fun canonical(objects: List<GameObject>): List<GameObject> =
+        if (objects.none { SPAWNED in it.id }) objects
+        else objects.map { if (SPAWNED in it.id) it.copy(id = SPAWNED) else it }
+            .sortedWith(compareBy<GameObject>({ it.id }, { it.position.y }, { it.position.x }))
 
     private fun solved(run: Run) = run.outcome == Outcome.SUCCESS
 
@@ -236,6 +245,10 @@ class LevelAnalysis(private val level: LevelData, engine: RuleEngine) {
     fun startsSolution(move: Move, length: Int): Boolean {
         val after = live.play(start, move.objectId, move.to) ?: return false
         return solved(after) || (length > 1 && solvable(after, length - 1))
+    }
+
+    private companion object {
+        const val SPAWNED = "#"
     }
 
     private fun com.shootcat.react.engine.model.Area.cells(): List<Position> =
