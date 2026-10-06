@@ -15,7 +15,7 @@ class LevelFilesTest {
         val w = Levels.worlds.single()
         assertEquals(1, w.world)
         assertEquals("Prüfung", w.title)
-        assertTrue(w.levelIds.size <= 10, "at most ten levels")
+        assertEquals(10, w.levelIds.size, "ten levels")
         assertEquals(w.levelIds.indices.map { "p_%02d".format(it + 1) }, w.levelIds)
         assertEquals(null, w.bonusLevelId)
         assertEquals(w.allLevelIds.toSet(), w.map.map { it.levelId }.toSet())
