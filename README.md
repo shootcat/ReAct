@@ -4,18 +4,24 @@
 
 REACT ist ein deterministisches 2D-Logik-Puzzle für Android über die Kräfte der Natur. Jedes Level ist ein Schnitt durch eine Landschaft: Feuer, Wasser, Dampf, Wolken, Erde und Stein folgen festen Regeln. Jede Bewegung des Spielers setzt die Welt sofort in Gang – man sieht live, wie Eis schmilzt, Wasser in Mulden läuft, Dampf aufsteigt und als Regen wiederkommt.
 
-**Stand:** Live-Simulation mit Rückgängig/Wiederholen, Ziehen-und-Verschmelzen, Aufgaben mit Sternen, Wasserkreislauf, Geräusche und Musik – und **vier Welten mit je 20 Leveln plus Bonuslevel**. Alle 84 Level haben eine bewiesene Mindestzugzahl.
+**Stand:** Live-Simulation mit Rückgängig/Wiederholen, Ziehen-und-Verschmelzen, Aufgaben mit Sternen, Wasserkreislauf, Geräusche und Musik. Die alten 84 Level sind ersetzt durch die Welt **„Prüfung“**: zehn neu entworfene Level (`p_01` … `p_10`) mit **Ablagefeldern**. Jedes beruht auf einer Einsicht, und jedes hat eine bewiesene Mindestzugzahl. Seine Schwierigkeit misst die vollständige Suche: Lösungen, Sackgassen, naheliegender Zug und Köder. Entwurf und Kennzahlen jedes Levels stehen in [`docs/LEVELDESIGN.md`](docs/LEVELDESIGN.md).
 
-## Welten
+## Welt „Prüfung“
 
-| Welt | Neue Elemente | Kniff |
+| Level | Einsicht | Züge |
 |---|---|---|
-| 1 · Wald | Flamme, großes Feuer, Wasser, Dampf, Wolke, Eis, Stein, Holz, Holzstapel, Samen, Baum | Wärme schmilzt Eis, Wasser lässt Samen keimen und löscht Feuer, Dampf wird zur Wolke, Wind treibt sie, Regen fällt |
-| 2 · Küste | Meerwasser, Sand | Meerwasser ist schwerer als Süßwasser und lässt nichts wachsen, nasser Sand hält Wasser auf, Steine bringen das Meer zum Überlaufen |
-| 3 · Vulkan | Lava, Glutfels, Bimsstein | Lava fließt und erstarrt an Wasser zu Stein, der Glutfels kocht jedes Wasser, Bimsstein schwimmt |
-| 4 · Frost | Frostkristall, Schnee, Salz | Wasser gefriert am Frost zu einem **losen Eisblock**, den man tragen kann; Salz taut Eis und Schnee, macht Wasser aber salzig – und sinkt im Meer wie ein Stein |
+| p_01 „Umweg“ | Dampf steigt auf, wird unter der Decke zur Wolke und regnet dort, wohin kein Wasser fließt | 2 |
+| p_02 „Zu wenig“ | Wasser erst sammeln, dann reicht es | 3 |
+| p_03 „Verdrängung“ | Ein Stein hebt Wasser über den Rand | 3 |
+| p_04 „Tragbares Wasser“ | Am Frost gefrorenes Wasser ist ein Block, den man tragen kann | 4 |
+| p_05 „Salz“ | Salz löst sich in dem, was es zuerst berührt: aus Schnee wird Süßwasser, aus Wasser Meerwasser | 4 |
+| p_06 „Dampfmaschine“ | Der Dampf eines gelöschten Feuers taut das Eis, an das kein Feld heranreicht | 5 |
+| p_07 „Damm aus Sand“ | Erst nasser Sand hält dicht | 5 |
+| p_08 „Opfer“ | Das Feuer schmilzt selbst den Schnee, den man zum Löschen braucht | 6 |
+| p_09 „Fernregen“ | Wolken tragen Wasser; Steine im Windkanal bestimmen, wo sie regnen | 6 |
+| p_10 „Meisterstück“ | Eine Kette aus vier Ideen: vereinen, schmelzen, frieren, tauen | 7 |
 
-Die Schwierigkeit steigt innerhalb jeder Welt von einem Zug bis zu sechs oder sieben Zügen in der richtigen Reihenfolge, mit geteilten Ressourcen und Ketten aus mehreren Reaktionen. Jede Welt knüpft an die vorige an: das zweite Level einer Welt ist etwa so schwer wie das zehnte der vorigen. Höhere Level haben **optionale Aufgaben** (Sterne), z. B. einen Baum nicht zu verbrennen oder mit wenigen Zügen auszukommen. Das **Bonuslevel** jeder Welt öffnet sich, wenn alle 20 Level gelöst sind; die nächste Welt öffnet sich mit dem letzten Level der vorigen.
+Alle Elemente der früheren Welten (Feuer, Wasser, Dampf, Wolke, Eis, Stein, Holz, Samen, Meerwasser, Sand, Lava, Glutfels, Frost, Schnee, Salz …) stehen weiter in `elements.json`; die Prüfung nutzt sie gemischt. Ab Level 3 führt der naheliegende Zug nicht zur Lösung, ab Level 5 liegt ein Köder bereit. Das letzte Level hat einen Stern für die kürzeste Lösung.
 
 ## APK herunterladen
 
@@ -27,7 +33,7 @@ Alle Builds sind mit demselben Schlüssel signiert und installieren sich als Upd
 
 ## Spielen
 
-1. Startbildschirm → **Spielen** → auf der Weltkarte (Wald unten, Frost oben) eine Welt wählen → ein Level wählen.
+1. Startbildschirm → **Spielen** → Welt „Prüfung“ → ein Level wählen.
 2. Bewegliche Dinge liegen auf einem weichen Schatten in einem hellen Rahmen. Man zieht sie – oder tippt sie an und dann das Zielfeld. Man muss nicht genau treffen.
 3. **Ziehen und Verschmelzen:** zwei Flammen werden ein großes Feuer, zwei Hölzer ein Holzstapel, Wasser auf Wasser wird tiefes Wasser. Was nicht zusammenpasst, prallt ab – oder reagiert, wenn es eine Regel dafür gibt (eine Flamme neben Eis landet daneben und schmilzt es). Beim Ziehen zeigt das Zielfeld, was passieren wird.
 4. Die Welt reagiert **sofort** und läuft Schritt für Schritt, bis alles ruht.
@@ -44,6 +50,8 @@ Alle Builds sind mit demselben Schlüssel signiert und installieren sich als Upd
 Ohne `"placement"` gilt das alte Verhalten: jedes freie, bebaubare Feld.
 
 Das Spielfeld skaliert auf jede Bildschirmgröße und hält ringsum mindestens 20 dp Abstand (mehr, wo die Zurück-Geste des Systems weiter hereinreicht). Überschüssige Höhe wird zu mehr Himmel und mehr Erde.
+
+**Zoom:** Mit zwei Fingern lässt sich das Spielfeld bis auf das Dreifache vergrößern und verschieben, für die breiten Level p_09 (15 Felder) und p_10 (13 Felder). Dabei bleibt kein leerer Rand, und Zusammenziehen zeigt wieder das ganze Feld. Ein Finger zieht und tippt wie immer; kommt ein zweiter dazu, bricht das Ziehen ab.
 
 Das **Entdeckungsbuch** sammelt jede beobachtete Reaktion; unbekannte erscheinen als Silhouette.
 
@@ -67,7 +75,8 @@ app/                        Android-App (Kotlin, Jetpack Compose, MVVM/UDF)
   ui/level/                 Spielfeld, Landschaft, Wasserdarstellung, Aufgaben, „Aufgabe erfüllt“
   audio/SoundManager.kt     Effekte (SoundPool) und Musik je Welt (MediaPlayer)
   data/                     Fortschritt, Einstellungen, Inhalte
-  src/main/assets/levels/   elements.json (Elemente, Regeln, Verschmelzungen), world_01–04.json, w1_01 … w4_bonus.json
+  src/main/assets/levels/   elements.json (Elemente, Regeln, Verschmelzungen), world_01.json, p_01 … p_10.json
+docs/LEVELDESIGN.md         Entwurf jedes Levels: Einsicht, Falle, Lösung, Hebel, Kennzahlen, Abweichungen, Startbild
 ```
 
 ## Engine-Regeln
@@ -81,7 +90,7 @@ Pro Schritt sind höchstens **100 Regel-Transformationen** erlaubt; darüber bri
 
 Es gibt keine Level-Sonderfälle im Code: alles kommt aus den JSON-Dateien. Elemente werden über Eigenschaften beschrieben (`gravity`, `liquid`, `gas`, `density`, `heat`, `heat_radius`, `fuel`, `granular`, `condense`, `cloud` …). Level sind ASCII-Landschaften mit Legende: `#` Erde, `%` Fels, `.` frei, `:` frei, aber nicht bebaubar, `+` Ablagefeld; Großbuchstaben sind bewegliche Dinge (`isMovable`), Kleinbuchstaben gehören zur Landschaft. Ziele: `fill`, `extinguish`, `rain`, `state`, `preserve`, `clear` und `max_moves`, jeweils optional als Stern.
 
-Die Musterlösungen aller Level stehen in `engine/src/test/resources/walkthroughs.txt` (`w4_02 min=2`, `w1_01 [1] fire_1_11@7,9` – in Klammern die erreichten optionalen Aufgaben). Der Test spielt jede Lösung durch, prüft die Sterne und beweist per Breitensuche, dass es keine kürzere Lösung gibt (vollständig bei Leveln mit Ablagefeldern, sonst bis zwei Züge tief).
+Die Musterlösungen aller Level stehen in `engine/src/test/resources/walkthroughs.txt` (`p_02 min=3`, `p_10 [2] fire_1_5@8,6 …` – in Klammern die erreichten optionalen Aufgaben). Der Test spielt jede Lösung durch, prüft die Sterne und beweist per Breitensuche, dass es keine kürzere Lösung gibt (vollständig bei Leveln mit Ablagefeldern, sonst bis zwei Züge tief).
 
 ## Schwierigkeit
 
@@ -91,9 +100,26 @@ Für Level mit Ablagefeldern misst `DifficultyReportTest` per vollständiger Suc
 2. **Lösungen**: Anzahl verschiedener Lösungen in Mindestlänge; Reihenfolge-Varianten zählen einzeln.
 3. **Sackgassen**: Anteil der möglichen ersten Züge, nach denen das Level nicht mehr lösbar ist (Suche bis Mindestzüge plus zwei).
 4. **Naheliegender Zug**: ein bewegliches Objekt auf das Ablagefeld, das dem Hauptziel am nächsten liegt. Ab Level 3 darf er keine Mindestlösung beginnen.
-5. **Köder**: bewegliche Objekte, die in keiner Mindestlösung vorkommen oder dort nie auf ihrem naheliegenden Feld landen. Ab Level 5 Pflicht.
+5. **Köder**: bewegliche Objekte, die in keiner Mindestlösung vorkommen, oder solche, die die Lösung für etwas anderes braucht als ihren offensichtlichen Zweck. Letztere stehen mit Begründung in `REPURPOSED` im Test, etwa der Tropfen in p_08, der nicht löscht, sondern auffängt. Ab Level 5 Pflicht.
 
-Der Test prüft die Kurve je Levelnummer (1–2: 2–3 Züge; 3–4: 3–4 Züge, mindestens 30 % Sackgassen; 5–7: 4–6 Züge, 40 %; 8–10: 6–8 Züge, 50 %) und schreibt die Tabelle nach `engine/build/difficulty.md`. Für Level mit Ablagefeldern beweist `WalkthroughTest` die Mindestzugzahl vollständig, für alte Level ohne Ablagefelder nur bis zwei Züge tief.
+Die Suche verwirft Welten, in denen ein Hauptziel nicht mehr erreichbar ist, etwa wenn der Samen verbrannt ist. Welten, die sich nur in den Nummern selbst entstandener Dinge unterscheiden (Schmelzwasser, Dampf, Eis), zählt sie als eine.
+
+Aktueller Stand (`engine/build/difficulty.md`):
+
+| Level | Mindestzüge | Lösungen | Sackgassen | Naheliegender Zug | Köder |
+|---|---|---|---|---|---|
+| p_01 | 2 | 3 | 44 % (4/9) | führt nicht zur Lösung | – |
+| p_02 | 3 | 2 | 75 % (6/8) | führt nicht zur Lösung | – |
+| p_03 | 3 | 8 | 33 % (4/12) | führt nicht zur Lösung | – |
+| p_04 | 4 | 4 | 33 % (4/12) | führt nicht zur Lösung | – |
+| p_05 | 4 | 8 | 50 % (12/24) | führt nicht zur Lösung | fire_9_5, water_7_2 |
+| p_06 | 5 | 32 | 45 % (9/20) | führt nicht zur Lösung | salt_2_1 |
+| p_07 | 5 | 4 | 50 % (3/6) | führt nicht zur Lösung | water_1_2 |
+| p_08 | 6 | 9 | 50 % (6/12) | führt nicht zur Lösung | water_3_5 |
+| p_09 | 6 | 10 | 83 % (10/12) | führt nicht zur Lösung | stone_7_9 |
+| p_10 | 7 | 12 | 52 % (10/19) | führt nicht zur Lösung | water_10_6 |
+
+Der Test prüft die Kurve je Levelnummer (1–2: 2–3 Züge; 3–4: 3–4 Züge, mindestens 30 % Sackgassen; 5–7: 4–6 Züge, 40 %; 8–10: 6–8 Züge, 50 %) und schreibt die Tabelle nach `engine/build/difficulty.md`. `WalkthroughTest` beweist die Mindestzugzahl jedes Levels vollständig.
 
 ## Bauen und testen
 
