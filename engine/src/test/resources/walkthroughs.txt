@@ -11,3 +11,5 @@ p_05 min=4
 p_05 [] water_5_2@2,4 frost_7_5@2,4 ice#1@6,6 snow_9_2@9,8
 p_06 min=5
 p_06 [] fire_3_2@1,4 water_1_2@1,4 water_6_2@1,4 water_8_2@1,4 water_6_2@8,11
+p_07 min=5
+p_07 [] sand_9_11@8,1 water_1_2@8,1 sand_9_11@8,8 water_3_2@4,4 water_5_2@4,4

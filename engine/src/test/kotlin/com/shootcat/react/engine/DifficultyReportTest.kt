@@ -65,7 +65,9 @@ class DifficultyReportTest {
 
     private companion object {
         /** Things a level's solution uses for something else than their obvious purpose, with the reason. */
-        val REPURPOSED: Map<String, Map<String, String>> = mapOf()
+        val REPURPOSED: Map<String, Map<String, String>> = mapOf(
+            "p_07" to mapOf("water_1_2" to "die kleine Pfütze gehört nicht ins Becken, sie macht den Sand nass"),
+        )
     }
 
     @Test
