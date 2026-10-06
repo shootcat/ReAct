@@ -23,7 +23,8 @@ import kotlin.math.abs
  * many first moves lead into a dead end, whether the obvious move works and which things are bait.
  *
  * Moves that lead to the same world count once. With marked placement only the placement fields and the
- * cells of objects (to merge or react with) are tried, so the search is complete and fast.
+ * cells of objects (to merge or react with) are tried, so the search is complete and fast. A world in
+ * which a main goal can no longer be met (the seed has burnt) is not searched any further.
  */
 class LevelAnalysis(private val level: LevelData, engine: RuleEngine) {
 
@@ -43,6 +44,54 @@ class LevelAnalysis(private val level: LevelData, engine: RuleEngine) {
     private fun key(run: Run) = Key(run.state.objects, run.latched)
 
     private fun solved(run: Run) = run.outcome == Outcome.SUCCESS
+
+    /** Over, or a main goal can no longer be met whatever comes next: nothing more to search here. */
+    private fun lost(run: Run) = (run.outcome != null && !solved(run)) || hopeless(run)
+
+    private val stateGoals = level.goals.withIndex().filter { (_, g) -> !g.optional && (g is TargetState || g is TargetPreserved) }
+    private val reachable = ConcurrentHashMap<Pair<String, String>, Set<String>>()
+
+    /**
+     * A main goal about one thing that can never be met again: the thing is gone, or it is in a state
+     * from which no rule leads to the one asked for (a withered seed never sprouts). Merges can change
+     * what a thing is, so things that merge are never given up on.
+     */
+    private fun hopeless(run: Run): Boolean = stateGoals.any { (index, goal) ->
+        if (index in run.latched) return@any false
+        val (id, wanted, vanishes) = when (goal) {
+            is TargetState -> Triple(goal.objectId, goal.state, goal.vanishes)
+            is TargetPreserved -> Triple(goal.objectId, goal.state, false)
+            else -> return@any false
+        }
+        val o = run.state.objectById(id) ?: return@any !vanishes
+        o.state != wanted && level.merges.none { o.type == it.a || o.type == it.b } &&
+            wanted !in reachable.getOrPut(o.type to o.state) { statesFrom(o) }
+    }
+
+    /** Every state [o] could still get into: through the rules, or through its own physics (burning down). */
+    private fun statesFrom(o: GameObject): Set<String> {
+        val physics = o.properties.filterKeys { it.endsWith("_state") }.values
+        val seen = mutableSetOf(o.state)
+        val queue = ArrayDeque(listOf(o.state))
+        while (queue.isNotEmpty()) {
+            val state = queue.removeFirst()
+            val next = buildList {
+                addAll(physics)
+                for (rule in level.rules) {
+                    val c = rule.conditions
+                    if (c.target == o.type && (c.targetState == null || c.targetState == state)) {
+                        rule.effect.targetState?.let(::add)
+                        rule.elseEffect?.targetState?.let(::add)
+                    }
+                    if ((c.source == null || c.source == o.type) && (c.sourceState == null || c.sourceState == state)) {
+                        rule.effect.sourceState?.let(::add)
+                    }
+                }
+            }
+            for (n in next) if (seen.add(n)) queue += n
+        }
+        return seen
+    }
 
     /** Cells worth dropping something on: placement fields and objects, or every buildable cell. */
     fun targets(state: GameState): List<Position> {
@@ -75,7 +124,7 @@ class LevelAnalysis(private val level: LevelData, engine: RuleEngine) {
             for ((moves, run) in frontier) {
                 for ((m, after) in successors(run)) {
                     if (solved(after)) return moves + m
-                    if (after.outcome == null && seen.add(key(after))) next += (moves + m) to after
+                    if (!lost(after) && seen.add(key(after))) next += (moves + m) to after
                 }
             }
             frontier = next
@@ -86,7 +135,7 @@ class LevelAnalysis(private val level: LevelData, engine: RuleEngine) {
     /** Whether the level can still be solved from [run] with at most [moves] more moves. */
     fun solvable(run: Run, moves: Int): Boolean {
         if (solved(run)) return true
-        if (moves <= 0 || run.outcome != null) return false
+        if (moves <= 0 || lost(run)) return false
         val k = key(run)
         if ((unsolvableWithin[k] ?: -1) >= moves) return false
         for ((_, after) in successors(run)) {
@@ -108,7 +157,7 @@ class LevelAnalysis(private val level: LevelData, engine: RuleEngine) {
                 successors(run).sumOf { (_, after) ->
                     when {
                         solved(after) -> if (left == 1) 1L else 0L
-                        after.outcome != null -> 0L
+                        lost(after) -> 0L
                         else -> count(after, left - 1)
                     }
                 }
@@ -122,7 +171,7 @@ class LevelAnalysis(private val level: LevelData, engine: RuleEngine) {
                 if (listed.size >= keep) return
                 when {
                     solved(after) -> if (left == 1) listed += moves + m
-                    after.outcome == null && count(after, left - 1) > 0 -> collect(after, left - 1, moves + m)
+                    !lost(after) && count(after, left - 1) > 0 -> collect(after, left - 1, moves + m)
                 }
             }
         }
