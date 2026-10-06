@@ -16,3 +16,5 @@ p_07 [] sand_9_11@8,1 water_1_2@8,1 sand_9_11@8,8 water_3_2@4,4 water_5_2@4,4
 p_08 min=6
 p_08 [] snow_7_8@6,9 water_3_5@6,9 stone_7_9@1,4 snow_5_5@6,9 snow_7_8@6,9 water_3_5@9,9
 p_08 [1] water_3_5@1,4 snow_7_8@6,9 water_3_5@6,9 stone_7_9@1,4 snow_5_5@6,9 snow_7_8@6,9 water_3_5@9,9
+p_09 min=6
+p_09 [] fire_3_7@6,7 fire_4_7@6,7 fire_3_7@8,14 fire_3_7@4,14 stone_12_9@8,14 stone_7_9@6,7

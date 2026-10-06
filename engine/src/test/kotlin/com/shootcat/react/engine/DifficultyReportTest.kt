@@ -68,6 +68,7 @@ class DifficultyReportTest {
         val REPURPOSED: Map<String, Map<String, String>> = mapOf(
             "p_07" to mapOf("water_1_2" to "die kleine Pfütze gehört nicht ins Becken, sie macht den Sand nass"),
         "p_08" to mapOf("water_3_5" to "das Wasser des Samens löscht nicht, es fängt das Schmelzwasser auf"),
+        "p_09" to mapOf("stone_7_9" to "der Stein ist kein Hindernis, er hält die volle Wolke fest, bis man sie loslässt"),
         )
     }
 

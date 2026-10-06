@@ -39,6 +39,9 @@ class LevelAnalysis(private val level: LevelData, engine: RuleEngine) {
     val start: Run = live.start()
 
     private val successorCache = ConcurrentHashMap<Key, List<Pair<Move, Run>>>()
+
+    /** One run per world: the search treats runs with the same [Key] alike, so it keeps only one of them. */
+    private val canonical = ConcurrentHashMap<Key, Run>()
     private val unsolvableWithin = ConcurrentHashMap<Key, Int>()
 
     private fun key(run: Run) = Key(run.state.objects, run.latched)
@@ -111,8 +114,13 @@ class LevelAnalysis(private val level: LevelData, engine: RuleEngine) {
                 .toList()
                 .filterNotNull()
             val seen = HashSet<Key>()
-            results.filter { seen.add(key(it.second)) }
+            results.filter { seen.add(key(it.second)) }.map { (m, after) -> m to intern(after) }
         }
+    }
+
+    private fun intern(run: Run): Run {
+        val k = key(run)
+        return canonical[k] ?: canonical.putIfAbsent(k, run.copy(events = emptyList())) ?: canonical.getValue(k)
     }
 
     /** The fewest moves that solve the level, searched up to [limit] moves: one such solution, or null. */
