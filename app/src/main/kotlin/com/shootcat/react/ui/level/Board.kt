@@ -9,6 +9,11 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.withInfiniteAnimationFrameNanos
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateCentroid
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -36,6 +41,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
@@ -45,6 +51,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -89,9 +96,30 @@ private val EDGE = 20.dp
 internal data class BoardLayout(val cell: Float, val origin: Offset) {
     fun cellAt(offset: Offset) = Position(floor((offset.x - origin.x) / cell).toInt(), floor((offset.y - origin.y) / cell).toInt())
 
+    /**
+     * This layout after a two-finger gesture: scaled by [factor] around [focus] and moved by [pan] (canvas
+     * pixels). It never shrinks below the whole grid ([of]) nor grows beyond [MAX_ZOOM] times that, and a
+     * grid larger than the canvas always covers it, so no empty edge opens up.
+     */
+    fun transformed(factor: Float, focus: Offset, pan: Offset, width: Float, height: Float, columns: Int, rows: Int): BoardLayout {
+        val whole = of(width, height, columns, rows)
+        val cell = (cell * factor).coerceIn(whole.cell, whole.cell * MAX_ZOOM)
+        if (cell <= whole.cell) return whole
+        val wanted = focus + pan - (focus - origin) * (cell / this.cell)
+        fun place(wanted: Float, extent: Float, room: Float, spareShare: Float) =
+            if (extent <= room) (room - extent) * spareShare else wanted.coerceIn(room - extent, 0f)
+        return BoardLayout(
+            cell,
+            Offset(place(wanted.x, cell * columns, width, 0.5f), place(wanted.y, cell * rows, height, SKY_SHARE)),
+        )
+    }
+
     companion object {
         /** The share of spare height that goes to the sky above the grid. */
         private const val SKY_SHARE = 0.6f
+
+        /** How far two fingers can zoom in: cells up to this many times their size with the whole grid shown. */
+        const val MAX_ZOOM = 3f
 
         fun of(width: Float, height: Float, columns: Int, rows: Int): BoardLayout {
             val cell = minOf(width / columns, height / rows)
@@ -154,6 +182,8 @@ fun Board(
         label = "slow",
     )
     var drag by remember { mutableStateOf<DragState?>(null) }
+    // The player's zoomed view (two fingers); null shows the whole grid.
+    var view by remember(level.id) { mutableStateOf<BoardLayout?>(null) }
     var selected by remember { mutableStateOf<String?>(null) }
     val shake = remember { Animatable(0f) }
     var shaking by remember { mutableStateOf<String?>(null) }
@@ -220,11 +250,29 @@ fun Board(
                 .size(maxWidth, maxHeight)
                 .clip(RoundedCornerShape(18.dp))
                 .testTag("board")
+                .pointerInput(level.id) {
+                    // Two fingers zoom and pan. They take the touch away from the one-finger drag and tap below.
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                        do {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            val focus = event.calculateCentroid(useCurrent = false)
+                            if (event.changes.count { it.pressed } >= 2 && focus.isSpecified) {
+                                view = layoutOf(currentState, view).transformed(
+                                    event.calculateZoom(), focus, event.calculatePan(),
+                                    size.width.toFloat(), size.height.toFloat(), currentState.width, currentState.height,
+                                )
+                                drag = null
+                                event.changes.forEach { it.consume() }
+                            }
+                        } while (event.changes.any { it.pressed })
+                    }
+                }
                 .pointerInput(interactive) {
                     if (!interactive) return@pointerInput
                     detectDragGestures(
                         onDragStart = { offset ->
-                            val layout = layoutOf(currentState)
+                            val layout = layoutOf(currentState, view)
                             val at = offset - layout.origin
                             val obj = pickMovable(currentState, at, layout.cell, exactFirst = true)
                             if (obj != null) {
@@ -237,7 +285,7 @@ fun Board(
                             val d = drag
                             if (d != null) {
                                 change.consume()
-                                val cell = layoutOf(currentState).cell
+                                val cell = layoutOf(currentState, view).cell
                                 val pointer = d.pointer + amount
                                 drag = d.copy(pointer = pointer, hover = cellAt(dragCenter(pointer, d.grab, cell), cell))
                             }
@@ -254,7 +302,7 @@ fun Board(
                     if (!interactive) return@pointerInput
                     detectTapGestures(
                         onTap = { tap ->
-                            val layout = layoutOf(currentState)
+                            val layout = layoutOf(currentState, view)
                             val offset = tap - layout.origin
                             val cell = layout.cell
                             val p = cellAt(offset, cell)
@@ -280,7 +328,7 @@ fun Board(
                     )
                 },
         ) {
-            val layout = BoardLayout.of(size.width, size.height, state.width, state.height)
+            val layout = shownLayout(view, size.width, size.height, state.width, state.height)
             val cell = layout.cell
             if (cell <= 0f) return@Canvas
             water.update(state, previous, progress, clockNanos ?: frameNanos, snapKey)
@@ -348,8 +396,12 @@ private const val LIFT = 0.6f
 private const val REACH = 0.95f
 private const val MIN_REACH_DP = 30
 
-private fun PointerInputScope.layoutOf(state: GameState) =
-    BoardLayout.of(size.width.toFloat(), size.height.toFloat(), state.width, state.height)
+private fun PointerInputScope.layoutOf(state: GameState, view: BoardLayout?) =
+    shownLayout(view, size.width.toFloat(), size.height.toFloat(), state.width, state.height)
+
+/** The whole grid, or the player's zoomed [view] of it, fitted to the canvas as it is now. */
+private fun shownLayout(view: BoardLayout?, width: Float, height: Float, columns: Int, rows: Int) =
+    view?.transformed(1f, Offset.Zero, Offset.Zero, width, height, columns, rows) ?: BoardLayout.of(width, height, columns, rows)
 
 private fun cellCenter(p: Position, cell: Float) = Offset((p.x + 0.5f) * cell, (p.y + 0.5f) * cell)
 
