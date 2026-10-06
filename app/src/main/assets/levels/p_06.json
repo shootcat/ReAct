@@ -1,0 +1,78 @@
+{
+ "id": "p_06",
+ "title": "Dampfmaschine",
+ "world": 1,
+ "intro": "",
+ "look": 4,
+ "placement": "marked",
+ "map": [
+  "...........",
+  "..K........",
+  "%W%F+%Q%R%.",
+  "%%%%%+%%%%%",
+  "%+.j%.%%%.%",
+  "%.%.....j.%",
+  "%.%.....%.%",
+  "%.%.....%.%",
+  "%.%11111%.%",
+  "%.%%%%%%%.%",
+  "%.%%%%%%%.%",
+  "%.%%%%%%+b%",
+  "%%%%%%%%%%%"
+ ],
+ "legend": {
+  "1": {
+   "type": "WATER",
+   "amount": 1
+  },
+  "F": {
+   "type": "FIRE",
+   "isMovable": true
+  },
+  "K": {
+   "type": "SALT",
+   "isMovable": true
+  },
+  "Q": {
+   "type": "WATER",
+   "isMovable": true,
+   "amount": 3
+  },
+  "R": {
+   "type": "WATER",
+   "isMovable": true,
+   "amount": 3
+  },
+  "W": {
+   "type": "WATER",
+   "isMovable": true,
+   "amount": 2
+  },
+  "b": {
+   "type": "BIG_FIRE"
+  },
+  "j": {
+   "type": "ICE",
+   "properties": {
+    "gravity": false
+   }
+  }
+ },
+ "goals": [
+  {
+   "type": "extinguish",
+   "text": "Lösche die Feuer"
+  },
+  {
+   "type": "fill",
+   "area": [
+    3,
+    5,
+    7,
+    8
+   ],
+   "min": 17,
+   "text": "Fülle die Mulde"
+  }
+ ]
+}
