@@ -67,6 +67,7 @@ class DifficultyReportTest {
         /** Things a level's solution uses for something else than their obvious purpose, with the reason. */
         val REPURPOSED: Map<String, Map<String, String>> = mapOf(
             "p_07" to mapOf("water_1_2" to "die kleine Pfütze gehört nicht ins Becken, sie macht den Sand nass"),
+        "p_08" to mapOf("water_3_5" to "das Wasser des Samens löscht nicht, es fängt das Schmelzwasser auf"),
         )
     }
 

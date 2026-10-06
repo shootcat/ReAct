@@ -1,0 +1,57 @@
+{
+ "id": "p_08",
+ "title": "Opfer",
+ "world": 1,
+ "intro": "",
+ "look": 4,
+ "placement": "marked",
+ "map": [
+  "...........",
+  "...........",
+  "...........",
+  "...........",
+  "%+%........",
+  "%e%Q%N%....",
+  "%%%%%%%....",
+  "%%%%%%.....",
+  "%%%%%%%N%..",
+  "%%%%%%+Sb+%",
+  "%%%%%%.%%%%",
+  "%%%%%%.%%%%",
+  "%%%%%%%%%%%"
+ ],
+ "legend": {
+  "N": {
+   "type": "SNOW",
+   "isMovable": true
+  },
+  "Q": {
+   "type": "WATER",
+   "isMovable": true,
+   "amount": 1
+  },
+  "S": {
+   "type": "STONE",
+   "isMovable": true
+  },
+  "b": {
+   "type": "BIG_FIRE"
+  },
+  "e": {
+   "type": "SEED"
+  }
+ },
+ "goals": [
+  {
+   "type": "extinguish",
+   "text": "Lösche das große Feuer"
+  },
+  {
+   "type": "state",
+   "object": "seed_1_5",
+   "state": "SPROUTED",
+   "text": "Lass den Samen keimen",
+   "optional": true
+  }
+ ]
+}
