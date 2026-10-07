@@ -186,6 +186,24 @@ class MaterialsTest {
     }
 
     @Test
+    fun `boiling sea water gives plain steam whose cloud rains fresh water`() {
+        val level = level(
+            listOf("%%%%%%%%%%", "+.........", "..........", "..........", "..........", "%G~~~~~~~%", "%%%%%%%%%%"),
+            "\"G\": {\"type\": \"EMBER_ROCK\"}, \"~\": {\"type\": \"SEAWATER\"}",
+        )
+        val engine = Levels.engine(level)
+        var state = level.initialState()
+        val seen = mutableSetOf<String>()
+        repeat(150) {
+            state = engine.step(state).state
+            seen += state.objects.map { it.type }
+            assertTrue(state.objects.none { it.type == "SEAWATER" && it.position.y < 5 }, "no salt water above the sea")
+        }
+        assertEquals(setOf("EMBER_ROCK", "SEAWATER", "STEAM", "CLOUD", "WATER"), seen, "plain steam, a cloud and its fresh rain")
+        assertTrue(state.objects.any { it.isRaining })
+    }
+
+    @Test
     fun `snow next to burning wood melts and its water puts the wood out in the same move`() {
         val level = level(listOf("s..+B..", "%%%%%%%"), burn)
         val live = Levels.live(level)
