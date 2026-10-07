@@ -12,7 +12,7 @@ Drei Messpunkte, jeder aus einem anderen Gebiet. Der Spieler kennt alle Elemente
 
 | Level | Gebiet | Ziel | Einsicht | Stand |
 |---|---|---|---|---|
-| t_01 „Kochstelle“ | Wald, leicht | Wasser im Becken kocht, der Wald brennt nicht | Glut erhitzt, ohne zu zünden | in Arbeit |
+| t_01 „Kochstelle“ | Wald, leicht | Wasser im Becken kocht, der Wald brennt nicht | Glut erhitzt, ohne zu zünden | fertig, 4 Züge |
 | t_02 „Süßwasser“ | Küste, Mitte | Becken auf der Klippe voll Süßwasser, die Hütte brennt nicht | Verdunsten entsalzt | in Arbeit |
 | t_03 „Tiefe Schmelze“ | Mine, Obergrenze | Glas herstellen, der Wald brennt nicht | Metall leitet Hitze durch die Wand; es gibt nur eine Flamme | in Arbeit |
 
@@ -83,7 +83,7 @@ Pro Schritt sind höchstens **100 Regel-Transformationen** erlaubt; darüber bri
 
 Es gibt keine Level-Sonderfälle im Code: alles kommt aus den JSON-Dateien. Elemente werden über Eigenschaften beschrieben (`gravity`, `liquid`, `gas`, `density`, `heat`, `heat_radius`, `conducts`, `heat_through_wall`, `burn_moves`, `granular`, `condense`, `cloud` …). Level sind ASCII-Landschaften mit Legende: `#` Erde, `%` Fels, `.` frei, `:` frei, aber nicht bebaubar, `+` Ablagefeld; Großbuchstaben sind bewegliche Dinge (`isMovable`), Kleinbuchstaben gehören zur Landschaft. Ziele: `fill` (mit `min` oder `"full": true`; eine fremde Flüssigkeit im Bereich verdirbt es), `produce` (mindestens `min` Dinge vom Typ `element`), `heat` (eine Flüssigkeit im Bereich kocht), `extinguish`, `rain`, `state`, `preserve` (ein Ding oder alle Dinge der `types` in einem Bereich), `clear` und `max_moves`, jeweils optional als Stern.
 
-Die Musterlösungen aller Level stehen in `engine/src/test/resources/walkthroughs.txt` (`t_01 min=4`, `t_01 [] wood_3_2@5,6 …` – in Klammern die erreichten optionalen Aufgaben). Der Test spielt jede Lösung durch, prüft die Sterne und beweist per Breitensuche, dass es keine kürzere Lösung gibt (vollständig bei Leveln mit Ablagefeldern, sonst bis zwei Züge tief).
+Die Musterlösungen aller Level stehen in `engine/src/test/resources/walkthroughs.txt` (`t_01 min=4`, `t_01 [] fire_0_4@5,4 …` – in Klammern die erreichten optionalen Aufgaben). Der Test spielt jede Lösung durch, prüft die Sterne und beweist per Breitensuche, dass es keine kürzere Lösung gibt (vollständig bei Leveln mit Ablagefeldern, sonst bis zwei Züge tief).
 
 ## Schwierigkeit
 

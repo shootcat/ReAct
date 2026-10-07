@@ -1,0 +1,67 @@
+{
+ "id": "t_01",
+ "title": "Kochstelle",
+ "world": 1,
+ "intro": "Das Wasser im Becken soll kochen. Der Wald daneben darf nicht brennen.",
+ "look": 1,
+ "placement": "marked",
+ "map": [
+  "..........",
+  "..........",
+  "..........",
+  "++...+....",
+  "F%++W+....",
+  "###~##+...",
+  "#######+TT",
+  "#######w##",
+  "#######w##",
+  "##########"
+ ],
+ "legend": {
+  "F": {
+   "type": "FIRE",
+   "isMovable": true
+  },
+  "W": {
+   "type": "WOOD",
+   "isMovable": true
+  },
+  "~": {
+   "type": "WATER",
+   "amount": 2,
+   "isMovable": true
+  },
+  "w": {
+   "type": "WATER",
+   "amount": 8
+  },
+  "T": {
+   "type": "TREE"
+  }
+ },
+ "goals": [
+  {
+   "type": "heat",
+   "area": [
+    7,
+    7,
+    7,
+    8
+   ],
+   "text": "Bring das Wasser im Becken zum Kochen"
+  },
+  {
+   "type": "preserve",
+   "types": [
+    "TREE"
+   ],
+   "area": [
+    8,
+    5,
+    9,
+    6
+   ],
+   "text": "Der Wald darf nicht brennen"
+  }
+ ]
+}

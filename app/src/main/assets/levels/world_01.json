@@ -2,7 +2,16 @@
   "world": 1,
   "title": "Test",
   "icon": "FIRE",
-  "levels": [],
+  "levels": [
+    "t_01"
+  ],
   "bonus": null,
-  "map": []
+  "map": [
+    {
+      "level": "t_01",
+      "x": 0.3,
+      "y": 0.82,
+      "icon": "EMBER"
+    }
+  ]
 }
