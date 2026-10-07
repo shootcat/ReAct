@@ -136,6 +136,16 @@ class MaterialsTest {
     }
 
     @Test
+    fun `glowing hot metal cannot be picked up, cooled down it can`() {
+        val level = level(listOf("+.+..", ".Gm..", "%%%%%"), "$hot, \"m\": {\"type\": \"METAL\", \"isMovable\": true}")
+        val heated = steps(level, 4)
+        assertEquals("HOT", heated.objectAt(Position(2, 1))?.state)
+        assertNull(drops.resolve(heated, "metal_2_1", Position(2, 0)), "too hot to touch")
+        val cold = steps(level, 0)
+        assertIs<Drop.Placed>(drops.resolve(cold, "metal_2_1", Position(2, 0)))
+    }
+
+    @Test
     fun `hot metal cools down a few steps after its heat source is gone`() {
         val level = level(listOf("+....", ".GM..", "%%%%%"), hot)
         val heated = steps(level, 6)
@@ -291,6 +301,17 @@ class MaterialsTest {
         assertEquals("INTACT", steps(glow, 5).objectAt(Position(2, 1))?.state)
         val doused = level(listOf("+....", ".~u..", "%%%%%"), "$stuff, \"u\": {\"type\": \"HUT\", \"state\": \"BURNING\"}")
         assertEquals("CHARRED", steps(doused, 2).objectAt(Position(2, 1))?.state)
+    }
+
+    @Test
+    fun `a snowball stays put at an edge where powder snow trickles down, and melts all the same`() {
+        val legend = "\"b\": {\"type\": \"SNOW\", \"state\": \"BALL\"}, \"p\": {\"type\": \"SNOW\"}, \"G\": {\"type\": \"EMBER\"}"
+        val ball = level(listOf("+....", "..b..", "%%%.%", "%%%.%", "%%%%%"), legend)
+        assertEquals(ball.initialState().objects, steps(ball, 3).objects, "the ball does not slide off")
+        val powder = level(listOf("+....", "..p..", "%%%.%", "%%%.%", "%%%%%"), legend)
+        assertEquals(Position(3, 3), steps(powder, 3).objects.single().position, "powder trickles into the hole")
+        val warm = level(listOf("+....", ".Gb..", "%%%%%"), legend)
+        assertTrue(steps(warm, 2).objects.none { it.type == "SNOW" })
     }
 
     @Test

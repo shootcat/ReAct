@@ -66,7 +66,7 @@ fun DrawScope.drawGameObject(
         "SEAWATER" -> drawLiquidTile(topLeft, cell, alpha, time, info, Palette.seaLight, Palette.sea)
         "LAVA" -> drawLiquidTile(topLeft, cell, alpha, time, info, Palette.lava, Palette.lavaDeep)
         "SAND" -> drawGrains(topLeft, cell, alpha, info, wet = obj.state == "WET", Palette.sand, Palette.sandDark)
-        "SNOW" -> drawGrains(topLeft, cell, alpha, info, wet = false, Palette.snow, Palette.snowShade)
+        "SNOW" -> if (obj.state == "BALL") drawSnowball(topLeft, cell, alpha) else drawGrains(topLeft, cell, alpha, info, wet = false, Palette.snow, Palette.snowShade)
         "PUMICE" -> drawPumice(topLeft, cell, alpha)
         "SALT" -> drawSalt(topLeft, cell, alpha)
         else -> drawCircle(Palette.textDim, cell * 0.3f, topLeft + Offset(cell / 2, cell / 2), alpha)
@@ -265,6 +265,18 @@ private fun DrawScope.drawPumice(tl: Offset, c: Float, alpha: Float) {
     drawPath(path, Color.Black, alpha = alpha * 0.25f, style = Stroke(width = c * 0.03f))
     val holes = listOf(0.3f to 0.45f, 0.55f to 0.38f, 0.66f to 0.62f, 0.4f to 0.7f, 0.5f to 0.55f, 0.24f to 0.62f)
     for ((x, y) in holes) drawCircle(Palette.pumiceDark, c * 0.04f, tl + Offset(c * x, c * y), alpha = alpha * 0.8f)
+}
+
+/** A packed snowball: it keeps its shape and does not trickle away like powder snow. */
+private fun DrawScope.drawSnowball(tl: Offset, c: Float, alpha: Float) {
+    val center = tl + Offset(c / 2, c * 0.62f)
+    val r = c * 0.32f
+    drawOval(Color.Black, tl + Offset(c * 0.2f, c * 0.9f), Size(c * 0.6f, c * 0.08f), alpha = alpha * 0.2f)
+    drawCircle(Brush.radialGradient(listOf(Color.White, Palette.snow, Palette.snowShade), center - Offset(r * 0.35f, r * 0.4f), r * 1.5f), r, center, alpha = alpha)
+    drawCircle(Palette.snowShade, r, center, alpha = alpha * 0.8f, style = Stroke(width = c * 0.02f))
+    for ((x, y) in listOf(0.12f to 0.1f, -0.15f to 0.18f, 0.05f to -0.12f)) {
+        drawCircle(Palette.snowShade, c * 0.025f, center + Offset(r * x * 2, r * y * 2), alpha = alpha * 0.7f)
+    }
 }
 
 /** A cluster of salt crystals. */

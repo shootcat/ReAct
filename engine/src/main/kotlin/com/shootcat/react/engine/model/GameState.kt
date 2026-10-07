@@ -105,7 +105,7 @@ data class GameState(
     /** Player action: move a movable object to a cell where it may be placed. Gas there is pushed aside. */
     fun withObjectMoved(id: String, to: Position): GameState? {
         val obj = objectById(id) ?: return null
-        if (!obj.isMovable) return null
+        if (!obj.canBePickedUp) return null
         if (obj.position == to) return this
         if (!canPlace(to)) return null
         val gas = objectAt(to) ?: return copy(objects = objects.map { if (it.id == id) obj.copy(position = to) else it })
@@ -119,7 +119,7 @@ data class GameState(
     fun withLiquidDisplaced(id: String, to: Position): GameState? {
         val obj = objectById(id) ?: return null
         val liquid = objectAt(to)?.takeIf { it.isLiquid } ?: return null
-        if (!obj.isMovable || obj.hasAmount || isWall(to) || to in noBuild) return null
+        if (!obj.canBePickedUp || obj.hasAmount || isWall(to) || to in noBuild) return null
         return replacing(obj, to, liquid)
     }
 

@@ -200,7 +200,7 @@ fun Board(
         selected = null
     }
     // A selected object that melted, burnt or was undone away is no longer selected.
-    val shownSelection = selected?.takeIf { state.objectById(it)?.isMovable == true }
+    val shownSelection = selected?.takeIf { state.objectById(it)?.canBePickedUp == true }
 
     // The water keeps its own smoothly moving picture of the simulation, driven by the frame clock.
     val water = remember(level.id) { WaterView() }
@@ -307,8 +307,8 @@ fun Board(
                             val offset = tap - layout.origin
                             val cell = layout.cell
                             val p = cellAt(offset, cell)
-                            val exact = currentState.objectAt(p)?.takeIf { it.isMovable }
-                            val sel = selected?.takeIf { currentState.objectById(it)?.isMovable == true }
+                            val exact = currentState.objectAt(p)?.takeIf { it.canBePickedUp }
+                            val sel = selected?.takeIf { currentState.objectById(it)?.canBePickedUp == true }
                             when {
                                 sel != null && exact?.id == sel -> selected = null
                                 sel != null && currentPreview(sel, p) != null -> {
@@ -420,11 +420,11 @@ private fun objectOffset(o: GameObject, previous: GameState?, progress: Float): 
 /** The movable object under the finger, or else the nearest one within reach of it. */
 private fun PointerInputScope.pickMovable(state: GameState, offset: Offset, cell: Float, exactFirst: Boolean): GameObject? {
     if (exactFirst) {
-        state.objectAt(cellAt(offset, cell))?.takeIf { it.isMovable }?.let { return it }
+        state.objectAt(cellAt(offset, cell))?.takeIf { it.canBePickedUp }?.let { return it }
     }
     val reach = max(cell * REACH, MIN_REACH_DP.dp.toPx())
     return state.objects
-        .filter { it.isMovable }
+        .filter { it.canBePickedUp }
         .map { it to (cellCenter(it.position, cell) - offset).let { d -> hypot(d.x, d.y) } }
         .filter { it.second <= reach }
         .minByOrNull { it.second }
@@ -585,7 +585,8 @@ private fun DrawScope.drawMovableFrames(
     showMarkers: Boolean,
 ) {
     val pulse = 0.5f + 0.5f * sin(time * TAU * 2f)
-    for (o in state.objects.filter { it.isMovable && it.id != dragged }) {
+    // Glowing hot metal cannot be taken: no frame until it has cooled down.
+    for (o in state.objects.filter { it.canBePickedUp && it.id != dragged }) {
         if (!showMarkers && o.id != selected) continue
         val at = shownAt(o) * cell
         val inset = cell * 0.04f

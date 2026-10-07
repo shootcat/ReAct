@@ -124,7 +124,7 @@ class LevelAnalysis(private val level: LevelData, engine: RuleEngine) {
     fun successors(run: Run): List<Pair<Move, Run>> {
         if (run.outcome != null) return emptyList()
         return successorCache.getOrPut(key(run)) {
-            val candidates = run.state.objects.filter { it.isMovable }.flatMap { o -> targets(run.state).map { Move(o.id, it) } }
+            val candidates = run.state.objects.filter { it.canBePickedUp }.flatMap { o -> targets(run.state).map { Move(o.id, it) } }
             val results = candidates.parallelStream()
                 .map { m -> live.play(run, m.objectId, m.to)?.let { m to it } }
                 .toList()
@@ -152,6 +152,35 @@ class LevelAnalysis(private val level: LevelData, engine: RuleEngine) {
                 }
             }
             frontier = next
+        }
+        return null
+    }
+
+    /**
+     * The same complete search as [shortest], for levels too big to keep every world in memory: starting at
+     * [from], it caches nothing, deduplicates only the layers it still has to expand and merely checks the
+     * last one. Returns a solution with at most [limit] moves, or null if there is none.
+     */
+    fun shortestWithin(limit: Int, from: Run = start): List<Move>? {
+        if (solved(from)) return emptyList()
+        val seen = HashSet<Key>().apply { add(key(from)) }
+        var frontier = listOf(emptyList<Move>() to from)
+        for (depth in 1..limit) {
+            val expand = depth < limit
+            val found = java.util.concurrent.atomic.AtomicReference<List<Move>?>(null)
+            val next = java.util.concurrent.ConcurrentLinkedQueue<Pair<List<Move>, Run>>()
+            frontier.parallelStream().forEach { (moves, run) ->
+                if (found.get() != null) return@forEach
+                for (o in run.state.objects.filter { it.canBePickedUp }) {
+                    for (to in targets(run.state)) {
+                        val after = live.play(run, o.id, to) ?: continue
+                        if (solved(after)) found.compareAndSet(null, moves + Move(o.id, to))
+                        else if (expand && !lost(after)) next += (moves + Move(o.id, to)) to after.copy(events = emptyList())
+                    }
+                }
+            }
+            found.get()?.let { return it }
+            frontier = next.filter { seen.add(key(it.second)) }
         }
         return null
     }

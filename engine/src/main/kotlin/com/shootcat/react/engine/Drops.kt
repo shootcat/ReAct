@@ -45,7 +45,7 @@ class Drops(private val types: TypeCatalog, private val rules: List<Rule>, priva
 
     fun resolve(state: GameState, objectId: String, to: Position): Drop? {
         val obj = state.objectById(objectId) ?: return null
-        if (!obj.isMovable || obj.position == to) return null
+        if (!obj.canBePickedUp || obj.position == to) return null
         if (!state.inBounds(to) || state.isWall(to) || to in state.noBuild) return null
         val field = state.isPlacementField(to)
         val target = state.objectAt(to)

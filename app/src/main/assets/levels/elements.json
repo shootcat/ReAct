@@ -284,14 +284,15 @@
     "conducts": true,
     "heat": 6,
     "heat_state": "HOT",
-    "heat_through_wall": true
+    "heat_through_wall": true,
+    "untouchable_state": "HOT"
    },
    "vanish_states": [],
    "state_names": {
     "COLD": "kalt",
     "HOT": "heiß"
    },
-   "description": "Neben Glut wird es heiß und gibt die Hitze weiter, ohne zu brennen – auch durch eine Wand hindurch. Ohne Hitze kühlt es langsam ab.",
+   "description": "Neben Glut wird es heiß und gibt die Hitze weiter, ohne zu brennen – auch durch eine Wand hindurch. Heiß lässt es sich nicht anfassen; ohne Hitze kühlt es langsam ab.",
    "world": 3
   },
   {
@@ -377,9 +378,10 @@
    ],
    "state_names": {
     "POWDER": "pulvrig",
+    "BALL": "Schneeball",
     "MELTED": "geschmolzen"
    },
-   "description": "Rieselt wie Sand, ist aber federleicht. Schmilzt bei Hitze zu wenig Wasser.",
+   "description": "Pulverschnee rieselt wie Sand, ein Schneeball bleibt liegen. Neben Hitze schmilzt beides zu Wasser, Salz taut es auch.",
    "world": 4
   },
   {
@@ -857,8 +859,7 @@
    "trigger": "TOUCH",
    "conditions": {
     "source_hot": true,
-    "target": "SNOW",
-    "target_state": "POWDER"
+    "target": "SNOW"
    },
    "effect": {
     "target_state": "MELTED",
@@ -891,8 +892,7 @@
    "trigger": "TOUCH",
    "conditions": {
     "source": "SALT",
-    "target": "SNOW",
-    "target_state": "POWDER"
+    "target": "SNOW"
    },
    "effect": {
     "target_state": "MELTED",

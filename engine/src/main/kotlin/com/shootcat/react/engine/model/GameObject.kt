@@ -55,6 +55,8 @@ object Props {
     const val FLAME = "flame"
     /** How far (in cells, around obstacles) the heat of a hot object reaches; 1 means touching only. */
     const val HEAT_RADIUS = "heat_radius"
+    /** While in this state it cannot be picked up: glowing hot metal would burn the hand. */
+    const val UNTOUCHABLE_STATE = "untouchable_state"
     /** Stuck in a slot of a wall, its heat passes through one wall cell to the cell behind (metal). */
     const val HEAT_THROUGH_WALL = "heat_through_wall"
     /** A cloud: hovers in place, drifts with the wind, takes up steam and rains once it is dense enough. */
@@ -131,6 +133,9 @@ data class GameObject(
             val heat = int(Props.HEAT)
             return if (heat > 0 && inState(Props.HEAT_STATE)) heat else 0
         }
+
+    /** The player may pick it up right now: it is movable and not too hot to touch. */
+    val canBePickedUp: Boolean get() = isMovable && string(Props.UNTOUCHABLE_STATE) != state
 
     /** Moves this thing still burns before it crumbles to [Props.BURNS_INTO]; 0 if it is not burning down. */
     val burnMovesLeft: Int
