@@ -16,6 +16,7 @@ import com.shootcat.react.engine.model.Position
 import com.shootcat.react.ui.theme.Palette
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
@@ -757,24 +758,24 @@ internal class WaterView {
     }
 
     /**
-     * Falling liquid without a source. A little is a slim, stretched drop; more is a short falling
-     * column with rounded ends.
+     * Falling liquid without a source. A little is a thin falling thread, more is a short falling column
+     * with rounded ends; never a drop shape.
      */
     private fun DrawScope.drawPiece(p: Piece, c: Float) {
         val look = lookOf(p.type)
         val cx = (p.x + 0.5f) * c
         if (p.size < 0.25f && p.bottom - p.top <= 1.05f) {
-            val w = c * (0.07f + 0.12f * sqrt(p.size / 0.25f))
-            val bottom = (p.bottom - 0.2f) * c
-            val top = bottom - c * 0.55f
-            val drop = Path().apply {
-                moveTo(cx, top)
-                cubicTo(cx + w * 0.35f, top + c * 0.25f, cx + w, bottom - w * 1.2f, cx + w, bottom - w)
-                cubicTo(cx + w, bottom, cx - w, bottom, cx - w, bottom - w)
-                cubicTo(cx - w, bottom - w * 1.2f, cx - w * 0.35f, top + c * 0.25f, cx, top)
-                close()
-            }
-            drawPath(drop, Brush.verticalGradient(listOf(look.light.copy(alpha = 0.4f), look.light, look.deep), top, bottom), alpha = p.alpha * 0.9f)
+            val w = c * (0.04f + 0.07f * sqrt(p.size / 0.25f))
+            val bottom = (p.bottom - 0.1f) * c
+            val top = bottom - c * 0.8f
+            drawLine(
+                Brush.verticalGradient(listOf(look.light.copy(alpha = 0f), look.light, look.deep), top, bottom),
+                Offset(cx, top + w),
+                Offset(cx, bottom - w),
+                strokeWidth = w * 2f,
+                cap = StrokeCap.Round,
+                alpha = p.alpha * 0.85f,
+            )
             return
         }
         // The tail of a pour: thin at the top where it tore off, full and rounded at its lower end.
@@ -795,17 +796,16 @@ internal class WaterView {
         drawLine(look.crest, Offset(cx - w * 0.1f, neck), Offset(cx - w * 0.1f, bottom - w * 0.6f), strokeWidth = c * 0.02f, cap = StrokeCap.Round, alpha = p.alpha * 0.4f)
     }
 
-    /** Where water hits solid ground: a few small droplets, nothing more. */
+    /** Where water hits solid ground: a thin film that spreads sideways and fades, no flying drops. */
     private fun DrawScope.drawSplash(s: Splash, c: Float) {
         val look = lookOf(s.type)
         val f = (s.age / 0.6f).coerceIn(0f, 1f)
         val strength = 0.4f + 0.6f * s.strength.coerceIn(0f, 1f)
-        for (k in 0 until 3) {
-            val dir = (k - 1).toFloat()
-            val x = s.at.x + dir * (0.12f + 0.25f * f) * strength
-            val y = s.at.y - (0.3f + 0.1f * k) * strength * 4f * f * (1f - f)
-            drawCircle(look.light, c * 0.03f, Offset(x * c, y * c), alpha = 0.6f * (1f - f))
-        }
+        val half = (0.12f + 0.3f * f) * strength * c
+        val y = s.at.y * c - c * 0.03f
+        val x = s.at.x * c
+        drawLine(look.light, Offset(x - half, y), Offset(x + half, y), strokeWidth = c * 0.05f * (1f - 0.6f * f), cap = StrokeCap.Round, alpha = 0.65f * (1f - f))
+        drawLine(look.crest, Offset(x - half * 0.6f, y - c * 0.02f), Offset(x + half * 0.6f, y - c * 0.02f), strokeWidth = c * 0.015f, cap = StrokeCap.Round, alpha = 0.4f * (1f - f))
     }
 }
 
@@ -874,4 +874,38 @@ private fun DrawScope.drawSurfaceFlames(tl: Offset, c: Float, lv: Float, time: F
         drawPath(flame, Palette.fire, alpha = 0.9f)
         drawCircle(Palette.fireCore, c * 0.04f, Offset(fx, surface - h * 0.2f), alpha = 0.9f)
     }
+}
+
+/**
+ * Liquid in the player's hand: a rounded, gently sloshing body whose size follows the amount, so a
+ * carried puddle looks like water and not like a box.
+ */
+internal fun DrawScope.drawCarriedLiquid(type: String, amount: Int, capacity: Int, center: Offset, c: Float, time: Float, alpha: Float = 0.95f) {
+    val look = lookOf(type)
+    val share = (amount.toFloat() / capacity.coerceAtLeast(1)).coerceIn(0.1f, 1f)
+    val rx = c * (0.2f + 0.24f * sqrt(share))
+    val ry = rx * 0.78f
+    val slosh = sin(time * TAU * 2f)
+    val steps = 24
+    val body = Path()
+    for (i in 0..steps) {
+        val a = TAU * i / steps
+        // A slightly flattened top that tilts back and forth, a full rounded bottom.
+        val wobble = 1f + 0.06f * sin(a * 3f + time * TAU * 3f)
+        var y = center.y + ry * sin(a) * wobble
+        if (sin(a) < 0f) y = center.y + ry * sin(a) * 0.75f * wobble + slosh * c * 0.02f * cos(a)
+        val x = center.x + rx * cos(a) * wobble
+        if (i == 0) body.moveTo(x, y) else body.lineTo(x, y)
+    }
+    body.close()
+    look.glow?.let { drawCircle(Brush.radialGradient(listOf(it.copy(alpha = 0.3f), Color.Transparent), center, rx * 2f), rx * 2f, center, alpha = alpha) }
+    drawPath(body, Brush.verticalGradient(listOf(look.light, look.deep), center.y - ry, center.y + ry), alpha = alpha * look.alpha)
+    drawLine(
+        look.crest,
+        Offset(center.x - rx * 0.45f, center.y - ry * 0.55f + slosh * c * 0.015f),
+        Offset(center.x + rx * 0.2f, center.y - ry * 0.62f - slosh * c * 0.015f),
+        strokeWidth = c * 0.03f,
+        cap = StrokeCap.Round,
+        alpha = alpha * look.crestAlpha,
+    )
 }

@@ -644,11 +644,20 @@ private fun DrawScope.drawDrag(
             style = Stroke(width = cell * 0.04f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(cell * 0.12f, cell * 0.08f))),
             alpha = 0.8f,
         )
-        drawGameObject(obj, landing, cell, 0.35f, time)
+        if (obj.isLiquid) {
+            drawCarriedLiquid(obj.type, obj.amount, obj.capacity, landing + Offset(cell / 2, cell * 0.62f), cell, time, alpha = 0.35f)
+        } else {
+            drawGameObject(obj, landing, cell, 0.35f, time)
+        }
     }
     val center = dragCenter(d.pointer, d.grab, cell)
     drawShadow(Offset(center.x / cell - 0.5f, center.y / cell - 0.5f + 0.25f), cell)
-    drawGameObject(obj, center - Offset(cell / 2, cell / 2), cell, 0.95f, time, infoFor(obj, state))
+    if (obj.isLiquid) {
+        // Carried water is a sloshing handful, not a box.
+        drawCarriedLiquid(obj.type, obj.amount, obj.capacity, center, cell, time)
+    } else {
+        drawGameObject(obj, center - Offset(cell / 2, cell / 2), cell, 0.95f, time, infoFor(obj, state))
+    }
 }
 
 /** Darkened edges give the board a small diorama feel. */
