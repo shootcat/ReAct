@@ -166,7 +166,7 @@ private fun MaterialRow(type: ObjectType, types: TypeCatalog) {
 /** The element families the reactions belong to (the "world" a rule was introduced in). */
 private val FAMILIES = mapOf(
     1 to "Wald · Feuer, Wasser, Holz",
-    2 to "Küste · Meer und Sand",
-    3 to "Vulkan · Lava und Glut",
+    2 to "Küste · Meer, Sand und Erde",
+    3 to "Mine · Glut, Metall und Glas",
     4 to "Winter · Eis, Schnee, Salz",
 )

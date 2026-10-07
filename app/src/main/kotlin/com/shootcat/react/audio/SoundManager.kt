@@ -134,6 +134,13 @@ class SoundManager(context: Context) {
             "merge" to R.raw.sfx_merge,
             "goal" to R.raw.sfx_goal,
             "success" to R.raw.sfx_success,
+            "crumble" to R.raw.sfx_crumble,
+            "chop" to R.raw.sfx_chop,
+            "glow" to R.raw.sfx_glow,
+            "crunch" to R.raw.sfx_crunch,
+            "clink" to R.raw.sfx_clink,
+            "chime" to R.raw.sfx_chime,
+            "squelch" to R.raw.sfx_squelch,
         )
 
         val VOLUMES = mapOf(
@@ -144,6 +151,9 @@ class SoundManager(context: Context) {
             "place" to 0.6f,
             "bounce" to 0.7f,
             "success" to 0.75f,
+            "crumble" to 0.7f,
+            "chime" to 0.6f,
+            "clink" to 0.6f,
         )
 
         val MUSIC = mapOf(
@@ -151,6 +161,8 @@ class SoundManager(context: Context) {
             2 to R.raw.music_coast,
             3 to R.raw.music_volcano,
             4 to R.raw.music_frost,
+            // The mine has no tune of its own: the deep volcano melody fits it best.
+            5 to R.raw.music_volcano,
         )
     }
 }

@@ -46,7 +46,16 @@ fun DrawScope.drawGameObject(
         "FIRE" -> drawCampfire(topLeft, cell, alpha, time + phase, big = false)
         "BIG_FIRE" -> drawCampfire(topLeft, cell, alpha, time + phase, big = true)
         "WOOD" -> drawLog(topLeft, cell, alpha, time + phase, obj)
-        "WOOD_PILE" -> drawPile(topLeft, cell, alpha, time + phase, obj)
+        "CHARCOAL" -> drawCharcoal(topLeft, cell, alpha)
+        "EMBER" -> drawEmbers(topLeft, cell, alpha, time + phase)
+        "ASH" -> drawAsh(topLeft, cell, alpha, time + phase)
+        "ORE" -> drawOre(topLeft, cell, alpha, time + phase)
+        "SMELT" -> drawSmelt(topLeft, cell, alpha)
+        "METAL" -> drawMetal(topLeft, cell, alpha, time + phase, obj)
+        "GLASS" -> drawGlass(topLeft, cell, alpha, time + phase)
+        "EARTH" -> drawEarth(topLeft, cell, alpha)
+        "MUD" -> drawMud(topLeft, cell, alpha, time + phase)
+        "HUT" -> drawHut(topLeft, cell, alpha, time + phase, obj)
         "ICE" -> drawIce(topLeft, cell, alpha, time + phase)
         "STONE" -> drawStone(topLeft, cell, alpha, Palette.stone, Palette.stoneDark)
         "SEED" -> drawSeed(topLeft, cell, alpha, time + phase, obj.state)
@@ -56,9 +65,8 @@ fun DrawScope.drawGameObject(
         "WATER" -> drawLiquidTile(topLeft, cell, alpha, time, info, Palette.waterLight, Palette.water)
         "SEAWATER" -> drawLiquidTile(topLeft, cell, alpha, time, info, Palette.seaLight, Palette.sea)
         "LAVA" -> drawLiquidTile(topLeft, cell, alpha, time, info, Palette.lava, Palette.lavaDeep)
-        "SAND" -> drawGrains(topLeft, cell, alpha, info, wet = obj.state == "WET", glass = obj.state == "GLASS", Palette.sand, Palette.sandDark)
-        "SNOW" -> drawGrains(topLeft, cell, alpha, info, wet = false, glass = false, Palette.snow, Palette.snowShade)
-        "EMBER_ROCK" -> drawEmberRock(topLeft, cell, alpha, time + phase)
+        "SAND" -> drawGrains(topLeft, cell, alpha, info, wet = obj.state == "WET", Palette.sand, Palette.sandDark)
+        "SNOW" -> drawGrains(topLeft, cell, alpha, info, wet = false, Palette.snow, Palette.snowShade)
         "PUMICE" -> drawPumice(topLeft, cell, alpha)
         "SALT" -> drawSalt(topLeft, cell, alpha)
         else -> drawCircle(Palette.textDim, cell * 0.3f, topLeft + Offset(cell / 2, cell / 2), alpha)
@@ -130,7 +138,6 @@ private fun woodColors(obj: GameObject): Pair<Color, Color> {
     val moves = obj.int(Props.BURN_MOVES, 1).coerceAtLeast(1)
     val burnt = if (obj.state == "BURNING") (obj.burnt.toFloat() / moves).coerceIn(0f, 1f) else 0f
     return when (obj.state) {
-        "CHARRED" -> Palette.charcoal to Color(0xFF151110)
         "BURNING" -> lerp(Palette.wood, Palette.charcoal, burnt) to lerp(Palette.woodDark, Color(0xFF151110), burnt)
         else -> Palette.woodLight to Palette.woodDark
     }
@@ -192,23 +199,9 @@ private fun DrawScope.drawLog(tl: Offset, c: Float, alpha: Float, time: Float, o
     val (light, dark) = woodColors(obj)
     val h = c * 0.42f
     val origin = Offset(tl.x + c * 0.06f, tl.y + c - h - c * 0.04f)
-    drawLogShape(origin, c * 0.88f, h, light, dark, alpha, obj.state == "CHARRED")
+    drawLogShape(origin, c * 0.88f, h, light, dark, alpha, charred = false)
     if (obj.state == "BURNING") {
         drawFlamesOnTop(origin.x, origin.x + c * 0.88f, origin.y, c, time, alpha, flameStrength(obj))
-        drawBurnMoves(tl, c, alpha, time, obj.burnMovesLeft)
-    }
-}
-
-/** Two logs below, one on top. */
-private fun DrawScope.drawPile(tl: Offset, c: Float, alpha: Float, time: Float, obj: GameObject) {
-    val (light, dark) = woodColors(obj)
-    val h = c * 0.3f
-    val charred = obj.state == "CHARRED"
-    drawLogShape(Offset(tl.x + c * 0.02f, tl.y + c - h - c * 0.02f), c * 0.52f, h, light, dark, alpha, charred)
-    drawLogShape(Offset(tl.x + c * 0.46f, tl.y + c - h - c * 0.02f), c * 0.52f, h, light, dark, alpha, charred)
-    drawLogShape(Offset(tl.x + c * 0.18f, tl.y + c - 2 * h - c * 0.02f), c * 0.64f, h, light, dark, alpha, charred)
-    if (obj.state == "BURNING") {
-        drawFlamesOnTop(tl.x + c * 0.1f, tl.x + c * 0.9f, tl.y + c - 2 * h, c, time, alpha, 1.3f * flameStrength(obj))
         drawBurnMoves(tl, c, alpha, time, obj.burnMovesLeft)
     }
 }
@@ -274,23 +267,6 @@ private fun DrawScope.drawPumice(tl: Offset, c: Float, alpha: Float) {
     for ((x, y) in holes) drawCircle(Palette.pumiceDark, c * 0.04f, tl + Offset(c * x, c * y), alpha = alpha * 0.8f)
 }
 
-private fun DrawScope.drawEmberRock(tl: Offset, c: Float, alpha: Float, time: Float) {
-    drawRect(Palette.basalt, tl, Size(c + 0.5f, c + 0.5f), alpha = alpha)
-    val pulse = 0.55f + 0.45f * sin(time * TAU)
-    val center = tl + Offset(c / 2, c / 2)
-    drawCircle(Brush.radialGradient(listOf(Palette.ember.copy(alpha = 0.5f * pulse), Color.Transparent), center, c * 0.8f), c * 0.8f, center, alpha = alpha)
-    val crack = Path().apply {
-        moveTo(tl.x + c * 0.1f, tl.y + c * 0.3f)
-        lineTo(tl.x + c * 0.4f, tl.y + c * 0.45f)
-        lineTo(tl.x + c * 0.35f, tl.y + c * 0.7f)
-        lineTo(tl.x + c * 0.7f, tl.y + c * 0.85f)
-        moveTo(tl.x + c * 0.4f, tl.y + c * 0.45f)
-        lineTo(tl.x + c * 0.8f, tl.y + c * 0.25f)
-    }
-    drawPath(crack, Palette.ember, alpha = alpha * (0.6f + 0.4f * pulse), style = Stroke(width = c * 0.05f, cap = StrokeCap.Round))
-    drawPath(crack, Palette.fireCore, alpha = alpha * pulse * 0.7f, style = Stroke(width = c * 0.02f, cap = StrokeCap.Round))
-}
-
 /** A cluster of salt crystals. */
 private fun DrawScope.drawSalt(tl: Offset, c: Float, alpha: Float) {
     val cubes = listOf(Triple(0.18f, 0.48f, 0.32f), Triple(0.48f, 0.4f, 0.36f), Triple(0.34f, 0.2f, 0.26f))
@@ -303,12 +279,7 @@ private fun DrawScope.drawSalt(tl: Offset, c: Float, alpha: Float) {
 }
 
 /** Sand or snow: a heap on its own, a dune surface next to more of it, solid under more of it. */
-private fun DrawScope.drawGrains(tl: Offset, c: Float, alpha: Float, info: ObjectInfo, wet: Boolean, glass: Boolean, light: Color, dark: Color) {
-    if (glass) {
-        drawRoundRect(Brush.linearGradient(listOf(Color(0xFFBFE9E3), Color(0xFF6FB3AB)), tl, tl + Offset(c, c)), tl + Offset(c * 0.05f, c * 0.05f), Size(c * 0.9f, c * 0.9f), CornerRadius(c * 0.08f), alpha = alpha * 0.75f)
-        drawLine(Color.White, tl + Offset(c * 0.2f, c * 0.25f), tl + Offset(c * 0.5f, c * 0.15f), strokeWidth = c * 0.04f, cap = StrokeCap.Round, alpha = alpha * 0.8f)
-        return
-    }
+private fun DrawScope.drawGrains(tl: Offset, c: Float, alpha: Float, info: ObjectInfo, wet: Boolean, light: Color, dark: Color) {
     val base = if (wet) Palette.sandWet else light
     val shade = if (wet) Color(0xFF5E4626) else dark
     if (info.joinAbove) {
@@ -360,21 +331,13 @@ private fun DrawScope.drawSeed(tl: Offset, c: Float, alpha: Float, time: Float, 
     }
 }
 
-/** A tree: trunk in its cell, crown reaching up into the cell above. Burning, it flares; charred, it is bare. */
+/** A tree: trunk in its cell, crown reaching up into the cell above. Burning, it flares. */
 private fun DrawScope.drawTree(tl: Offset, c: Float, alpha: Float, time: Float, obj: GameObject) {
     val cx = tl.x + c / 2
     val ground = tl.y + c
-    val charred = obj.state == "CHARRED"
     val burning = obj.state == "BURNING"
-    val trunk = if (charred) Palette.charcoal else Palette.bark
-    drawRect(trunk, Offset(cx - c * 0.08f, ground - c * 0.62f), Size(c * 0.16f, c * 0.62f), alpha = alpha)
+    drawRect(Palette.bark, Offset(cx - c * 0.08f, ground - c * 0.62f), Size(c * 0.16f, c * 0.62f), alpha = alpha)
     drawLine(Palette.barkDark, Offset(cx - c * 0.02f, ground - c * 0.5f), Offset(cx - c * 0.02f, ground - c * 0.1f), strokeWidth = c * 0.025f, alpha = alpha * 0.6f)
-    if (charred) {
-        for (side in listOf(-1f, 1f)) {
-            drawLine(Palette.charcoal, Offset(cx, ground - c * 0.6f), Offset(cx + side * c * 0.28f, ground - c * 0.95f), strokeWidth = c * 0.05f, cap = StrokeCap.Round, alpha = alpha)
-        }
-        return
-    }
     val sway = c * 0.025f * sin(time * TAU)
     val crown = listOf(
         Triple(0f, -0.95f, 0.36f), Triple(-0.24f, -0.72f, 0.28f), Triple(0.24f, -0.72f, 0.28f),
@@ -488,5 +451,194 @@ private fun DrawScope.drawLiquidTile(tl: Offset, c: Float, alpha: Float, time: F
             }
         }
         drawPath(crest, Color.White, alpha = alpha * 0.6f, style = Stroke(width = c * 0.035f, cap = StrokeCap.Round))
+    }
+}
+
+// ------------------------------------------------------------------ materials of the sandbox
+
+/** Charcoal: a blackened log, cracked into the typical little squares, with a dull sheen. */
+private fun DrawScope.drawCharcoal(tl: Offset, c: Float, alpha: Float) {
+    val h = c * 0.44f
+    val origin = Offset(tl.x + c * 0.06f, tl.y + c - h - c * 0.04f)
+    drawLogShape(origin, c * 0.88f, h, Color(0xFF5C524D), Color(0xFF1A1513), alpha, charred = true)
+    for (i in 1..4) {
+        val x = origin.x + c * 0.88f * i / 5.2f
+        drawLine(Color(0xFF0C0A09), Offset(x, origin.y + h * 0.12f), Offset(x - h * 0.08f, origin.y + h * 0.88f), strokeWidth = c * 0.022f, alpha = alpha * 0.8f)
+    }
+    drawLine(Color(0xFFB5ADA8), origin + Offset(h * 0.5f, h * 0.2f), origin + Offset(c * 0.5f, h * 0.2f), strokeWidth = c * 0.03f, cap = StrokeCap.Round, alpha = alpha * 0.55f)
+}
+
+/**
+ * Embers: a small heap of coals glowing from inside. They breathe, but they never flame – that is what
+ * sets them apart from fire at a glance.
+ */
+private fun DrawScope.drawEmbers(tl: Offset, c: Float, alpha: Float, time: Float) {
+    val pulse = 0.6f + 0.4f * sin(time * TAU)
+    val ground = tl.y + c * 0.96f
+    val center = Offset(tl.x + c / 2, ground - c * 0.2f)
+    drawCircle(Brush.radialGradient(listOf(Palette.ember.copy(alpha = 0.45f * pulse), Color.Transparent), center, c * 0.75f), c * 0.75f, center, alpha = alpha)
+    val coals = listOf(Triple(0.3f, 0.16f, 0.19f), Triple(0.68f, 0.16f, 0.18f), Triple(0.5f, 0.3f, 0.2f), Triple(0.5f, 0.12f, 0.16f))
+    coals.forEachIndexed { i, (x, y, r) ->
+        val at = Offset(tl.x + c * x, ground - c * y)
+        val glow = 0.55f + 0.45f * sin(time * TAU + i * 1.9f)
+        drawCircle(Brush.radialGradient(listOf(lerp(Palette.emberDeep, Palette.fireCore, glow * 0.6f), Color(0xFF2A1410)), at, c * r * 1.1f), c * r, at, alpha = alpha)
+        drawArc(Color(0xFF1A0E0B), 200f, 140f, useCenter = false, topLeft = at - Offset(c * r, c * r), size = Size(c * r * 2, c * r * 2), style = Stroke(width = c * 0.035f), alpha = alpha * 0.7f)
+    }
+    // A spark now and then.
+    val p = (time * 1.3f) % 1f
+    drawCircle(Palette.fireCore, c * 0.025f, Offset(tl.x + c * (0.42f + 0.12f * sin(time * TAU * 2)), ground - c * (0.45f + 0.4f * p)), alpha = alpha * (1f - p) * 0.9f)
+}
+
+/** Ash: a low, pale heap; a thin thread of smoke still rises from it. */
+private fun DrawScope.drawAsh(tl: Offset, c: Float, alpha: Float, time: Float) {
+    val ground = tl.y + c
+    val heap = Path().apply {
+        moveTo(tl.x + c * 0.08f, ground)
+        cubicTo(tl.x + c * 0.2f, ground - c * 0.3f, tl.x + c * 0.75f, ground - c * 0.34f, tl.x + c * 0.92f, ground)
+        close()
+    }
+    drawPath(heap, Brush.verticalGradient(listOf(Palette.ash, Palette.ashDark), ground - c * 0.3f, ground), alpha = alpha)
+    for ((x, y) in listOf(0.3f to 0.1f, 0.5f to 0.18f, 0.62f to 0.08f, 0.42f to 0.06f, 0.72f to 0.12f)) {
+        drawCircle(Color(0xFF3E3A37), c * 0.022f, Offset(tl.x + c * x, ground - c * y), alpha = alpha * 0.7f)
+    }
+    val p = (time * 0.6f) % 1f
+    drawCircle(Palette.ash, c * (0.04f + 0.06f * p), Offset(tl.x + c * (0.5f + 0.08f * sin(time * TAU)), ground - c * (0.3f + 0.5f * p)), alpha = alpha * 0.35f * (1f - p))
+}
+
+/** Ore: a dark, heavy rock with warm metal flecks that catch the light. */
+private fun DrawScope.drawOre(tl: Offset, c: Float, alpha: Float, time: Float) {
+    val path = stonePath(tl, c)
+    drawPath(path, Brush.linearGradient(listOf(Palette.ore, Palette.oreDark), tl, tl + Offset(c, c)), alpha = alpha)
+    drawPath(path, Color.Black, alpha = alpha * 0.35f, style = Stroke(width = c * 0.035f))
+    val flecks = listOf(0.34f to 0.42f, 0.58f to 0.36f, 0.66f to 0.62f, 0.4f to 0.7f, 0.5f to 0.54f, 0.26f to 0.6f)
+    flecks.forEachIndexed { i, (x, y) ->
+        val glint = 0.6f + 0.4f * sin(time * TAU + i * 1.4f)
+        val at = tl + Offset(c * x, c * y)
+        drawCircle(Palette.oreFleck, c * 0.04f, at, alpha = alpha * 0.9f)
+        drawCircle(Palette.metalLight, c * 0.016f, at - Offset(c * 0.01f, c * 0.01f), alpha = alpha * glint)
+    }
+}
+
+/** Smelt: lumps of ore pressed into charcoal, ready for the heat. */
+private fun DrawScope.drawSmelt(tl: Offset, c: Float, alpha: Float) {
+    val path = stonePath(tl, c)
+    drawPath(path, Brush.linearGradient(listOf(Color(0xFF3A3230), Color(0xFF141110)), tl, tl + Offset(c, c)), alpha = alpha)
+    drawPath(path, Color.Black, alpha = alpha * 0.4f, style = Stroke(width = c * 0.035f))
+    val lumps = listOf(Triple(0.36f, 0.48f, 0.11f), Triple(0.6f, 0.42f, 0.1f), Triple(0.5f, 0.66f, 0.12f), Triple(0.3f, 0.7f, 0.07f), Triple(0.7f, 0.66f, 0.07f))
+    for ((x, y, r) in lumps) {
+        val at = tl + Offset(c * x, c * y)
+        drawCircle(Brush.linearGradient(listOf(Palette.ore, Palette.oreDark), at - Offset(c * r, c * r), at + Offset(c * r, c * r)), c * r, at, alpha = alpha)
+        drawCircle(Palette.oreFleck, c * r * 0.3f, at - Offset(c * r * 0.3f, c * r * 0.3f), alpha = alpha * 0.8f)
+    }
+}
+
+/** Metal: an ingot; hot, it glows red to orange and shimmers. */
+private fun DrawScope.drawMetal(tl: Offset, c: Float, alpha: Float, time: Float, obj: GameObject) {
+    val hot = obj.state == "HOT"
+    val ground = tl.y + c * 0.94f
+    val bar = Path().apply {
+        moveTo(tl.x + c * 0.1f, ground)
+        lineTo(tl.x + c * 0.24f, ground - c * 0.36f)
+        lineTo(tl.x + c * 0.76f, ground - c * 0.36f)
+        lineTo(tl.x + c * 0.9f, ground)
+        close()
+    }
+    val pulse = 0.75f + 0.25f * sin(time * TAU * 1.5f)
+    if (hot) {
+        val center = Offset(tl.x + c / 2, ground - c * 0.18f)
+        drawCircle(Brush.radialGradient(listOf(Palette.ember.copy(alpha = 0.5f * pulse), Color.Transparent), center, c * 0.7f), c * 0.7f, center, alpha = alpha)
+    }
+    val (light, dark) = if (hot) lerp(Palette.fireCore, Palette.ember, 1f - pulse) to Palette.emberDeep else Palette.metalLight to Palette.metalDark
+    drawPath(bar, Brush.verticalGradient(listOf(light, dark), ground - c * 0.36f, ground), alpha = alpha)
+    drawPath(bar, Color.Black, alpha = alpha * 0.35f, style = Stroke(width = c * 0.03f))
+    val top = Path().apply {
+        moveTo(tl.x + c * 0.24f, ground - c * 0.36f)
+        lineTo(tl.x + c * 0.76f, ground - c * 0.36f)
+        lineTo(tl.x + c * 0.7f, ground - c * 0.3f)
+        lineTo(tl.x + c * 0.3f, ground - c * 0.3f)
+        close()
+    }
+    drawPath(top, Color.White, alpha = alpha * (if (hot) 0.35f else 0.45f))
+    if (hot) {
+        for (i in 0..2) {
+            val p = (time * 1.2f + i / 3f) % 1f
+            val x = tl.x + c * (0.32f + 0.18f * i) + c * 0.03f * sin((p + i) * TAU * 2)
+            drawLine(Palette.fireCore, Offset(x, ground - c * (0.42f + 0.3f * p)), Offset(x, ground - c * (0.48f + 0.3f * p)), strokeWidth = c * 0.02f, cap = StrokeCap.Round, alpha = alpha * 0.5f * (1f - p))
+        }
+    }
+}
+
+/** Glass: a clear block with a cool tint, bright edges and a travelling glint. */
+private fun DrawScope.drawGlass(tl: Offset, c: Float, alpha: Float, time: Float) {
+    val origin = tl + Offset(c * 0.12f, c * 0.28f)
+    val size = Size(c * 0.76f, c * 0.66f)
+    drawRoundRect(Brush.linearGradient(listOf(Palette.glass, Palette.glassDeep), origin, origin + Offset(size.width, size.height)), origin, size, CornerRadius(c * 0.06f), alpha = alpha * 0.55f)
+    drawRoundRect(Palette.glass, origin, size, CornerRadius(c * 0.06f), style = Stroke(width = c * 0.03f), alpha = alpha * 0.9f)
+    drawLine(Color.White, origin + Offset(c * 0.08f, c * 0.1f), origin + Offset(c * 0.08f, c * 0.5f), strokeWidth = c * 0.035f, cap = StrokeCap.Round, alpha = alpha * 0.7f)
+    val p = (time * 0.5f) % 1f
+    val x = origin.x + size.width * p
+    drawLine(Color.White, Offset(x, origin.y + c * 0.04f), Offset(x - c * 0.12f, origin.y + size.height - c * 0.04f), strokeWidth = c * 0.03f, cap = StrokeCap.Round, alpha = alpha * 0.4f * sin(p * PI.toFloat()))
+}
+
+/** A clump of earth with crumbs and a tuft of grass. */
+private fun DrawScope.drawEarth(tl: Offset, c: Float, alpha: Float) {
+    val ground = tl.y + c * 0.96f
+    val clump = Path().apply {
+        moveTo(tl.x + c * 0.1f, ground)
+        cubicTo(tl.x + c * 0.08f, ground - c * 0.45f, tl.x + c * 0.9f, ground - c * 0.52f, tl.x + c * 0.9f, ground)
+        close()
+    }
+    drawPath(clump, Brush.verticalGradient(listOf(Palette.soil, Palette.soilDark), ground - c * 0.45f, ground), alpha = alpha)
+    for ((x, y) in listOf(0.3f to 0.12f, 0.55f to 0.22f, 0.7f to 0.1f, 0.42f to 0.3f, 0.22f to 0.24f)) {
+        drawCircle(Palette.soilDark, c * 0.03f, Offset(tl.x + c * x, ground - c * y), alpha = alpha * 0.9f)
+    }
+    for (k in -1..1) {
+        drawLine(Palette.leaf, Offset(tl.x + c * (0.5f + 0.06f * k), ground - c * 0.36f), Offset(tl.x + c * (0.5f + 0.12f * k), ground - c * 0.5f), strokeWidth = c * 0.03f, cap = StrokeCap.Round, alpha = alpha)
+    }
+}
+
+/** Mud: a flat, glossy puddle of wet earth with a slow bubble. */
+private fun DrawScope.drawMud(tl: Offset, c: Float, alpha: Float, time: Float) {
+    val ground = tl.y + c * 0.98f
+    val blob = Path().apply {
+        moveTo(tl.x + c * 0.04f, ground)
+        cubicTo(tl.x + c * 0.04f, ground - c * 0.42f, tl.x + c * 0.96f, ground - c * 0.48f, tl.x + c * 0.96f, ground)
+        close()
+    }
+    drawPath(blob, Brush.verticalGradient(listOf(Palette.mud, Palette.mudDark), ground - c * 0.4f, ground), alpha = alpha)
+    drawPath(blob, Color.Black, alpha = alpha * 0.3f, style = Stroke(width = c * 0.025f))
+    drawArc(Color.White, 200f, 70f, useCenter = false, topLeft = Offset(tl.x + c * 0.18f, ground - c * 0.36f), size = Size(c * 0.42f, c * 0.24f), style = Stroke(width = c * 0.03f, cap = StrokeCap.Round), alpha = alpha * 0.45f)
+    for ((x, y) in listOf(0.3f to 0.12f, 0.72f to 0.16f, 0.5f to 0.08f)) {
+        drawCircle(Palette.mudDark, c * 0.03f, Offset(tl.x + c * x, ground - c * y), alpha = alpha * 0.8f)
+    }
+    val p = (time * 0.4f) % 1f
+    val r = c * 0.06f * sin(p * PI.toFloat())
+    drawCircle(Palette.mud, r, Offset(tl.x + c * 0.64f, ground - c * 0.3f), alpha = alpha, style = Stroke(width = c * 0.022f))
+}
+
+/** A small wooden hut: plank walls, a red roof, a door. Burning, flames lick the roof; charred, it is black. */
+private fun DrawScope.drawHut(tl: Offset, c: Float, alpha: Float, time: Float, obj: GameObject) {
+    val charred = obj.state == "CHARRED"
+    val ground = tl.y + c
+    val wallTop = ground - c * 0.48f
+    val (plank, plankDark) = if (charred) Color(0xFF3A302C) to Color(0xFF1A1513) else Palette.woodLight to Palette.woodDark
+    drawRect(Brush.verticalGradient(listOf(plank, plankDark), wallTop, ground), Offset(tl.x + c * 0.14f, wallTop), Size(c * 0.72f, c * 0.48f), alpha = alpha)
+    for (i in 1..3) {
+        val y = wallTop + c * 0.12f * i
+        drawLine(plankDark, Offset(tl.x + c * 0.14f, y), Offset(tl.x + c * 0.86f, y), strokeWidth = c * 0.015f, alpha = alpha * 0.7f)
+    }
+    drawRect(if (charred) Color(0xFF0E0B0A) else Color(0xFF3B2716), Offset(tl.x + c * 0.42f, ground - c * 0.3f), Size(c * 0.16f, c * 0.3f), alpha = alpha)
+    val roof = Path().apply {
+        moveTo(tl.x + c * 0.04f, wallTop + c * 0.02f)
+        lineTo(tl.x + c * 0.5f, ground - c * 0.86f)
+        lineTo(tl.x + c * 0.96f, wallTop + c * 0.02f)
+        close()
+    }
+    val (roofLight, roofDark) = if (charred) Color(0xFF2A2220) to Color(0xFF120E0D) else Palette.roof to Palette.roofDark
+    drawPath(roof, Brush.verticalGradient(listOf(roofLight, roofDark), ground - c * 0.86f, wallTop), alpha = alpha)
+    drawPath(roof, Color.Black, alpha = alpha * 0.3f, style = Stroke(width = c * 0.025f))
+    if (obj.state == "BURNING") {
+        drawFlamesOnTop(tl.x + c * 0.18f, tl.x + c * 0.82f, wallTop - c * 0.12f, c, time, alpha, 1.1f * flameStrength(obj))
+        drawBurnMoves(tl, c, alpha, time, obj.burnMovesLeft)
     }
 }

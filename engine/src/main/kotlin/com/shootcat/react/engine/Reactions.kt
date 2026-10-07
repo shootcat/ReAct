@@ -69,13 +69,15 @@ object Reactions {
         return Reaction(rule.id, rule.name, rule.phase, inputs, output)
     }
 
-    /** A merge in the same form, e.g. "Flamme + Flamme → Großes Feuer". */
+    /** A merge in the same form, e.g. "Flamme + Flamme → Großes Feuer", or "Stein + Baum → Holz, Stein bleibt" for a tool. */
     fun describeMerge(merge: MergeRule, types: TypeCatalog): Reaction = Reaction(
         ruleId = merge.id,
         name = merge.name,
         phase = Phase.STATE,
         inputs = listOf(ReactionToken(types.name(merge.a), merge.a), ReactionToken(types.name(merge.b), merge.b)),
-        output = ReactionToken(merge.name, merge.result),
+        output = merge.keptType
+            ?.let { ReactionToken("${types.name(merge.result)}, ${types.name(it)} bleibt", merge.result) }
+            ?: ReactionToken(merge.name, merge.result),
     )
 
     private fun sourceToken(rule: Rule, types: TypeCatalog): ReactionToken {

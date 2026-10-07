@@ -48,7 +48,7 @@ class GoalTypesTest {
     }
 
     private val basin = listOf("G..F....", ".....+..", "%%%%%ww%", "%%%%%%%%")
-    private val basinLegend = "\"G\": {\"type\": \"EMBER_ROCK\", \"isMovable\": true}, \"F\": {\"type\": \"FIRE\", \"isMovable\": true}, " +
+    private val basinLegend = "\"G\": {\"type\": \"EMBER\", \"isMovable\": true}, \"F\": {\"type\": \"FIRE\", \"isMovable\": true}, " +
         "\"w\": {\"type\": \"WATER\", \"amount\": 8}"
     private val heatGoal = "{\"type\": \"heat\", \"area\": [5, 2, 6, 2], \"text\": \"Bring das Wasser zum Kochen\"}"
 
@@ -56,7 +56,7 @@ class GoalTypesTest {
     fun `heat is met once a liquid in the area boils and stays met`() {
         val level = level(basin, basinLegend, heatGoal)
         val live = Levels.live(level)
-        val moved = live.move(live.start(), "ember_rock_0_0", Position(5, 1))!!
+        val moved = live.move(live.start(), "ember_0_0", Position(5, 1))!!
         var run = moved
         var latchedAt = -1
         var step = 0

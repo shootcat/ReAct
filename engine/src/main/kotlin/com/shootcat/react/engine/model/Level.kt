@@ -211,7 +211,7 @@ data class LevelData(
     val merges: List<MergeRule> = emptyList(),
     /** With marked placement: the placement fields ('+'), the only cells things may be put down on. */
     val placement: Set<Position>? = null,
-    /** Which landscape the level is drawn in (1 forest, 2 coast, 3 volcano, 4 frost); its world by default. */
+    /** Which landscape the level is drawn in (1 forest, 2 coast, 3 volcano, 4 frost, 5 mine); its world by default. */
     val look: Int = world,
 ) {
     val mainGoals: List<LevelGoal> get() = goals.filter { !it.optional }

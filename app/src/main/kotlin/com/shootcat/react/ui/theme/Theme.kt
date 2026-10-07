@@ -62,6 +62,21 @@ object Palette {
     val pumiceDark = Color(0xFF9A9286)
     val basalt = Color(0xFF3A3436)
     val ember = Color(0xFFFF8A3D)
+    val emberDeep = Color(0xFFD9381E)
+    val ash = Color(0xFFA7A29E)
+    val ashDark = Color(0xFF6E6965)
+    val ore = Color(0xFF6A5A52)
+    val oreDark = Color(0xFF3E3430)
+    val oreFleck = Color(0xFFD9895A)
+    val metalLight = Color(0xFFD6DEE8)
+    val glass = Color(0xFFBFEAF0)
+    val glassDeep = Color(0xFF5FA9B8)
+    val soil = Color(0xFF7A5534)
+    val soilDark = Color(0xFF4A321E)
+    val mud = Color(0xFF7A5634)
+    val mudDark = Color(0xFF3E2A1C)
+    val roof = Color(0xFF8A3B2A)
+    val roofDark = Color(0xFF5A2219)
     val cloud = Color(0xFFF4F7FA)
     val cloudDark = Color(0xFF8F9BA8)
     val rain = Color(0xFF9CC9FF)
@@ -104,10 +119,17 @@ object WorldLooks {
         cover = Color(0xFFF2F7FB), coverDark = Color(0xFFBCD0E0), horizon = Color(0xFF8DA4BF),
     )
 
+    val mine = WorldLook(
+        skyTop = Color(0xFF231B16), skyBottom = Color(0xFF4E3C2E), cave = Color(0xFF0D0A09),
+        earth = Color(0xFF4A3A30), earthDark = Color(0xFF2B211B), rock = Color(0xFF5A5250), rockDark = Color(0xFF332E2D),
+        cover = Color(0xFF7A6A5C), coverDark = Color(0xFF4F443B), horizon = Color(0xFF2E231C),
+    )
+
     fun of(world: Int): WorldLook = when (world) {
         2 -> coast
         3 -> volcano
         4 -> frost
+        5 -> mine
         else -> forest
     }
 }

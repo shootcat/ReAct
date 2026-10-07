@@ -203,7 +203,7 @@ object LevelLoader {
             wind = wind,
             merges = world.merges,
             placement = placement,
-            look = dto.look?.also { if (it !in 1..4) fail("$where: look $it is not 1 to 4") } ?: dto.world,
+            look = dto.look?.also { if (it !in 1..5) fail("$where: look $it is not 1 to 5") } ?: dto.world,
         )
     }
 

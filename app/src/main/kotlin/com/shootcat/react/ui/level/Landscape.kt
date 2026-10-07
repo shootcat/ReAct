@@ -136,6 +136,7 @@ internal class Landscape(
             2 -> drawCoastScenery(cell, w, horizon, time, slow)
             3 -> drawVolcanoScenery(cell, w, horizon, time, slow)
             4 -> drawFrostScenery(cell, w, horizon, time, slow)
+            5 -> drawMineScenery(cell, w, h, time, slow)
             else -> drawForestScenery(cell, w, horizon, time, slow)
         }
     }
@@ -281,6 +282,49 @@ internal class Landscape(
             val x = hash(i, 2, 8) * w + c * 0.4f * sin((slow * 6 + hash(i, 3, 8)) * TAU)
             val y = ((hash(i, 4, 8) + slow * 5f) % 1f) * height * c
             drawCircle(Color.White, c * (0.03f + 0.03f * hash(i, 5, 8)), Offset(x, y), alpha = 0.7f)
+        }
+    }
+
+    /**
+     * Deep in a mine: a rock face instead of a sky, timber frames holding up the gallery, lanterns that
+     * flicker on the beams, glinting veins of ore and dust drifting in the lamplight.
+     */
+    private fun DrawScope.drawMineScenery(c: Float, w: Float, h: Float, time: Float, slow: Float) {
+        // Strata and veins in the far rock.
+        for (i in 0 until 9) {
+            val y = h * hash(i, 1, 11)
+            drawLine(look.horizon, Offset(0f, y), Offset(w, y + c * (hash(i, 2, 11) - 0.5f)), strokeWidth = c * (0.08f + 0.12f * hash(i, 3, 11)), alpha = 0.5f)
+        }
+        for (i in 0 until 12) {
+            val at = Offset(hash(i, 4, 11) * w, hash(i, 5, 11) * h)
+            val glint = 0.3f + 0.7f * abs(sin((time * 0.7f + hash(i, 6, 11)) * TAU))
+            drawCircle(Color(0xFFD9895A), c * 0.04f, at, alpha = 0.35f)
+            drawCircle(Color(0xFFFFE2B8), c * 0.02f, at, alpha = 0.5f * glint)
+        }
+        // Timber frames: two posts and a beam, every few cells.
+        val beam = Color(0xFF5A3E26)
+        val beamDark = Color(0xFF3A2716)
+        var x = c * 1.5f
+        var k = 0
+        while (x < w) {
+            val top = c * (0.6f + 0.3f * hash(k, 7, 11))
+            drawRect(Brush.horizontalGradient(listOf(beam, beamDark), x - c * 0.12f, x + c * 0.12f), Offset(x - c * 0.12f, top), Size(c * 0.24f, h - top), alpha = 0.85f)
+            drawRect(Brush.verticalGradient(listOf(beam, beamDark), top - c * 0.2f, top + c * 0.1f), Offset(x - c * 0.9f, top - c * 0.2f), Size(c * 1.8f, c * 0.3f), alpha = 0.85f)
+            // A lantern hanging from the beam.
+            val lamp = Offset(x + c * 0.5f, top + c * 0.45f)
+            val flicker = 0.75f + 0.25f * sin(time * TAU * 3f + k) * sin(time * TAU * 1.3f + k * 2)
+            drawLine(Color(0xFF1E1A18), Offset(lamp.x, top + c * 0.1f), Offset(lamp.x, lamp.y - c * 0.12f), strokeWidth = c * 0.025f, alpha = 0.8f)
+            drawCircle(Brush.radialGradient(listOf(Color(0x88FFB15A), Color.Transparent), lamp, c * 2.4f), c * 2.4f, lamp, alpha = flicker)
+            drawRoundRect(Color(0xFF2A2420), Offset(lamp.x - c * 0.1f, lamp.y - c * 0.14f), Size(c * 0.2f, c * 0.26f), CornerRadius(c * 0.04f))
+            drawCircle(Color(0xFFFFD27A), c * 0.06f, lamp, alpha = flicker)
+            x += c * (4f + 1.5f * hash(k, 8, 11))
+            k++
+        }
+        // Dust in the lamplight.
+        for (i in 0 until 14) {
+            val dx = hash(i, 9, 11) * w + c * 0.5f * sin((slow * 4 + hash(i, 10, 11)) * TAU)
+            val dy = ((hash(i, 12, 11) + slow * 1.5f) % 1f) * h
+            drawCircle(Color(0xFFE8D2B0), c * 0.02f, Offset(dx, dy), alpha = 0.3f)
         }
     }
 

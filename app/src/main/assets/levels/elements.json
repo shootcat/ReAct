@@ -18,6 +18,23 @@
    "world": 1
   },
   {
+   "type": "SEAWATER",
+   "name": "Meerwasser",
+   "default_state": "LIQUID",
+   "properties": {
+    "liquid": true,
+    "capacity": 8,
+    "density": 11,
+    "weight": 2
+   },
+   "vanish_states": [],
+   "state_names": {
+    "LIQUID": "flüssig"
+   },
+   "description": "Salzig und schwerer als Süßwasser: sinkt darunter. Löscht Feuer, aber nichts wächst davon.",
+   "world": 2
+  },
+  {
    "type": "STEAM",
    "name": "Dampf",
    "default_state": "GAS",
@@ -120,14 +137,11 @@
    "world": 1
   },
   {
-   "type": "WOOD_PILE",
-   "name": "Holzstapel",
-   "default_state": "DRY",
+   "type": "TREE",
+   "name": "Baum",
+   "default_state": "GREEN",
    "properties": {
-    "gravity": true,
-    "density": 7,
-    "weight": 16,
-    "heat": 6,
+    "heat": 5,
     "heat_state": "BURNING",
     "flame": true,
     "burn_moves": 3,
@@ -135,11 +149,31 @@
    },
    "vanish_states": [],
    "state_names": {
-    "DRY": "trocken",
+    "GREEN": "grün",
     "BURNING": "brennt"
    },
-   "description": "Zwei Hölzer zusammen. Brennt drei Züge lang und so heiß, dass Wasser daneben verdampft. Nur tiefes Wasser löscht ihn.",
+   "description": "Steht fest. Fängt an einer Flamme Feuer, gibt es an Nachbarn weiter und brennt drei Züge lang. Ein Stein fällt ihn zu Holz.",
    "world": 1
+  },
+  {
+   "type": "HUT",
+   "name": "Hütte",
+   "default_state": "INTACT",
+   "properties": {
+    "heat": 5,
+    "heat_state": "BURNING",
+    "flame": true,
+    "burn_moves": 3,
+    "burns_into": "ASH"
+   },
+   "vanish_states": [],
+   "state_names": {
+    "INTACT": "steht",
+    "BURNING": "brennt",
+    "CHARRED": "verkohlt"
+   },
+   "description": "Eine Holzhütte. Fängt an einer Flamme Feuer wie ein Baum.",
+   "world": 2
   },
   {
    "type": "CHARCOAL",
@@ -158,6 +192,24 @@
    "world": 1
   },
   {
+   "type": "EMBER",
+   "name": "Glut",
+   "default_state": "GLOWING",
+   "properties": {
+    "gravity": true,
+    "density": 6,
+    "weight": 5,
+    "heat": 7,
+    "heat_state": "GLOWING"
+   },
+   "vanish_states": [],
+   "state_names": {
+    "GLOWING": "glüht"
+   },
+   "description": "Holzkohle mit einer Flamme darin. Glüht heiß, aber ohne Flamme: bringt Wasser zum Kochen, schmilzt Sand und Schmelzgut, zündet aber nichts an.",
+   "world": 3
+  },
+  {
    "type": "ASH",
    "name": "Asche",
    "default_state": "COLD",
@@ -172,6 +224,54 @@
    },
    "description": "Was von Holz bleibt, das ganz abgebrannt ist. Zu nichts mehr zu gebrauchen.",
    "world": 1
+  },
+  {
+   "type": "STONE",
+   "name": "Stein",
+   "default_state": "SOLID",
+   "properties": {
+    "gravity": true,
+    "density": 25,
+    "weight": 40
+   },
+   "vanish_states": [],
+   "state_names": {
+    "SOLID": "fest"
+   },
+   "description": "Schwer. Sinkt im Wasser und hebt so den Wasserspiegel.",
+   "world": 1
+  },
+  {
+   "type": "ORE",
+   "name": "Erz",
+   "default_state": "SOLID",
+   "properties": {
+    "gravity": true,
+    "density": 26,
+    "weight": 30
+   },
+   "vanish_states": [],
+   "state_names": {
+    "SOLID": "roh"
+   },
+   "description": "Gestein mit Metall darin. Auf Holzkohle gelegt wird daraus Schmelzgut.",
+   "world": 3
+  },
+  {
+   "type": "SMELT",
+   "name": "Schmelzgut",
+   "default_state": "SOLID",
+   "properties": {
+    "gravity": true,
+    "density": 22,
+    "weight": 25
+   },
+   "vanish_states": [],
+   "state_names": {
+    "SOLID": "bereit"
+   },
+   "description": "Erz und Holzkohle zusammen. Neben Glut schmilzt es zu Metall.",
+   "world": 3
   },
   {
    "type": "METAL",
@@ -192,7 +292,95 @@
     "HOT": "heiß"
    },
    "description": "Neben Glut wird es heiß und gibt die Hitze weiter, ohne zu brennen – auch durch eine Wand hindurch. Ohne Hitze kühlt es langsam ab.",
-   "world": 1
+   "world": 3
+  },
+  {
+   "type": "SAND",
+   "name": "Sand",
+   "default_state": "DRY",
+   "properties": {
+    "gravity": true,
+    "density": 20,
+    "weight": 20,
+    "granular": true,
+    "granular_state": "DRY"
+   },
+   "vanish_states": [],
+   "state_names": {
+    "DRY": "trocken",
+    "WET": "nass"
+   },
+   "description": "Rieselt und türmt sich. Neben Glut oder heißem Metall schmilzt er zu Glas.",
+   "world": 2
+  },
+  {
+   "type": "GLASS",
+   "name": "Glas",
+   "default_state": "SOLID",
+   "properties": {
+    "gravity": true,
+    "density": 22,
+    "weight": 20
+   },
+   "vanish_states": [],
+   "state_names": {
+    "SOLID": "klar"
+   },
+   "description": "Geschmolzener Sand, klar und hart.",
+   "world": 3
+  },
+  {
+   "type": "EARTH",
+   "name": "Erde",
+   "default_state": "SOLID",
+   "properties": {
+    "gravity": true,
+    "density": 16,
+    "weight": 16
+   },
+   "vanish_states": [],
+   "state_names": {
+    "SOLID": "locker"
+   },
+   "description": "Ein Klumpen Erde. Mit Wasser oder Salzwasser wird daraus Schlamm.",
+   "world": 2
+  },
+  {
+   "type": "MUD",
+   "name": "Schlamm",
+   "default_state": "SOLID",
+   "properties": {
+    "gravity": true,
+    "density": 17,
+    "weight": 18
+   },
+   "vanish_states": [],
+   "state_names": {
+    "SOLID": "nass"
+   },
+   "description": "Erde und Wasser zusammen: schwer und klebrig. Das Wasser darin löscht nichts mehr.",
+   "world": 2
+  },
+  {
+   "type": "SNOW",
+   "name": "Schnee",
+   "default_state": "POWDER",
+   "properties": {
+    "gravity": true,
+    "density": 4,
+    "weight": 3,
+    "granular": true,
+    "granular_state": "POWDER"
+   },
+   "vanish_states": [
+    "MELTED"
+   ],
+   "state_names": {
+    "POWDER": "pulvrig",
+    "MELTED": "geschmolzen"
+   },
+   "description": "Rieselt wie Sand, ist aber federleicht. Schmilzt bei Hitze zu wenig Wasser.",
+   "world": 4
   },
   {
    "type": "ICE",
@@ -214,20 +402,23 @@
    "world": 1
   },
   {
-   "type": "STONE",
-   "name": "Stein",
-   "default_state": "SOLID",
+   "type": "SALT",
+   "name": "Salz",
+   "default_state": "CRYSTAL",
    "properties": {
     "gravity": true,
-    "density": 25,
-    "weight": 40
+    "density": 18,
+    "weight": 10
    },
-   "vanish_states": [],
+   "vanish_states": [
+    "DISSOLVED"
+   ],
    "state_names": {
-    "SOLID": "fest"
+    "CRYSTAL": "Kristall",
+    "DISSOLVED": "gelöst"
    },
-   "description": "Schwer. Sinkt im Wasser und hebt so den Wasserspiegel.",
-   "world": 1
+   "description": "Taut Eis und Schnee. Löst sich in Wasser und macht daraus Meerwasser.",
+   "world": 4
   },
   {
    "type": "SEED",
@@ -249,62 +440,6 @@
    },
    "description": "Keimt, sobald Süßwasser ihn berührt. Hitze verbrennt ihn.",
    "world": 1
-  },
-  {
-   "type": "TREE",
-   "name": "Baum",
-   "default_state": "GREEN",
-   "properties": {
-    "heat": 5,
-    "heat_state": "BURNING",
-    "flame": true,
-    "burn_moves": 3,
-    "burns_into": "ASH"
-   },
-   "vanish_states": [],
-   "state_names": {
-    "GREEN": "grün",
-    "BURNING": "brennt"
-   },
-   "description": "Steht fest. Fängt an einer Flamme Feuer, gibt es an Nachbarn weiter und brennt drei Züge lang. Ein Stein fällt ihn zu Holz.",
-   "world": 1
-  },
-  {
-   "type": "SEAWATER",
-   "name": "Meerwasser",
-   "default_state": "LIQUID",
-   "properties": {
-    "liquid": true,
-    "capacity": 8,
-    "density": 11,
-    "weight": 2
-   },
-   "vanish_states": [],
-   "state_names": {
-    "LIQUID": "flüssig"
-   },
-   "description": "Salzig und schwerer als Süßwasser: sinkt darunter. Löscht Feuer, aber nichts wächst davon.",
-   "world": 2
-  },
-  {
-   "type": "SAND",
-   "name": "Sand",
-   "default_state": "DRY",
-   "properties": {
-    "gravity": true,
-    "density": 20,
-    "weight": 20,
-    "granular": true,
-    "granular_state": "DRY"
-   },
-   "vanish_states": [],
-   "state_names": {
-    "DRY": "trocken",
-    "WET": "nass",
-    "GLASS": "Glas"
-   },
-   "description": "Rieselt zur Seite. Nass klebt er zusammen und hält Wasser auf; Hitze trocknet ihn wieder.",
-   "world": 2
   },
   {
    "type": "LAVA",
@@ -329,21 +464,6 @@
    "world": 3
   },
   {
-   "type": "EMBER_ROCK",
-   "name": "Glutfels",
-   "default_state": "HOT",
-   "properties": {
-    "heat": 7,
-    "heat_state": "HOT"
-   },
-   "vanish_states": [],
-   "state_names": {
-    "HOT": "glüht"
-   },
-   "description": "Heißes Gestein aus der Tiefe. Erlischt nie und bringt Wasser darauf zum Kochen.",
-   "world": 3
-  },
-  {
    "type": "PUMICE",
    "name": "Bimsstein",
    "default_state": "SOLID",
@@ -358,46 +478,6 @@
    },
    "description": "Ein Stein voller Luftlöcher: er schwimmt.",
    "world": 3
-  },
-  {
-   "type": "SNOW",
-   "name": "Schnee",
-   "default_state": "POWDER",
-   "properties": {
-    "gravity": true,
-    "density": 4,
-    "weight": 3,
-    "granular": true,
-    "granular_state": "POWDER"
-   },
-   "vanish_states": [
-    "MELTED"
-   ],
-   "state_names": {
-    "POWDER": "pulvrig",
-    "MELTED": "geschmolzen"
-   },
-   "description": "Rieselt wie Sand, ist aber federleicht. Schmilzt bei Hitze zu wenig Wasser.",
-   "world": 4
-  },
-  {
-   "type": "SALT",
-   "name": "Salz",
-   "default_state": "CRYSTAL",
-   "properties": {
-    "gravity": true,
-    "density": 18,
-    "weight": 10
-   },
-   "vanish_states": [
-    "DISSOLVED"
-   ],
-   "state_names": {
-    "CRYSTAL": "Kristall",
-    "DISSOLVED": "gelöst"
-   },
-   "description": "Taut Eis und Schnee. Löst sich in Wasser und macht daraus Meerwasser.",
-   "world": 4
   }
  ],
  "rules": [
@@ -505,22 +585,6 @@
    "sound": "crackle"
   },
   {
-   "id": "heat_ignites_wood_pile",
-   "name": "Entzünden (Stapel)",
-   "trigger": "TOUCH",
-   "conditions": {
-    "source_hot": true,
-    "target": "WOOD_PILE",
-    "target_state": "DRY",
-    "source_flame": true
-   },
-   "effect": {
-    "target_state": "BURNING"
-   },
-   "world": 1,
-   "sound": "crackle"
-  },
-  {
    "id": "heat_ignites_tree",
    "name": "Entzünden (Baum)",
    "trigger": "TOUCH",
@@ -544,25 +608,6 @@
     "source": "WATER",
     "target": "WOOD",
     "target_state": "BURNING"
-   },
-   "effect": {
-    "transform": "CHARCOAL",
-    "spawn_object": "STEAM",
-    "spawn_amount": 4,
-    "source_consume": 2
-   },
-   "world": 1,
-   "sound": "hiss"
-  },
-  {
-   "id": "water_douses_wood_pile",
-   "name": "Ablöschen",
-   "trigger": "TOUCH",
-   "conditions": {
-    "source": "WATER",
-    "target": "WOOD_PILE",
-    "target_state": "BURNING",
-    "source_min_amount": 6
    },
    "effect": {
     "transform": "CHARCOAL",
@@ -693,25 +738,6 @@
    "sound": "hiss"
   },
   {
-   "id": "sea_douses_wood_pile",
-   "name": "Ablöschen (Meer)",
-   "trigger": "TOUCH",
-   "conditions": {
-    "source": "SEAWATER",
-    "target": "WOOD_PILE",
-    "target_state": "BURNING",
-    "source_min_amount": 6
-   },
-   "effect": {
-    "transform": "CHARCOAL",
-    "spawn_object": "STEAM",
-    "spawn_amount": 4,
-    "source_consume": 2
-   },
-   "world": 2,
-   "sound": "hiss"
-  },
-  {
    "id": "sea_douses_tree",
    "name": "Ablöschen (Meer)",
    "trigger": "TOUCH",
@@ -826,22 +852,6 @@
    "sound": "hiss"
   },
   {
-   "id": "lava_melts_sand",
-   "name": "Glas",
-   "trigger": "TOUCH",
-   "conditions": {
-    "source_hot": true,
-    "min_heat": 8,
-    "target": "SAND",
-    "target_state": "DRY"
-   },
-   "effect": {
-    "target_state": "GLASS"
-   },
-   "world": 3,
-   "sound": "sizzle"
-  },
-  {
    "id": "heat_melts_snow",
    "name": "Tauwetter",
    "trigger": "TOUCH",
@@ -922,7 +932,89 @@
    "else_effect": {
     "target_state": "COLD"
    },
-   "world": 1
+   "world": 3
+  },
+  {
+   "id": "heat_melts_sand",
+   "name": "Glas",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source_hot": true,
+    "min_heat": 6,
+    "target": "SAND",
+    "target_state": "DRY"
+   },
+   "effect": {
+    "transform": "GLASS"
+   },
+   "world": 3,
+   "sound": "chime"
+  },
+  {
+   "id": "ember_smelts",
+   "name": "Schmelzen",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source": "EMBER",
+    "target": "SMELT"
+   },
+   "effect": {
+    "transform": "METAL"
+   },
+   "world": 3,
+   "sound": "clink"
+  },
+  {
+   "id": "heat_ignites_hut",
+   "name": "Entzünden",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source_hot": true,
+    "source_flame": true,
+    "target": "HUT",
+    "target_state": "INTACT"
+   },
+   "effect": {
+    "target_state": "BURNING"
+   },
+   "world": 2,
+   "sound": "crackle"
+  },
+  {
+   "id": "water_douses_hut",
+   "name": "Löschen",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source": "WATER",
+    "target": "HUT",
+    "target_state": "BURNING"
+   },
+   "effect": {
+    "target_state": "CHARRED",
+    "spawn_object": "STEAM",
+    "spawn_amount": 4,
+    "source_consume": 2
+   },
+   "world": 2,
+   "sound": "hiss"
+  },
+  {
+   "id": "sea_douses_hut",
+   "name": "Löschen",
+   "trigger": "TOUCH",
+   "conditions": {
+    "source": "SEAWATER",
+    "target": "HUT",
+    "target_state": "BURNING"
+   },
+   "effect": {
+    "target_state": "CHARRED",
+    "spawn_object": "STEAM",
+    "spawn_amount": 4,
+    "source_consume": 2
+   },
+   "world": 2,
+   "sound": "hiss"
   }
  ],
  "merges": [
@@ -933,15 +1025,6 @@
    "b": "FIRE",
    "result": "BIG_FIRE",
    "sound": "whoosh",
-   "world": 1
-  },
-  {
-   "id": "logs_merge",
-   "name": "Holzstapel",
-   "a": "WOOD",
-   "b": "WOOD",
-   "result": "WOOD_PILE",
-   "sound": "thud",
    "world": 1
   },
   {
@@ -969,8 +1052,44 @@
    "b": "TREE",
    "result": "WOOD",
    "keep": "a",
-   "sound": "thud",
+   "sound": "chop",
    "world": 1
+  },
+  {
+   "id": "fire_on_charcoal",
+   "name": "Glut",
+   "a": "FIRE",
+   "b": "CHARCOAL",
+   "result": "EMBER",
+   "sound": "glow",
+   "world": 3
+  },
+  {
+   "id": "ore_on_charcoal",
+   "name": "Schmelzgut",
+   "a": "ORE",
+   "b": "CHARCOAL",
+   "result": "SMELT",
+   "sound": "crunch",
+   "world": 3
+  },
+  {
+   "id": "earth_and_water",
+   "name": "Schlamm",
+   "a": "EARTH",
+   "b": "WATER",
+   "result": "MUD",
+   "sound": "squelch",
+   "world": 2
+  },
+  {
+   "id": "earth_and_sea",
+   "name": "Schlamm",
+   "a": "EARTH",
+   "b": "SEAWATER",
+   "result": "MUD",
+   "sound": "squelch",
+   "world": 2
   }
  ]
 }
