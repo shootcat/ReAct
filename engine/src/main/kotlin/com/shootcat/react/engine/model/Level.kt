@@ -20,6 +20,9 @@ data class WindZone(val area: Area, val dx: Int)
 /**
  * Dropping one element onto another of a matching kind merges them into a stronger one, e.g. two
  * flames into a big fire. When [result] is the liquid both are made of, their amounts simply add up.
+ *
+ * With [keep] ("a" or "b") it is a tool instead: the thing of that type stays where it is, untouched, and
+ * only the other one turns into [result] in its place – a stone dropped on a tree fells it into wood.
  */
 data class MergeRule(
     val id: String,
@@ -29,8 +32,16 @@ data class MergeRule(
     val result: String,
     val sound: String? = null,
     val world: Int = 1,
+    val keep: String? = null,
 ) {
     fun matches(x: String, y: String): Boolean = (x == a && y == b) || (x == b && y == a)
+
+    /** The type that survives a tool merge unchanged, or null for an ordinary merge. */
+    val keptType: String? get() = when (keep) {
+        "a" -> a
+        "b" -> b
+        else -> null
+    }
 }
 
 /**

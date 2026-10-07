@@ -50,8 +50,9 @@ object LevelLoader {
         val rules = dto.rules.map { it.toModel() }
         rules.forEach { validateRule(it, types, "catalog") }
         requireUnique(rules.map { it.id }, "rule id in catalog")
-        val merges = dto.merges.map { MergeRule(it.id, it.name ?: it.id, it.a, it.b, it.result, it.sound, it.world) }
+        val merges = dto.merges.map { MergeRule(it.id, it.name ?: it.id, it.a, it.b, it.result, it.sound, it.world, it.keep) }
         merges.forEach { m ->
+            if (m.keep != null && m.keep !in setOf("a", "b")) fail("catalog: merge '${m.id}' keeps '${m.keep}', not \"a\" or \"b\"")
             listOf(m.a, m.b, m.result).forEach { if (it !in types) fail("catalog: merge '${m.id}' uses unknown type '$it'") }
         }
         requireUnique(merges.map { it.id }, "merge id in catalog")
@@ -341,6 +342,7 @@ object LevelLoader {
         val result: String,
         val sound: String? = null,
         val world: Int = 1,
+        val keep: String? = null,
     )
 
     @Serializable

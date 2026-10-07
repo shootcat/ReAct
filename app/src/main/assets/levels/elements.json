@@ -901,6 +901,16 @@
    "result": "SEAWATER",
    "sound": "splash",
    "world": 2
+  },
+  {
+   "id": "stone_fells_tree",
+   "name": "Fällen",
+   "a": "STONE",
+   "b": "TREE",
+   "result": "WOOD",
+   "keep": "a",
+   "sound": "thud",
+   "world": 1
   }
  ]
 }

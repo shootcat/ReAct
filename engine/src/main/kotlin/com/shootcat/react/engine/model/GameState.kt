@@ -123,6 +123,12 @@ data class GameState(
         return replacing(obj, to, liquid)
     }
 
+    /** [into] takes the place of the object with [replacedId] (a tree felled into wood); nothing else moves. */
+    fun withReplaced(replacedId: String, into: GameObject): GameState? {
+        if (objectById(replacedId) == null) return null
+        return copy(objects = (objects.filter { it.id != replacedId } + into).sortedBy { it.id })
+    }
+
     /**
      * Two objects merge: [sourceId] disappears and the object [into] takes the target's place. When
      * [into] holds more than one cell can, the rest overflows into the cells around it (up first).

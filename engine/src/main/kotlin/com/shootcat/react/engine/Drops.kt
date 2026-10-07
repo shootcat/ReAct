@@ -26,7 +26,8 @@ sealed interface Drop {
  * Drag and drop with the same rules everywhere:
  *
  * 1. Onto an empty cell (or one with only gas): the object is put there.
- * 2. Onto an element it merges with (two flames, two logs, water onto water): they become one.
+ * 2. Onto an element it merges with (two flames, two logs, water onto water): they become one. A tool
+ *    merge (a stone on a tree) leaves the tool where it was and changes only the other thing.
  * 3. A solid onto a liquid: it goes in and pushes the liquid up – the level rises.
  * 4. Onto something it reacts with (water onto fire, fire onto ice): it lands next to it and the
  *    normal physics take over.
@@ -53,6 +54,12 @@ class Drops(private val types: TypeCatalog, private val rules: List<Rule>, priva
         val merge = merges.firstOrNull { it.matches(obj.type, target.type) }
         if (merge != null) {
             if (!field && to.neighbours().none { state.inBounds(it) && state.placement?.contains(it) == true }) return null
+            val kept = merge.keptType
+            if (kept != null) {
+                // A tool: the thing that is kept stays where it is, the other turns into the result in place.
+                val changed = if (obj.type == kept) target else obj
+                return state.withReplaced(changed.id, transformed(changed, merge.result))?.let { Drop.Merged(it, target.id, merge) }
+            }
             val into = merged(obj, target, merge)
             return state.withMerged(obj.id, into)?.let { Drop.Merged(it, target.id, merge) }
         }
@@ -80,6 +87,13 @@ class Drops(private val types: TypeCatalog, private val rules: List<Rule>, priva
         if (c.sourceHot && source.heatOutput < c.minHeat) return false
         if (c.sourceMinAmount > 0 && source.amount < c.sourceMinAmount) return false
         return c.source != null || c.sourceHot
+    }
+
+    /** [obj] turned into [type] where it lies; a loose solid (wood from a felled tree) can be picked up. */
+    private fun transformed(obj: GameObject, type: String): GameObject {
+        val props = types.require(type).properties
+        val loose = obj.isMovable || (props["gravity"] == "true" && props["liquid"] != "true")
+        return types.create(id = obj.id, type = type, position = obj.position, isMovable = loose)
     }
 
     /** The object that replaces [target]: the same liquid with both amounts, or the merge's result type. */
