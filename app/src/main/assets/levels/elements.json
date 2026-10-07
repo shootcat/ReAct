@@ -164,6 +164,27 @@
    "world": 1
   },
   {
+   "type": "METAL",
+   "name": "Metall",
+   "default_state": "COLD",
+   "properties": {
+    "gravity": true,
+    "density": 30,
+    "weight": 30,
+    "conducts": true,
+    "heat": 6,
+    "heat_state": "HOT",
+    "heat_through_wall": true
+   },
+   "vanish_states": [],
+   "state_names": {
+    "COLD": "kalt",
+    "HOT": "heiß"
+   },
+   "description": "Neben Glut wird es heiß und gibt die Hitze weiter, ohne zu brennen – auch durch eine Wand hindurch. Ohne Hitze kühlt es langsam ab.",
+   "world": 1
+  },
+  {
    "type": "ICE",
    "name": "Eis",
    "default_state": "SOLID",
@@ -879,6 +900,22 @@
    },
    "world": 4,
    "sound": "soak"
+  },
+  {
+   "id": "metal_heats",
+   "name": "Wärmeleitung",
+   "trigger": "HEAT",
+   "conditions": {
+    "target": "METAL",
+    "min_load": 1
+   },
+   "effect": {
+    "target_state": "HOT"
+   },
+   "else_effect": {
+    "target_state": "COLD"
+   },
+   "world": 1
   }
  ],
  "merges": [

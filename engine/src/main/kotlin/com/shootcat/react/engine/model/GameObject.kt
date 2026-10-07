@@ -48,6 +48,8 @@ object Props {
     const val FLAME = "flame"
     /** How far (in cells, around obstacles) the heat of a hot object reaches; 1 means touching only. */
     const val HEAT_RADIUS = "heat_radius"
+    /** Stuck in a slot of a wall, its heat passes through one wall cell to the cell behind (metal). */
+    const val HEAT_THROUGH_WALL = "heat_through_wall"
     /** A cloud: hovers in place, drifts with the wind, takes up steam and rains once it is dense enough. */
     const val CLOUD = "cloud"
     /** Liquid a cloud rains … */
@@ -103,6 +105,7 @@ data class GameObject(
     /** Air-like: falling things pass through gas and clouds. */
     val isAiry: Boolean get() = isGas || isCloud
     val heatRadius: Int get() = int(Props.HEAT_RADIUS, 1)
+    val heatsThroughWalls: Boolean get() = flag(Props.HEAT_THROUGH_WALL)
 
     /** Load this object puts on what is below it. Gas weighs nothing. */
     val load: Int

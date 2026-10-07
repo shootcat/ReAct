@@ -147,13 +147,24 @@ class RuleEngine(
     /**
      * Hot objects whose heat reaches a cell from further away than touching (a big fire, lava): it
      * spreads up to their [GameObject.heatRadius] through open air and gas. Whatever stands in the
-     * way (rock, water, a stone) takes the heat but does not pass it on.
+     * way (rock, water, a stone) takes the heat but does not pass it on. Hot metal stuck in a slot of
+     * a wall (walls on two opposite sides) also heats the cell straight behind each wall cell it
+     * touches; one wall cell thick, never more.
      */
     private fun farHeat(state: GameState): Map<Position, List<GameObject>> {
         val result = HashMap<Position, MutableList<GameObject>>()
         for (o in state.objects) {
+            if (o.heatOutput <= 0) continue
+            if (o.heatsThroughWalls && inSlot(state, o.position)) {
+                for (wall in o.position.neighbours()) {
+                    val behind = Position(2 * wall.x - o.position.x, 2 * wall.y - o.position.y)
+                    if (state.isWall(wall) && state.inBounds(behind) && !state.isWall(behind)) {
+                        result.getOrPut(behind) { mutableListOf() } += o
+                    }
+                }
+            }
             val radius = o.heatRadius
-            if (radius < 2 || o.heatOutput <= 0) continue
+            if (radius < 2) continue
             val distance = hashMapOf(o.position to 0)
             val queue = ArrayDeque(listOf(o.position))
             while (queue.isNotEmpty()) {
@@ -171,6 +182,9 @@ class RuleEngine(
         }
         return result
     }
+
+    private fun inSlot(state: GameState, p: Position): Boolean =
+        state.isWall(p.left()) && state.isWall(p.right()) || state.isWall(p.up()) && state.isWall(p.down())
 
     private fun sourcesFor(
         trigger: Trigger,

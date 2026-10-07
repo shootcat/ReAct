@@ -1,5 +1,6 @@
 package com.shootcat.react.engine
 
+import com.shootcat.react.engine.model.GameState
 import com.shootcat.react.engine.model.LevelData
 import com.shootcat.react.engine.model.Position
 import kotlin.test.Test
@@ -91,5 +92,62 @@ class MaterialsTest {
         val start = level(listOf("W.+f+G..", "%%%%%%%%"), legend).initialState()
         assertIs<Drop.NextTo>(drops.resolve(start, "wood_0_0", Position(3, 0)))
         assertNull(drops.resolve(start, "wood_0_0", Position(5, 0)), "wood dropped on embers bounces off")
+    }
+
+    private val hot = "\"G\": {\"type\": \"EMBER_ROCK\"}, \"M\": {\"type\": \"METAL\"}, \"W\": {\"type\": \"WOOD\"}, " +
+        "\"i\": {\"type\": \"ICE\"}"
+
+    private fun steps(level: LevelData, n: Int, from: GameState = level.initialState()): GameState {
+        val engine = Levels.engine(level)
+        var state = from
+        repeat(n) { state = engine.step(state).state }
+        return state
+    }
+
+    @Test
+    fun `metal next to embers gets hot, passes the heat on and still sets nothing alight`() {
+        val level = level(listOf("+.....", ".GMMW.", "%%%%%%"), hot)
+        val after = steps(level, 6)
+        val metal = after.objects.filter { it.type == "METAL" }
+        assertEquals(listOf("HOT", "HOT"), metal.map { it.state }, "the metal touching the embers and the metal behind it")
+        assertTrue(metal.all { it.heatOutput > 0 && !it.isFlame })
+        assertEquals("DRY", after.objectAt(Position(4, 1))?.state, "hot metal has no flame")
+    }
+
+    @Test
+    fun `hot metal stuck in a wall slot heats what lies behind the wall`() {
+        val level = level(listOf("+.....", "..G...", "%%M%%%", "%%%%%%", "%%i%%%", "%%%%%%"), hot)
+        val after = steps(level, 6)
+        assertEquals("HOT", after.objectAt(Position(2, 2))?.state)
+        assertTrue(after.objects.none { it.type == "ICE" }, "the ice behind the wall melted")
+        assertTrue(after.objects.any { it.type == "WATER" })
+    }
+
+    @Test
+    fun `heat does not pass a wall without metal in the slot`() {
+        val embers = level(listOf("+.....", "......", "%%G%%%", "%%%%%%", "%%i%%%", "%%%%%%"), hot)
+        assertEquals("ICE", steps(embers, 10).objectAt(Position(2, 4))?.type, "embers in the slot only heat what they touch")
+        val onFloor = level(listOf("+.....", ".GM...", "%%%%%%", "%%i%%%", "%%%%%%"), hot)
+        val floor = steps(onFloor, 10)
+        assertEquals("HOT", floor.objectAt(Position(2, 1))?.state)
+        assertEquals("ICE", floor.objectAt(Position(2, 3))?.type, "metal lying on the floor is not stuck in a slot")
+        val thick = level(listOf("+.....", "..G...", "%%M%%%", "%%%%%%", "%%%%%%", "%%i%%%", "%%%%%%"), hot)
+        assertEquals("ICE", steps(thick, 10).objectAt(Position(2, 5))?.type, "one wall cell, never two")
+    }
+
+    @Test
+    fun `hot metal cools down a few steps after its heat source is gone`() {
+        val level = level(listOf("+....", ".GM..", "%%%%%"), hot)
+        val heated = steps(level, 6)
+        assertEquals("HOT", heated.objectAt(Position(2, 1))?.state)
+        val engine = Levels.engine(level)
+        var state = heated.copy(objects = heated.objects.filter { it.type != "EMBER_ROCK" })
+        var cooledAfter = 0
+        while (state.objectAt(Position(2, 1))?.state == "HOT" && cooledAfter < 50) {
+            state = engine.step(state).state
+            cooledAfter++
+        }
+        assertEquals("COLD", state.objectAt(Position(2, 1))?.state)
+        assertTrue(cooledAfter in 3..12, "cooled after $cooledAfter steps")
     }
 }
