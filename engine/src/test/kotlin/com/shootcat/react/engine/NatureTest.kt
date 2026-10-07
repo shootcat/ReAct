@@ -103,35 +103,6 @@ class NatureTest {
     }
 
     @Test
-    fun `water frozen at a frost crystal becomes a loose block of ice`() {
-        val level = Levels.inline(
-            listOf(
-                "...........",
-                ".S.........",
-                "%%.........",
-                "%~~~%......",
-                "%~~~%......",
-                "%%%%%......",
-                "%%%%%.X....",
-                "%%%%%%%....",
-                "........b..",
-                "%%%%%%%%%%%",
-            ),
-            "\"S\": {\"type\": \"STONE\", \"isMovable\": true}, \"~\": {\"type\": \"WATER\"}, \"X\": {\"type\": \"FROST\"}, " +
-                "\"b\": {\"type\": \"BIG_FIRE\"}",
-        )
-        val live = Levels.live(level)
-        // The stone makes the basin overflow; the overflow fills the cup beside the frost and freezes there.
-        val run = live.play(live.start(), "stone_1_1", Position(2, 3))!!
-        val ice = run.state.objects.single { it.type == "ICE" }
-        assertTrue(ice.isMovable)
-        assertEquals("FROST", run.state.objectAt(ice.position.right())?.type)
-        // Carried next to the big fire it melts into deep water and douses it.
-        val done = live.play(run, ice.id, Position(7, 8))!!
-        assertTrue(done.state.objects.none { it.type == "BIG_FIRE" && it.state == "ACTIVE" })
-    }
-
-    @Test
     fun `things that neither merge nor react bounce off`() {
         val start = TestWorld.state(
             "#S...S#",

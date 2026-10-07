@@ -11,12 +11,12 @@ import kotlin.test.assertTrue
 class LevelFilesTest {
 
     @Test
-    fun `one world, the exam, with its levels in order and all on its map`() {
+    fun `one world, the test, with its levels in order and all on its map`() {
         val w = Levels.worlds.single()
         assertEquals(1, w.world)
-        assertEquals("Prüfung", w.title)
-        assertEquals(10, w.levelIds.size, "ten levels")
-        assertEquals(w.levelIds.indices.map { "p_%02d".format(it + 1) }, w.levelIds)
+        assertEquals("Test", w.title)
+        assertTrue(w.levelIds.size <= 3, "at most three test levels")
+        assertEquals(w.levelIds.indices.map { "t_%02d".format(it + 1) }, w.levelIds)
         assertEquals(null, w.bonusLevelId)
         assertEquals(w.allLevelIds.toSet(), w.map.map { it.levelId }.toSet())
         assertNotNull(w.icon)

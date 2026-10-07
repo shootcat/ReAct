@@ -19,8 +19,12 @@ data class Progress(
 }
 
 class ProgressStore(context: Context) {
-    // A new file: progress of the earlier level sets does not fit the new worlds.
-    private val prefs = context.getSharedPreferences("react_progress_v2", Context.MODE_PRIVATE)
+    // A new file: progress of the earlier level sets (and their discoveries) does not fit the test world.
+    private val prefs = context.getSharedPreferences("react_progress_v3", Context.MODE_PRIVATE)
+
+    init {
+        for (old in OLD_FILES) context.getSharedPreferences(old, Context.MODE_PRIVATE).edit().clear().apply()
+    }
 
     fun load(): Progress = Progress(
         completed = read(KEY_COMPLETED),
@@ -46,5 +50,8 @@ class ProgressStore(context: Context) {
         const val KEY_COMPLETED = "completed"
         const val KEY_EXTRAS = "extras"
         const val KEY_DISCOVERIES = "discoveries"
+
+        /** Where earlier versions kept their progress; it is thrown away. */
+        val OLD_FILES = listOf("react_progress", "react_progress_v2")
     }
 }

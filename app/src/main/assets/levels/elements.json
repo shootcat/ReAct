@@ -319,18 +319,6 @@
    "world": 3
   },
   {
-   "type": "FROST",
-   "name": "Frostkristall",
-   "default_state": "COLD",
-   "properties": {},
-   "vanish_states": [],
-   "state_names": {
-    "COLD": "eisig"
-   },
-   "description": "Ewiges Eis. Lässt ein volles Feld Süßwasser daneben zu Eis gefrieren – Meerwasser nicht.",
-   "world": 4
-  },
-  {
    "type": "SNOW",
    "name": "Schnee",
    "default_state": "POWDER",
@@ -808,21 +796,6 @@
    },
    "world": 3,
    "sound": "sizzle"
-  },
-  {
-   "id": "frost_freezes_water",
-   "name": "Gefrieren",
-   "trigger": "TOUCH",
-   "conditions": {
-    "source": "FROST",
-    "target": "WATER",
-    "target_min_amount": 8
-   },
-   "effect": {
-    "transform": "ICE"
-   },
-   "world": 4,
-   "sound": "freeze"
   },
   {
    "id": "heat_melts_snow",

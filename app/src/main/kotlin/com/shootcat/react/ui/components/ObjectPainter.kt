@@ -60,7 +60,6 @@ fun DrawScope.drawGameObject(
         "SNOW" -> drawGrains(topLeft, cell, alpha, info, wet = false, glass = false, Palette.snow, Palette.snowShade)
         "EMBER_ROCK" -> drawEmberRock(topLeft, cell, alpha, time + phase)
         "PUMICE" -> drawPumice(topLeft, cell, alpha)
-        "FROST" -> drawFrost(topLeft, cell, alpha, time + phase)
         "SALT" -> drawSalt(topLeft, cell, alpha)
         else -> drawCircle(Palette.textDim, cell * 0.3f, topLeft + Offset(cell / 2, cell / 2), alpha)
     }
@@ -269,24 +268,6 @@ private fun DrawScope.drawSalt(tl: Offset, c: Float, alpha: Float) {
         drawRoundRect(Palette.snowShade, o, Size(c * s, c * s), CornerRadius(c * 0.03f), style = Stroke(width = c * 0.025f), alpha = alpha)
         drawLine(Color.White, o + Offset(c * s * 0.2f, c * s * 0.25f), o + Offset(c * s * 0.6f, c * s * 0.25f), strokeWidth = c * 0.025f, alpha = alpha)
     }
-}
-
-/** An ice crystal that never melts: a glowing snowflake. */
-private fun DrawScope.drawFrost(tl: Offset, c: Float, alpha: Float, time: Float) {
-    val center = tl + Offset(c / 2, c / 2)
-    val pulse = 0.7f + 0.3f * sin(time * TAU)
-    drawCircle(Brush.radialGradient(listOf(Palette.frost.copy(alpha = 0.55f * pulse), Color.Transparent), center, c * 0.75f), c * 0.75f, center, alpha = alpha)
-    for (i in 0 until 6) {
-        val a = i * TAU / 6 + time * 0.2f
-        val tip = center + Offset(cos(a) * c * 0.38f, sin(a) * c * 0.38f)
-        drawLine(Color.White, center, tip, strokeWidth = c * 0.05f, cap = StrokeCap.Round, alpha = alpha)
-        val mid = center + Offset(cos(a) * c * 0.22f, sin(a) * c * 0.22f)
-        for (side in listOf(-1f, 1f)) {
-            val b = a + side * 0.7f
-            drawLine(Palette.frost, mid, mid + Offset(cos(b) * c * 0.1f, sin(b) * c * 0.1f), strokeWidth = c * 0.035f, cap = StrokeCap.Round, alpha = alpha)
-        }
-    }
-    drawCircle(Color.White, c * 0.07f, center, alpha = alpha)
 }
 
 /** Sand or snow: a heap on its own, a dune surface next to more of it, solid under more of it. */

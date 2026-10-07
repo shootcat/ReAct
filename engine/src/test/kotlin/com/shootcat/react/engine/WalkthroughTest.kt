@@ -16,7 +16,7 @@ import kotlin.test.fail
  * meet exactly the listed optional goals, together they must show every optional goal, and an
  * exhaustive search proves there is no solution with fewer moves than the level's declared minimum.
  *
- * Format: `p_05 min=4` and `p_05 [1] fire_2_3@5,3 ice_4_1@6,2` (optional goal indices, then moves).
+ * Format: `t_01 min=4` and `t_01 [1] fire_2_3@5,3 wood_4_1@6,2` (optional goal indices, then moves).
  */
 class WalkthroughTest {
 

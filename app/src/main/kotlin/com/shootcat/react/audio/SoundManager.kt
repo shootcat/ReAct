@@ -120,7 +120,6 @@ class SoundManager(context: Context) {
             "hiss" to R.raw.sfx_hiss,
             "boil" to R.raw.sfx_boil,
             "crackle" to R.raw.sfx_crackle,
-            "freeze" to R.raw.sfx_freeze,
             "melt" to R.raw.sfx_melt,
             "sizzle" to R.raw.sfx_sizzle,
             "soak" to R.raw.sfx_soak,

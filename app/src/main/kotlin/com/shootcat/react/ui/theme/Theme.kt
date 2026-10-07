@@ -62,7 +62,6 @@ object Palette {
     val pumiceDark = Color(0xFF9A9286)
     val basalt = Color(0xFF3A3436)
     val ember = Color(0xFFFF8A3D)
-    val frost = Color(0xFFA8E6FF)
     val cloud = Color(0xFFF4F7FA)
     val cloudDark = Color(0xFF8F9BA8)
     val rain = Color(0xFF9CC9FF)

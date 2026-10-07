@@ -168,5 +168,5 @@ private val FAMILIES = mapOf(
     1 to "Wald · Feuer, Wasser, Holz",
     2 to "Küste · Meer und Sand",
     3 to "Vulkan · Lava und Glut",
-    4 to "Frost · Eis, Schnee, Salz",
+    4 to "Winter · Eis, Schnee, Salz",
 )

@@ -253,7 +253,7 @@ class RuleEngine(
         if (transforms) {
             world.remove(target.id)
             val amount = target.amount.takeIf { target.hasAmount }
-            // What freezes solid (water at the frost) is a loose block the player can pick up.
+            // What turns into a loose solid thing is a block the player can pick up.
             val loose = target.isMovable || types[effect.transform!!]?.properties?.get(Props.GRAVITY) == "true" &&
                 types[effect.transform]?.properties?.get(Props.LIQUID) != "true"
             world.spawn(effect.transform, target.position, types, amount, isMovable = loose)
