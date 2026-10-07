@@ -41,6 +41,7 @@ object TestWorld {
                 ),
                 vanishStates = setOf("ASH"),
             ),
+            ObjectType("CHARCOAL", "Holzkohle", "SOLID", mapOf("gravity" to "true", "density" to "6", "weight" to "5")),
             ObjectType(
                 "METAL", "Metall", "COLD",
                 mapOf(
@@ -106,7 +107,7 @@ object TestWorld {
     val douseWood = Rule(
         "douse_wood", "Ablöschen", Trigger.TOUCH,
         RuleConditions(source = "WATER", target = "WOOD", targetState = "BURNING"),
-        RuleEffect(targetState = "CHARRED", spawnObject = "STEAM", spawnAmount = 4, sourceConsume = 2),
+        RuleEffect(transform = "CHARCOAL", spawnObject = "STEAM", spawnAmount = 4, sourceConsume = 2),
     )
     val conduct = Rule(
         "conduct", "Wärmeleitung", Trigger.HEAT,

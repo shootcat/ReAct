@@ -117,7 +117,6 @@
    "state_names": {
     "DRY": "trocken",
     "BURNING": "brennt",
-    "CHARRED": "verkohlt",
     "ASH": "verbrannt"
    },
    "description": "Leicht: schwimmt. Fängt Feuer und brennt eine Weile.",
@@ -143,10 +142,25 @@
    "state_names": {
     "DRY": "trocken",
     "BURNING": "brennt",
-    "CHARRED": "verkohlt",
     "ASH": "verbrannt"
    },
    "description": "Zwei Hölzer zusammen. Brennt dreimal so lange und so heiß, dass Wasser daneben verdampft. Nur tiefes Wasser löscht ihn.",
+   "world": 1
+  },
+  {
+   "type": "CHARCOAL",
+   "name": "Holzkohle",
+   "default_state": "SOLID",
+   "properties": {
+    "gravity": true,
+    "density": 6,
+    "weight": 5
+   },
+   "vanish_states": [],
+   "state_names": {
+    "SOLID": "kalt"
+   },
+   "description": "Rechtzeitig gelöschtes Holz: leicht, schwarz, brennt nicht von selbst. Mit einer Flamme wird daraus Glut, mit Erz Schmelzgut.",
    "world": 1
   },
   {
@@ -222,7 +236,6 @@
    "state_names": {
     "GREEN": "grün",
     "BURNING": "brennt",
-    "CHARRED": "verkohlt",
     "ASH": "verbrannt"
    },
    "description": "Steht fest. Fängt Feuer und gibt es an Nachbarn weiter.",
@@ -502,7 +515,7 @@
     "target_state": "BURNING"
    },
    "effect": {
-    "target_state": "CHARRED",
+    "transform": "CHARCOAL",
     "spawn_object": "STEAM",
     "spawn_amount": 4,
     "source_consume": 2
@@ -521,7 +534,7 @@
     "source_min_amount": 6
    },
    "effect": {
-    "target_state": "CHARRED",
+    "transform": "CHARCOAL",
     "spawn_object": "STEAM",
     "spawn_amount": 4,
     "source_consume": 2
@@ -539,7 +552,7 @@
     "target_state": "BURNING"
    },
    "effect": {
-    "target_state": "CHARRED",
+    "transform": "CHARCOAL",
     "spawn_object": "STEAM",
     "spawn_amount": 4,
     "source_consume": 2
@@ -640,7 +653,7 @@
     "target_state": "BURNING"
    },
    "effect": {
-    "target_state": "CHARRED",
+    "transform": "CHARCOAL",
     "spawn_object": "STEAM",
     "spawn_amount": 4,
     "source_consume": 2
@@ -659,7 +672,7 @@
     "source_min_amount": 6
    },
    "effect": {
-    "target_state": "CHARRED",
+    "transform": "CHARCOAL",
     "spawn_object": "STEAM",
     "spawn_amount": 4,
     "source_consume": 2
@@ -677,7 +690,7 @@
     "target_state": "BURNING"
    },
    "effect": {
-    "target_state": "CHARRED",
+    "transform": "CHARCOAL",
     "spawn_object": "STEAM",
     "spawn_amount": 4,
     "source_consume": 2

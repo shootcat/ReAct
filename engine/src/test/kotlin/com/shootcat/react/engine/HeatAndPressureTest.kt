@@ -98,7 +98,7 @@ class HeatAndPressureTest {
     }
 
     @Test
-    fun `water douses burning wood - it chars and steams`() {
+    fun `water douses burning wood - it turns into charcoal and steams`() {
         val start = TestWorld.state(
             "#####",
             "#...#",
@@ -107,7 +107,9 @@ class HeatAndPressureTest {
             "#####",
         ).let { s -> s.copy(objects = s.objects.map { if (it.type == "WOOD") it.copy(state = "BURNING") else it }) }
         val s = engine.step(start).state
-        assertEquals("CHARRED", s.stateOf("wood_2_2"))
+        assertEquals(null, s.objectById("wood_2_2"))
+        val coal = s.objects.single { it.type == "CHARCOAL" }
+        assertEquals(Position(2, 2), coal.position)
         assertEquals(4, s.totalSteam())
     }
 

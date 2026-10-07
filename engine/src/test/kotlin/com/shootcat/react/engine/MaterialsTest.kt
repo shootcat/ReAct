@@ -55,4 +55,21 @@ class MaterialsTest {
         val far = level(listOf("S+..t...", "%%%%%%%%")).initialState()
         assertNull(drops.resolve(far, "stone_0_0", Position(4, 0)))
     }
+
+    @Test
+    fun `burning wood quenched in time becomes loose charcoal`() {
+        val level = level(listOf("%%%%", "+...", "..W.", "..~.", "%%%%"), "\"W\": {\"type\": \"WOOD\", \"state\": \"BURNING\", \"isMovable\": true}, \"~\": {\"type\": \"WATER\", \"amount\": 3}")
+        val after = Levels.engine(level).step(level.initialState()).state
+        val coal = after.objects.single { it.type == "CHARCOAL" }
+        assertTrue(coal.isMovable)
+        assertTrue(after.objects.none { it.type == "WOOD" })
+        assertTrue(after.objects.any { it.type == "STEAM" })
+    }
+
+    @Test
+    fun `a burning tree quenched in time becomes charcoal too`() {
+        val level = level(listOf("+...", ".~u.", "%%%%"), "\"~\": {\"type\": \"WATER\", \"amount\": 3}, \"u\": {\"type\": \"TREE\", \"state\": \"BURNING\"}")
+        val after = Levels.engine(level).step(level.initialState()).state
+        assertEquals("CHARCOAL", after.objectAt(Position(2, 1))?.type)
+    }
 }
