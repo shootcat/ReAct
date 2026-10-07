@@ -69,7 +69,8 @@ app/                        Android-App (Kotlin, Jetpack Compose, MVVM/UDF)
   audio/SoundManager.kt     Effekte (SoundPool) und Musik je Welt (MediaPlayer)
   data/                     Fortschritt, Einstellungen, Inhalte
   src/main/assets/levels/   elements.json (Elemente, Regeln, Verschmelzungen), world_01.json (Welt „Test“), t_01 … t_03.json
-docs/LEVELDESIGN.md         Entwurf jedes Levels: Einsicht, Falle, Lösung, Hebel, Kennzahlen, Abweichungen, Startbild
+docs/LEVELDESIGN.md         Entwurf jedes Levels: Einsicht, Fallen, Köder, Kette, Kennzahlen, Ehrlichkeitsprüfung, Startbild
+docs/BERICHT_V2.md          Abschlussbericht zu Leitfaden V2: DifficultyReport, Beweise, Abweichungen
 ```
 
 ## Engine-Regeln
