@@ -137,9 +137,9 @@ class DifficultyReportTest {
             "t_03" to Expectation(9..10, 1.5, complete = false),
         )
         /**
-         * How deep level 3 is searched completely. The guide asks for 6; the worlds multiply by 15 to 20 per
-         * move (74 after one, 2 600 after two, 57 000 after three, 880 000 after four), so 6 would mean some
-         * 200 million settled worlds – hours and far more memory than a test has. 4 takes a few minutes.
+         * How deep level 3 is searched completely. The guide asks for 6; the different worlds multiply by 25
+         * to 45 per move (96 after one, 4 271 after two, 108 364 after three), so 6 would mean billions of
+         * settled moves – far more time and memory than a test has. 4 takes a few minutes.
          */
         const val DEEP_LIMIT = 4
         const val PLAYOUTS = 3000

@@ -90,7 +90,7 @@ Die Musterlösungen aller Level stehen in `engine/src/test/resources/walkthrough
 
 `DifficultyReportTest` misst die Testlevel nach Leitfaden V2 (5.2) mit `LevelAnalysis`. Jeder Zug wird gefolgt vom Einschwingen der Welt; Züge mit gleichem Ergebnis zählen einmal.
 
-1. **Mindestzüge**, bewiesen durch Breitensuche. Level 1 und 2 werden vollständig durchsucht. Bei Level 3 wächst die Zahl der Welten pro Zug etwa um den Faktor 15 bis 20; vollständig durchsucht wird bis 4 Züge (im Test, einige Minuten). Die Musterlösung mit 9 Zügen zeigt, dass es lösbar ist.
+1. **Mindestzüge**, bewiesen durch Breitensuche. Level 1 und 2 werden vollständig durchsucht. Bei Level 3 wächst die Zahl der Welten pro Zug um den Faktor 25 bis 45; vollständig durchsucht wird bis 4 Züge (im Test, einige Minuten). Die Musterlösung mit 9 Zügen zeigt, dass es lösbar ist.
 2. **Lösungen**: Anzahl verschiedener Lösungen in Mindestlänge; Reihenfolge-Varianten zählen einzeln.
 3. **Sackgassen**: Anteil der möglichen ersten Züge, nach denen das Level nicht mehr lösbar ist (Suche bis Mindestzüge plus zwei).
 4. **Naheliegender Zug**: ein bewegliches Objekt auf das Ablagefeld, das dem Hauptziel am nächsten liegt. Er darf keine Mindestlösung beginnen.

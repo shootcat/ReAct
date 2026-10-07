@@ -159,9 +159,9 @@ Das Feld am Becken ist das einzige direkt am Hauptziel; es ist die Falle für da
 - neben dem Schlitzfeld (für die Glut).
 
 **Kennzahlen (DifficultyReport):**
-- Mindestzüge 9. Vollständig durchsucht und bewiesen: keine Lösung mit bis zu 4 Zügen.
+- Mindestzüge 9. Vollständig durchsucht und bewiesen: keine Lösung mit bis zu 4 Zügen. Das zeigen zwei unabhängig geschriebene Suchen: der Test (`LevelAnalysis.shortestWithin`) und ein zweites Werkzeug, das pro Ebene nur Zugfolgen und Prüfsummen hält (10,7 Millionen simulierte Züge, 7 Minuten).
 - 0 von 3000 Zufallsspielen mit 12 Zügen lösen das Level.
-- Eine vollständige Suche bis 6 Züge, wie der Leitfaden sie vorsieht, ist nicht machbar. Die Zahl der Welten wächst pro Zug um den Faktor 15 bis 20: 74, 2 600, 57 000 und 880 000 nach einem bis vier Zügen. Bei 6 Zügen wären es etwa 200 Millionen Welten, mit Stunden Rechenzeit und weit mehr Speicher, als ein Test hat.
+- Eine vollständige Suche bis 6 Züge, wie der Leitfaden sie vorsieht, ist nicht machbar. Die Zahl der verschiedenen Welten wächst pro Zug um den Faktor 25 bis 45: 96, 4 271 und 108 364 nach einem bis drei Zügen. Hochgerechnet wären es nach 5 Zügen einige zehn Millionen Welten; Tiefe 6 hieße mehrere Milliarden zu simulierende Züge.
 - Zusätzlich vollständig geprüft: Nach den ersten vier Zügen der Musterlösung gibt es keinen Rest in 4 Zügen, nach den ersten fünf keinen in 3.
 
 **Warum es keine Lösung unter 9 Zügen gibt (Zählbegründung):**

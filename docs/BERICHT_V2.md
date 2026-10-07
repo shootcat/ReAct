@@ -39,7 +39,7 @@ Für t_03 sind Lösungszahl, Sackgassen und naheliegender Zug nicht berechnet: D
 - *Bewiesen:* Jede Falle aus dem Leitfaden ist eine Sackgasse. Nach der Falle findet eine vollständige Suche über 6 weitere Züge keine Lösung; ein brennender Wald oder eine brennende Hütte beendet die Suche sofort.
 
 **t_03**
-- *Bewiesen:* Keine Lösung mit bis zu 4 Zügen. Das prüft der Test in der CI.
+- *Bewiesen:* Keine Lösung mit bis zu 4 Zügen. Das prüft der Test in der CI; ein zweites, unabhängig geschriebenes Suchwerkzeug kommt zum selben Ergebnis (10,7 Millionen simulierte Züge).
 - *Bewiesen:* Nach den ersten 4 Zügen der Musterlösung gibt es keinen Rest in 4 Zügen, nach den ersten 5 keinen in 3.
 - *Begründet, nicht durch Suche bewiesen:* das Minimum 9. Eine Zählbegründung in `docs/LEVELDESIGN.md` zeigt, dass jede Lösung 9 verschiedene Züge braucht:
   - 1 Fällen;
@@ -108,7 +108,7 @@ Für t_03 sind Lösungszahl, Sackgassen und naheliegender Zug nicht berechnet: D
 
 **Prüfung**
 
-19. **Level 3, Suchtiefe:** Statt vollständig bis Tiefe 6 wird bis Tiefe 4 gesucht (siehe oben). Die Zahl der Welten wächst pro Zug um den Faktor 15 bis 20. Bei 6 Zügen wären es rund 200 Millionen, mit vielen Stunden Rechenzeit und weit mehr Speicher, als die Testmaschine hat; ein Versuch mit Tiefe 5 brach am Speicher ab. Ersatz:
+19. **Level 3, Suchtiefe:** Statt vollständig bis Tiefe 6 wird bis Tiefe 4 gesucht (siehe oben). Die Zahl der verschiedenen Welten wächst pro Zug um den Faktor 25 bis 45 (96, 4 271, 108 364 nach einem bis drei Zügen). Tiefe 6 hieße mehrere Milliarden zu simulierende Züge; ein erster Versuch mit Tiefe 5 brach am Speicher ab. Ersatz:
     - die Zählbegründung;
     - die gezielten Suchen ab Zwischenständen;
     - die Zufallsspiele.
