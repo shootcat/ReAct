@@ -69,6 +69,7 @@ import com.shootcat.react.engine.model.Props
 import com.shootcat.react.engine.model.TargetCleared
 import com.shootcat.react.engine.model.TargetContainerFilled
 import com.shootcat.react.engine.model.TargetExtinguished
+import com.shootcat.react.engine.model.TargetHeated
 import com.shootcat.react.engine.model.TargetPreserved
 import com.shootcat.react.engine.model.TargetRainTriggered
 import com.shootcat.react.engine.model.TargetState
@@ -546,22 +547,31 @@ private fun DrawScope.drawGoalAreas(goals: List<LevelGoal>, met: List<Boolean>, 
             is TargetExtinguished -> goal.area?.let { drawAreaOutline(it, cell, if (done) Palette.success else Palette.fire, alpha, fill = false) }
             is TargetRainTriggered -> goal.area?.let { drawAreaOutline(it, cell, if (done) Palette.success else Palette.rain, alpha, fill = false) }
             is TargetCleared -> goal.area?.let { drawAreaOutline(it, cell, if (done) Palette.success else Palette.ice, alpha, fill = false) }
-            is TargetState, is TargetPreserved -> {
-                val id = if (goal is TargetState) goal.objectId else (goal as TargetPreserved).objectId
-                val o = state.objectById(id) ?: return@forEachIndexed
-                val center = Offset((o.position.x + 0.5f) * cell, (o.position.y + 0.9f) * cell)
-                val color = if (done) Palette.success else Palette.accent
-                drawOval(
-                    color,
-                    Offset(center.x - cell * 0.45f, center.y - cell * 0.12f),
-                    Size(cell * 0.9f, cell * 0.24f),
-                    style = Stroke(width = cell * 0.04f),
-                    alpha = alpha * (if (done) 1f else pulse),
-                )
+            is TargetHeated -> drawAreaOutline(goal.area, cell, if (done) Palette.success else Palette.fire, alpha, fill = false)
+            is TargetPreserved -> {
+                val area = goal.area
+                if (area != null) {
+                    drawAreaOutline(area, cell, if (done) Palette.success else Palette.accent, alpha, fill = false)
+                } else {
+                    for (kept in goal.things) state.objectById(kept.id)?.let { drawGoalRing(it.position, cell, done, alpha, pulse) }
+                }
             }
+            is TargetState -> state.objectById(goal.objectId)?.let { drawGoalRing(it.position, cell, done, alpha, pulse) }
             else -> Unit
         }
     }
+}
+
+/** A ring on the ground under the thing a task is about. */
+private fun DrawScope.drawGoalRing(at: Position, cell: Float, done: Boolean, alpha: Float, pulse: Float) {
+    val center = Offset((at.x + 0.5f) * cell, (at.y + 0.9f) * cell)
+    drawOval(
+        if (done) Palette.success else Palette.accent,
+        Offset(center.x - cell * 0.45f, center.y - cell * 0.12f),
+        Size(cell * 0.9f, cell * 0.24f),
+        style = Stroke(width = cell * 0.04f),
+        alpha = alpha * (if (done) 1f else pulse),
+    )
 }
 
 /** A light frame around everything the player may move; the selected object glows. */

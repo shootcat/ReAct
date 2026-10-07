@@ -61,16 +61,53 @@ sealed interface LevelGoal {
     fun isMet(state: GameState, moves: Int): Boolean
 }
 
-/** At least [min] units of [liquid] lie inside [area] (a pond, a hollow, a basin). */
+/**
+ * At least [min] units of [liquid] lie inside [area] (a pond, a hollow, a basin), and no other liquid:
+ * a basin of fresh water holds no salt water. A [full] goal asks for every open cell of the area to be
+ * full; [min] is then worked out from the area when the level is loaded.
+ */
 data class TargetContainerFilled(
     val area: Area,
     val liquid: String,
     val min: Int,
     override val text: String,
     override val optional: Boolean = false,
+    val full: Boolean = false,
 ) : LevelGoal {
     fun amount(state: GameState): Int = state.objects.filter { it.type == liquid && it.position in area }.sumOf { it.amount }
-    override fun isMet(state: GameState, moves: Int): Boolean = amount(state) >= min
+
+    /** Some other liquid lies in the area. */
+    fun spoilt(state: GameState): Boolean = state.objects.any { it.isLiquid && it.type != liquid && it.position in area }
+
+    override fun isMet(state: GameState, moves: Int): Boolean = amount(state) >= min && !spoilt(state)
+}
+
+/** At least [min] things of [type] exist anywhere (glass made from sand). */
+data class TargetProduced(
+    val type: String,
+    val min: Int,
+    override val text: String,
+    override val optional: Boolean = false,
+) : LevelGoal {
+    fun count(state: GameState): Int = state.objects.count { it.type == type }
+    override fun isMet(state: GameState, moves: Int): Boolean = count(state) >= min
+}
+
+/**
+ * A liquid inside [area] boils: heat turns some of it into steam. That is something that happens, not a
+ * state of the world, so the simulation reports it ([boiledIn]); once it has boiled, the goal stays met.
+ */
+data class TargetHeated(
+    val area: Area,
+    override val text: String,
+    override val optional: Boolean = false,
+) : LevelGoal {
+    override val latches: Boolean get() = true
+
+    /** True if one of the liquid cells that boiled in a step lies in the area. */
+    fun boiledIn(boiling: Collection<Position>): Boolean = boiling.any { it in area }
+
+    override fun isMet(state: GameState, moves: Int): Boolean = false
 }
 
 /** No open flame burns any more: inside [area], or anywhere if it is null. */
@@ -112,14 +149,27 @@ data class TargetState(
     }
 }
 
-/** [objectId] is still there and unchanged in [state], e.g. a tree that must not burn. */
+/** One thing a [TargetPreserved] goal protects, as it was at the start ([type] null: any type). */
+data class Kept(val id: String, val state: String, val type: String? = null)
+
+/**
+ * Everything in [things] is still there and unchanged, e.g. a hut, or every tree of a forest ([area])
+ * that must not burn.
+ */
 data class TargetPreserved(
-    val objectId: String,
-    val state: String,
+    val things: List<Kept>,
     override val text: String,
     override val optional: Boolean = true,
+    /** The protected area, if the goal is about a whole area rather than one thing. */
+    val area: Area? = null,
 ) : LevelGoal {
-    override fun isMet(state: GameState, moves: Int): Boolean = state.objectById(objectId)?.state == this.state
+    constructor(objectId: String, state: String, text: String, optional: Boolean = true) :
+        this(listOf(Kept(objectId, state)), text, optional)
+
+    fun intact(state: GameState, kept: Kept): Boolean =
+        state.objectById(kept.id)?.let { (kept.type == null || it.type == kept.type) && it.state == kept.state } == true
+
+    override fun isMet(state: GameState, moves: Int): Boolean = things.all { intact(state, it) }
 }
 
 /** Nothing of [types] is left: inside [area], or anywhere if it is null (e.g. all ice melted). */

@@ -34,8 +34,10 @@ import com.shootcat.react.engine.model.LevelGoal
 import com.shootcat.react.engine.model.TargetCleared
 import com.shootcat.react.engine.model.TargetContainerFilled
 import com.shootcat.react.engine.model.TargetExtinguished
+import com.shootcat.react.engine.model.TargetHeated
 import com.shootcat.react.engine.model.TargetMaxMoves
 import com.shootcat.react.engine.model.TargetPreserved
+import com.shootcat.react.engine.model.TargetProduced
 import com.shootcat.react.engine.model.TargetRainTriggered
 import com.shootcat.react.engine.model.TargetState
 import com.shootcat.react.engine.model.TypeCatalog
@@ -54,7 +56,9 @@ private fun iconOf(goal: LevelGoal, level: LevelData): TaskIcon {
         is TargetExtinguished -> TaskIcon("FIRE")
         is TargetRainTriggered -> TaskIcon("CLOUD", "RAINING")
         is TargetState -> TaskIcon(typeOf(goal.objectId), goal.state)
-        is TargetPreserved -> TaskIcon(typeOf(goal.objectId), goal.state)
+        is TargetPreserved -> goal.things.first().let { TaskIcon(it.type ?: typeOf(it.id), it.state) }
+        is TargetProduced -> TaskIcon(goal.type)
+        is TargetHeated -> TaskIcon("STEAM")
         is TargetCleared -> TaskIcon(goal.types.sorted().firstOrNull())
         is TargetMaxMoves -> TaskIcon(null, glyph = Glyph.HAND)
     }
@@ -64,6 +68,8 @@ private fun iconOf(goal: LevelGoal, level: LevelData): TaskIcon {
 private fun progressOf(goal: LevelGoal, state: GameState, moves: Int): String? = when (goal) {
     is TargetContainerFilled -> "${(goal.amount(state) * 100 / goal.min.coerceAtLeast(1)).coerceAtMost(100)} %"
     is TargetMaxMoves -> "$moves/${goal.moves}"
+    is TargetProduced -> "${goal.count(state).coerceAtMost(goal.min)}/${goal.min}"
+    is TargetPreserved -> if (goal.things.size > 1) "${goal.things.count { goal.intact(state, it) }}/${goal.things.size}" else null
     else -> null
 }
 

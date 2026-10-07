@@ -11,6 +11,7 @@ import com.shootcat.react.engine.model.Position
 import com.shootcat.react.engine.model.TargetCleared
 import com.shootcat.react.engine.model.TargetContainerFilled
 import com.shootcat.react.engine.model.TargetExtinguished
+import com.shootcat.react.engine.model.TargetHeated
 import com.shootcat.react.engine.model.TargetPreserved
 import com.shootcat.react.engine.model.TargetRainTriggered
 import com.shootcat.react.engine.model.TargetState
@@ -70,14 +71,20 @@ class LevelAnalysis(private val level: LevelData, engine: RuleEngine) {
      */
     private fun hopeless(run: Run): Boolean = stateGoals.any { (index, goal) ->
         if (index in run.latched) return@any false
-        val (id, wanted, vanishes) = when (goal) {
-            is TargetState -> Triple(goal.objectId, goal.state, goal.vanishes)
-            is TargetPreserved -> Triple(goal.objectId, goal.state, false)
-            else -> return@any false
+        when (goal) {
+            is TargetState -> {
+                val o = run.state.objectById(goal.objectId) ?: return@any !goal.vanishes
+                o.state != goal.state && level.merges.none { o.type == it.a || o.type == it.b } &&
+                    goal.state !in reachable.getOrPut(o.type to o.state) { statesFrom(o) }
+            }
+            // A protected thing that is gone, turned into something else or can never get back to how it was.
+            is TargetPreserved -> goal.things.any { kept ->
+                val o = run.state.objectById(kept.id) ?: return@any true
+                (kept.type != null && o.type != kept.type) ||
+                    o.state != kept.state && kept.state !in reachable.getOrPut(o.type to o.state) { statesFrom(o) }
+            }
+            else -> false
         }
-        val o = run.state.objectById(id) ?: return@any !vanishes
-        o.state != wanted && level.merges.none { o.type == it.a || o.type == it.b } &&
-            wanted !in reachable.getOrPut(o.type to o.state) { statesFrom(o) }
     }
 
     /** Every state [o] could still get into: through the rules, or through its own physics (burning down). */
@@ -210,8 +217,10 @@ class LevelAnalysis(private val level: LevelData, engine: RuleEngine) {
         for (goal in level.mainGoals) {
             when (goal) {
                 is TargetState -> state.objectById(goal.objectId)?.let { cells += it.position }
-                is TargetPreserved -> state.objectById(goal.objectId)?.let { cells += it.position }
+                is TargetPreserved -> goal.area?.let { cells += it.cells() }
+                    ?: goal.things.forEach { kept -> state.objectById(kept.id)?.let { cells += it.position } }
                 is TargetContainerFilled -> cells += goal.area.cells()
+                is TargetHeated -> cells += goal.area.cells()
                 is TargetExtinguished -> goal.area?.let { cells += it.cells() }
                     ?: state.objects.filter { it.flag("flame") && it.heatOutput > 0 }.forEach { cells += it.position }
                 is TargetCleared -> goal.area?.let { cells += it.cells() }

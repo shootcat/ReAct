@@ -3,6 +3,7 @@ package com.shootcat.react.engine
 import com.shootcat.react.engine.model.Area
 import com.shootcat.react.engine.model.Catalog
 import com.shootcat.react.engine.model.GameObject
+import com.shootcat.react.engine.model.Kept
 import com.shootcat.react.engine.model.LevelData
 import com.shootcat.react.engine.model.LevelGoal
 import com.shootcat.react.engine.model.LoadDirection
@@ -16,8 +17,10 @@ import com.shootcat.react.engine.model.RuleEffect
 import com.shootcat.react.engine.model.TargetCleared
 import com.shootcat.react.engine.model.TargetContainerFilled
 import com.shootcat.react.engine.model.TargetExtinguished
+import com.shootcat.react.engine.model.TargetHeated
 import com.shootcat.react.engine.model.TargetMaxMoves
 import com.shootcat.react.engine.model.TargetPreserved
+import com.shootcat.react.engine.model.TargetProduced
 import com.shootcat.react.engine.model.TargetRainTriggered
 import com.shootcat.react.engine.model.TargetState
 import com.shootcat.react.engine.model.Terrain
@@ -132,9 +135,26 @@ object LevelLoader {
             when (g.type) {
                 "fill" -> {
                     val liquid = g.liquid ?: "WATER"
-                    if (world.types[liquid]?.properties?.get("liquid") != "true") fail("$where: '$liquid' is not a liquid")
-                    TargetContainerFilled(area(g.area, "fill area") ?: fail("$where: fill goal needs an area"), liquid, g.min ?: 1, g.text, g.optional)
+                    val props = world.types[liquid]?.properties
+                    if (props?.get("liquid") != "true") fail("$where: '$liquid' is not a liquid")
+                    val basin = area(g.area, "fill area") ?: fail("$where: fill goal needs an area")
+                    if (g.full && g.min != null) fail("$where: a full fill goal has no min")
+                    // Full: every cell of the basin that is not rock or a fixed solid thing holds a full cell.
+                    val min = if (!g.full) {
+                        g.min ?: 1
+                    } else {
+                        val open = basin.cells.count { p -> p !in walls && objects.none { it.position == p && !it.isFluid && !it.isMovable } }
+                        if (open == 0) fail("$where: the fill area has no open cell")
+                        open * (props["capacity"]?.toIntOrNull() ?: 8)
+                    }
+                    TargetContainerFilled(basin, liquid, min, g.text, g.optional, g.full)
                 }
+                "produce" -> {
+                    val type = g.element ?: fail("$where: produce goal needs an element")
+                    if (type !in world.types) fail("$where: produce goal uses unknown type '$type'")
+                    TargetProduced(type, g.min ?: 1, g.text, g.optional)
+                }
+                "heat" -> TargetHeated(area(g.area, "heat area") ?: fail("$where: heat goal needs an area"), g.text, g.optional)
                 "extinguish" -> TargetExtinguished(area(g.area, "extinguish area"), g.text, g.optional)
                 "rain" -> TargetRainTriggered(area(g.area, "rain area"), g.text, g.optional)
                 "state" -> {
@@ -142,9 +162,16 @@ object LevelLoader {
                     val state = g.state ?: fail("$where: state goal needs a state")
                     TargetState(o.id, state, state in world.types.require(o.type).vanishStates, g.text, g.optional)
                 }
-                "preserve" -> {
+                "preserve" -> if (g.objectId != null) {
                     val o = objectFor(g.objectId, g.type)
-                    TargetPreserved(o.id, o.state, g.text, g.optional)
+                    TargetPreserved(listOf(Kept(o.id, o.state, o.type)), g.text, g.optional)
+                } else {
+                    // A whole area: every thing of the given types in it at the start, e.g. the trees of a forest.
+                    val zone = area(g.area, "preserve area") ?: fail("$where: preserve goal needs an object or an area")
+                    if (g.types.isEmpty()) fail("$where: preserve area needs types")
+                    val kept = objects.filter { it.type in g.types && it.position in zone }.map { Kept(it.id, it.state, it.type) }
+                    if (kept.isEmpty()) fail("$where: nothing of ${g.types} to preserve in ${g.area}")
+                    TargetPreserved(kept, g.text, g.optional, zone)
                 }
                 "clear" -> {
                     if (g.types.isEmpty()) fail("$where: clear goal needs types")
@@ -452,6 +479,8 @@ object LevelLoader {
         val state: String? = null,
         val moves: Int? = null,
         val types: List<String> = emptyList(),
+        val element: String? = null,
+        val full: Boolean = false,
     )
 
     @Serializable

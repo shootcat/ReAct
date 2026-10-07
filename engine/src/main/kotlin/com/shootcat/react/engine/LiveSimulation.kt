@@ -4,6 +4,7 @@ import com.shootcat.react.engine.model.GameState
 import com.shootcat.react.engine.model.LevelData
 import com.shootcat.react.engine.model.Position
 import com.shootcat.react.engine.model.Props
+import com.shootcat.react.engine.model.TargetHeated
 
 /** One thing the player did: dragged [objectId] from [from] and dropped it on [to]. */
 data class PlayerMove(val objectId: String, val from: Position, val to: Position)
@@ -53,6 +54,12 @@ class LiveSimulation(private val level: LevelData, private val engine: RuleEngin
 
     private val drops = Drops(engine.types, engine.rules, level.merges)
 
+    /** Rules that boil a liquid: their target is a liquid and they give off a gas. */
+    private val boilRules = engine.rules.filter { r ->
+        engine.types[r.conditions.target]?.properties?.get(Props.LIQUID) == "true" &&
+            engine.types[r.effect.spawnObject ?: ""]?.properties?.get(Props.GAS) == "true"
+    }.map { it.id }.toSet()
+
     fun start(): Run = Run(level.initialState())
 
     /** What dropping [objectId] on [to] would do, or null if it bounces off (or the run is over). */
@@ -89,7 +96,11 @@ class LiveSimulation(private val level: LevelData, private val engine: RuleEngin
             return Tick(finish(run.copy(active = false), solved), emptyList())
         }
         val steps = run.stepsSinceMove + 1
-        val latched = run.latched + level.goals.indices.filter { level.goals[it].latches && level.goals[it].isMet(step.state, run.moves.size) }
+        val boiling = step.events.filter { it.positive && it.ruleId in boilRules }.map { it.position }
+        val latched = run.latched + level.goals.indices.filter { i ->
+            val goal = level.goals[i]
+            goal.latches && (goal.isMet(step.state, run.moves.size) || goal is TargetHeated && goal.boiledIn(boiling))
+        }
         val met = goalsReached(step.state, run.moves.size, latched)
         val metFor = if (met) run.metFor + 1 else 0
         val next = run.copy(
