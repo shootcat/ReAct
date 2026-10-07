@@ -239,6 +239,8 @@ data class WorldData(
     /** Element type that stands for the world (world map). */
     val icon: String? = null,
     val merges: List<MergeRule> = emptyList(),
+    /** The player knows every reaction from the start (the test world: no rule is to be discovered). */
+    val reactionsKnown: Boolean = false,
 ) {
     val allLevelIds: List<String> get() = levelIds + listOfNotNull(bonusLevelId)
 }

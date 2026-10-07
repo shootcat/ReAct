@@ -80,6 +80,7 @@ object LevelLoader {
             bonusLevelId = dto.bonus,
             icon = dto.icon,
             merges = catalog.merges,
+            reactionsKnown = dto.reactionsKnown,
         )
     }
 
@@ -381,6 +382,7 @@ object LevelLoader {
         val levels: List<String>,
         val bonus: String? = null,
         val map: List<MapNodeDto> = emptyList(),
+        @SerialName("reactions_known") val reactionsKnown: Boolean = false,
     )
 
     @Serializable

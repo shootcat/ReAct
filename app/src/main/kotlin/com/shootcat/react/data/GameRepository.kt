@@ -22,6 +22,10 @@ class GameContent(val catalog: Catalog, val worlds: List<WorldData>, levels: Lis
     /** Everything that can be merged by dropping one element onto another. */
     val merges: List<MergeRule> get() = catalog.merges
 
+    /** Reactions the player knows without discovering them: all of them where a world says so. */
+    val knownFromStart: Set<String> =
+        if (worlds.any { it.reactionsKnown }) (allRules.map { it.id } + catalog.merges.map { it.id }).toSet() else emptySet()
+
     fun level(id: String): LevelData? = byId[id]
 
     fun world(number: Int): WorldData? = worlds.firstOrNull { it.world == number }

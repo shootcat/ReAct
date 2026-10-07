@@ -27,5 +27,6 @@
       "y": 0.26,
       "icon": "GLASS"
     }
-  ]
+  ],
+  "reactions_known": true
 }

@@ -160,6 +160,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
             // Progress in levels that no longer exist is dropped for good.
             val stored = store.load()
             val progress = stored.onlyLevels(content.worlds.flatMap { it.allLevelIds }.toSet())
+                .let { it.copy(discoveries = it.discoveries + content.knownFromStart) }
             if (progress != stored) store.save(progress)
             GameUiState(content = content, progress = progress, settings = settingsStore.load())
         } catch (e: Exception) {
@@ -202,7 +203,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
             }
             GameEvent.ResetProgress -> {
                 store.clear()
-                _state.update { it.copy(progress = Progress()) }
+                _state.update { it.copy(progress = Progress(discoveries = it.content?.knownFromStart.orEmpty())) }
             }
             is GameEvent.Move -> move(event.objectId, event.to)
             is GameEvent.Bounce -> sound.play("bounce")

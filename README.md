@@ -8,7 +8,7 @@ REACT ist ein deterministisches 2D-Logik-Puzzle für Android über die Kräfte d
 
 ## Welt „Test“
 
-Drei Messpunkte, jeder aus einem anderen Gebiet. Der Spieler kennt alle Elemente und Reaktionen darin schon; die Schwierigkeit kommt nur aus dem Kombinieren.
+Drei Messpunkte, jeder aus einem anderen Gebiet. Der Spieler kennt alle Elemente und Reaktionen darin schon; die Schwierigkeit kommt nur aus dem Kombinieren. Deshalb führt das Entdeckungsbuch in dieser Welt alle Reaktionen von Anfang an (`"reactions_known": true` in `world_01.json`).
 
 | Level | Gebiet | Ziel | Einsicht | Stand |
 |---|---|---|---|---|

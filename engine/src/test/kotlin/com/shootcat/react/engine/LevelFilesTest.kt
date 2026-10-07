@@ -18,6 +18,7 @@ class LevelFilesTest {
         assertTrue(w.levelIds.size <= 3, "at most three test levels")
         assertEquals(w.levelIds.indices.map { "t_%02d".format(it + 1) }, w.levelIds)
         assertEquals(null, w.bonusLevelId)
+        assertTrue(w.reactionsKnown, "the player knows every reaction of the test levels already")
         assertEquals(w.allLevelIds.toSet(), w.map.map { it.levelId }.toSet())
         assertNotNull(w.icon)
     }
