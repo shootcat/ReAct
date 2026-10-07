@@ -13,7 +13,7 @@ Drei Messpunkte, jeder aus einem anderen Gebiet. Der Spieler kennt alle Elemente
 | Level | Gebiet | Ziel | Einsicht | Stand |
 |---|---|---|---|---|
 | t_01 „Kochstelle“ | Wald, leicht | Wasser im Becken kocht, der Wald brennt nicht | Glut erhitzt, ohne zu zünden | fertig, 4 Züge |
-| t_02 „Süßwasser“ | Küste, Mitte | Becken auf der Klippe voll Süßwasser, die Hütte brennt nicht | Verdunsten entsalzt | in Arbeit |
+| t_02 „Süßwasser“ | Küste, Mitte | Becken auf der Klippe voll Süßwasser, die Hütte brennt nicht | Verdunsten entsalzt | fertig, 5 Züge |
 | t_03 „Tiefe Schmelze“ | Mine, Obergrenze | Glas herstellen, der Wald brennt nicht | Metall leitet Hitze durch die Wand; es gibt nur eine Flamme | in Arbeit |
 
 ## APK herunterladen

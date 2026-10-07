@@ -1,3 +1,5 @@
 # Musterlösungen: "<level> min=<n>" und "<level> [<optionale Ziele>] <objekt>@<x>,<y> ..."
 t_01 min=4
 t_01 [] fire_0_4@5,4 water_3_5@3,4 fire_0_4@4,4 charcoal#1@7,6
+t_02 min=5
+t_02 [] wood_0_9@3,5 fire_0_5@2,5 seawater_5_6@4,5 fire_0_5@3,5 charcoal#1@1,10

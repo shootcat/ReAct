@@ -49,3 +49,62 @@ Das Feld am Becken ist das einzige direkt am Hauptziel; es ist die Falle für da
 
 **Erwartung:** gelöst in etwa einer Minute.
 
+## t_02 „Süßwasser“ (Küste, Mitte)
+
+![Startzustand](screenshots/test/t_02.png)
+
+**Einsicht:** Verdunsten entsalzt. Dampf aus Salzwasser regnet als Süßwasser ab.
+
+**Ziele:** Fülle das Becken auf der Klippe mit Süßwasser (`fill` mit `"full": true`, Becken (6,10)–(7,10), 16 Einheiten, kein Salzwasser darin). Die Hütte am Strand darf nicht brennen (`preserve`).
+
+**Material:**
+- das Meer unten links (Salzwasser, fest);
+- eine bewegliche Salzwasser-Pfütze in einer Mulde (2 Einheiten, genau ein Löschen);
+- ein Holzstück, das auf dem Dach der Hütte liegt;
+- ein Lagerfeuer;
+- Erde als Köder;
+- eine Felsdecke über der Grotte (der Überhang) und Wind von links Richtung Klippe.
+
+**Karte:** oben eine Wiese auf der Felsdecke mit Feuer, Pfütze und Erde. Darunter die Grotte: links Strand mit Hütte und Meer, rechts die Klippe mit dem Becken. Das Meer ist nur über ein Feld am Strand erreichbar, und das grenzt an die Hütte. Das Feld am Becken liegt auf der Klippenkante neben dem Becken: Flüssiges läuft von dort hinein, Festes bleibt oben liegen.
+
+**Kette:**
+1. Das Holz von der Hütte weg auf die Wiese tragen und anzünden.
+2. Mit der Salzwasser-Pfütze löschen: Holzkohle.
+3. Feuer auf die Holzkohle: Glut.
+4. Glut aufs Feld am Meer. Sie kocht das Meer, ohne die Hütte anzuzünden.
+5. Der Dampf steigt unter die Felsdecke und wird zur Wolke. Der Wind treibt sie zur Klippe, bis die Wand sie aufhält; dort regnet sie Süßwasser ins Becken.
+
+**Musterlösung (5 Züge):** `wood_0_9@3,5`, `fire_0_5@2,5`, `seawater_5_6@4,5`, `fire_0_5@3,5`, `charcoal#1@1,10`. Nach dem letzten Zug dauert es gut 40 Schritte, bis das Becken voll ist.
+
+**Fallen** (je ein Test in `TrapsTest`):
+- *Salzwasser-Pfütze ins Becken:* Sie läuft hinein und verteilt sich. Glut oder Flamme kommen nicht an das Becken heran, also bleibt das Salzwasser für immer. Danach unlösbar (bis Rückgängig).
+- *Feuer ans Meer:* Das Meer löscht es, aber vorher steckt es die Hütte an. Danach unlösbar.
+- *Erde und Pfütze zu Schlamm:* Das einzige Löschwasser ist verbraucht. Danach unlösbar.
+- Weitere Sackgassen ohne eigenen Test:
+  - das Holz auf dem Hüttendach anzünden (Hütte brennt);
+  - die Pfütze aufs Feld über dem Lagerfeuer (löscht das Feuer);
+  - Erde ins Meer (Schlamm statt Meer am Strandfeld).
+
+**Köder:** die Erde (in keiner Lösung benutzt). Dazu das Feld am Becken, das zum Hineinkippen der Pfütze einlädt.
+
+**Ablagefelder:** 10 bei 5 Zügen (2 pro Zug). Falsch-Felder:
+- an der Klippe (für die Pfütze);
+- am Strand (für das Feuer);
+- über dem Holz an der Hütte (zum Anzünden);
+- auf dem Felsbrocken neben dem Lagerfeuer (Pfütze dort löscht das Feuer).
+
+**Kennzahlen (DifficultyReport):**
+- Mindestzüge 5, durch vollständige Suche bewiesen.
+- 45 Lösungen mit 5 Zügen, alle mit derselben Kette: Holz weg von der Hütte, anzünden, mit der Pfütze löschen, Glut machen, Glut ans Meer.
+- 19 % der ersten Züge (7 von 36) führen in eine Sackgasse.
+- Der naheliegende Zug, etwas aufs Feld am Strand, führt nicht zur Lösung.
+
+**Ehrlichkeitsprüfung:**
+- *Kürzer?* Nein: Die vollständige Suche findet mit 4 Zügen keine Lösung.
+- *Offensichtlicher?* Nein. Süßwasser gibt es im Level nicht. Das Löschen von brennendem Holz am Meer gibt nur 4 Einheiten Dampf, für eine volle Wolke braucht es 16. Nur dauerhaftes Kochen des Meeres füllt das Becken, und dauerhaft heiß ohne Flamme ist nur Glut.
+- Zwei Abkürzungen aus früheren Entwürfen sind versperrt:
+  - Kein zweites Feld liegt über dem Meer. Sonst ließe sich brennendes Holz dort ohne die Pfütze löschen, und die Glut läge gleich am Meer.
+  - Kein Feld liegt direkt über dem Becken. Sonst könnte man dort Holz anzünden und mit genau der hineingekippten Pfütze löschen; die Salz-Falle wäre dann umkehrbar.
+
+**Erwartung:** einige Minuten Nachdenken.
+

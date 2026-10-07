@@ -1,0 +1,80 @@
+{
+ "id": "t_02",
+ "title": "Süßwasser",
+ "world": 1,
+ "intro": "Das Becken auf der Klippe soll voll Süßwasser werden. Die Hütte am Strand darf nicht brennen.",
+ "look": 2,
+ "placement": "marked",
+ "map": [
+  ".........",
+  ".........",
+  ".........",
+  ".........",
+  ".+......+",
+  "F%+++.++E",
+  "%%%%%~%%%",
+  "%%%%%%%%%",
+  "+.......%",
+  "W...%+..%",
+  "H+..%%..%",
+  "#sss%%%%%",
+  "#sss%%%%%",
+  "#########"
+ ],
+ "legend": {
+  "F": {
+   "type": "FIRE",
+   "isMovable": true
+  },
+  "W": {
+   "type": "WOOD",
+   "isMovable": true
+  },
+  "~": {
+   "type": "SEAWATER",
+   "amount": 2,
+   "isMovable": true
+  },
+  "s": {
+   "type": "SEAWATER",
+   "amount": 8
+  },
+  "E": {
+   "type": "EARTH",
+   "isMovable": true
+  },
+  "H": {
+   "type": "HUT"
+  }
+ },
+ "goals": [
+  {
+   "type": "fill",
+   "liquid": "WATER",
+   "full": true,
+   "area": [
+    6,
+    10,
+    7,
+    10
+   ],
+   "text": "Fülle das Becken mit Süßwasser"
+  },
+  {
+   "type": "preserve",
+   "object": "hut_0_10",
+   "text": "Die Hütte darf nicht brennen"
+  }
+ ],
+ "wind": [
+  {
+   "area": [
+    0,
+    8,
+    7,
+    8
+   ],
+   "dx": 1
+  }
+ ]
+}

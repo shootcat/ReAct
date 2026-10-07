@@ -3,7 +3,8 @@
   "title": "Test",
   "icon": "FIRE",
   "levels": [
-    "t_01"
+    "t_01",
+    "t_02"
   ],
   "bonus": null,
   "map": [
@@ -12,6 +13,12 @@
       "x": 0.3,
       "y": 0.82,
       "icon": "EMBER"
+    },
+    {
+      "level": "t_02",
+      "x": 0.68,
+      "y": 0.55,
+      "icon": "CLOUD"
     }
   ]
 }

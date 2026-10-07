@@ -62,6 +62,36 @@ class TrapsTest {
         assertLost("t_01", run)
     }
 
+    // ------------------------------------------------------------------ t_02 Süßwasser
+
+    @Test
+    fun `t_02 the walkthrough still works`() {
+        val run = play("t_02", "wood_0_9@3,5", "fire_0_5@2,5", "seawater_5_6@4,5", "fire_0_5@3,5", "charcoal#1@1,10")
+        assertEquals(Outcome.SUCCESS, run.outcome)
+    }
+
+    @Test
+    fun `t_02 salt water poured into the basin spoils it for good`() {
+        val run = play("t_02", "seawater_5_6@5,9")
+        assertTrue(run.state.objects.any { it.type == "SEAWATER" && it.position.y == 10 && it.position.x in 6..7 })
+        assertLost("t_02", run)
+    }
+
+    @Test
+    fun `t_02 fire at the sea sets the hut alight`() {
+        val run = play("t_02", "fire_0_5@1,10")
+        assertEquals("BURNING", run.state.objectById("hut_0_10")?.state)
+        assertLost("t_02", run)
+    }
+
+    @Test
+    fun `t_02 earth and the puddle make mud and use up the only water to put out a fire`() {
+        val run = play("t_02", "seawater_5_6@8,5")
+        assertTrue(run.state.objects.any { it.type == "MUD" })
+        assertTrue(run.state.objects.none { it.isMovable && it.type == "SEAWATER" })
+        assertLost("t_02", run)
+    }
+
     private companion object {
         const val DEPTH = 6
     }
