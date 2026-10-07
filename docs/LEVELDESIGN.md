@@ -12,7 +12,7 @@ Kennungen in den Musterlösungen: Dinge heißen nach Typ und Startfeld (`fire_0_
 
 **Ziele:** Bring das Wasser im Becken zum Kochen (`heat`, Becken (7,7)–(7,8)). Der Wald darf nicht brennen (`preserve`, beide Bäume).
 
-**Material:** ein Holzstück, ein Lagerfeuer, eine kleine Pfütze in einer Mulde. Die Pfütze hat 2 Einheiten Wasser und reicht für genau ein Löschen.
+**Material:** ein Holzstück, ein Lagerfeuer, eine kleine Pfütze in einer Mulde. Die Pfütze hat 2 Einheiten Wasser und reicht für genau ein Löschen (Löschen verbraucht 2 Einheiten; was weniger hat, löscht nicht).
 
 **Karte:** oben eine Lichtung mit Lagerfeuer, Felsbrocken, Holz und der Mulde; darunter am Waldrand das Becken, ein schmaler Brunnen. Es ist nur über ein einziges Ablagefeld erreichbar, und das grenzt an den ersten Baum.
 
@@ -38,7 +38,7 @@ Das Feld am Becken ist das einzige direkt am Hauptziel; es ist die Falle für da
 
 **Kennzahlen (DifficultyReport):**
 - Mindestzüge 4, durch vollständige Suche bewiesen.
-- 24 Lösungen mit 4 Zügen. Alle sind Spielarten derselben Kette: andere Reihenfolge, anderer Ort zum Anzünden, oder die Holzkohle ans Becken tragen und dort das Feuer drauflegen.
+- 18 Lösungen mit 4 Zügen. Alle sind Spielarten derselben Kette: andere Reihenfolge, anderer Ort zum Anzünden, oder die Holzkohle ans Becken tragen und dort das Feuer drauflegen.
 - 26 % der ersten Züge (5 von 19) führen in eine Sackgasse.
 - Der naheliegende Zug, irgendetwas aufs Feld am Becken, führt nicht zur Lösung.
 
@@ -95,7 +95,7 @@ Das Feld am Becken ist das einzige direkt am Hauptziel; es ist die Falle für da
 
 **Kennzahlen (DifficultyReport):**
 - Mindestzüge 5, durch vollständige Suche bewiesen.
-- 45 Lösungen mit 5 Zügen, alle mit derselben Kette: Holz weg von der Hütte, anzünden, mit der Pfütze löschen, Glut machen, Glut ans Meer.
+- 21 Lösungen mit 5 Zügen, alle mit derselben Kette: Holz weg von der Hütte, anzünden, mit der Pfütze löschen, Glut machen, Glut ans Meer.
 - 19 % der ersten Züge (7 von 36) führen in eine Sackgasse.
 - Der naheliegende Zug, etwas aufs Feld am Strand, führt nicht zur Lösung.
 

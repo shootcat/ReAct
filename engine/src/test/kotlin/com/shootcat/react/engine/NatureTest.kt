@@ -277,18 +277,17 @@ class NatureTest {
     fun `the level is solved once the main goals hold, optional goals are judged then`() {
         val start = TestWorld.state(
             "#F.......#",
-            "#....I...#",
-            "#...###..#",
-            "#...#.#..#",
+            "#...#.I#.#",
+            "#...####.#",
             "##########",
         )
         val goals = listOf(
-            TargetState("ice_5_1", "MELTED", vanishes = true, text = "Schmilz das Eis"),
+            TargetState("ice_6_1", "MELTED", vanishes = true, text = "Schmilz das Eis"),
             TargetMaxMoves(1, "Ein Zug"),
             TargetPreserved("fire_1_0", "ACTIVE", "Das Feuer bleibt"),
         )
         val sim = LiveSimulation(level(start, goals), TestWorld.engine())
-        val run = sim.play(sim.start(), "fire_1_0", Position(5, 0))
+        val run = sim.play(sim.start(), "fire_1_0", Position(5, 1))
         assertNotNull(run)
         assertEquals(Outcome.SUCCESS, run.outcome)
         // Judged once the world has settled: the meltwater has put the fire out by then.

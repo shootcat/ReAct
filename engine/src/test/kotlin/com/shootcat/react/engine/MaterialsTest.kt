@@ -173,13 +173,13 @@ class MaterialsTest {
 
     @Test
     fun `a burning tree can still be put out two moves after it caught fire`() {
-        val level = level(listOf("F.+t+..S+.~+", "%%%%%%%%%%%%"), burn)
+        val level = level(listOf("F.+t+..S+..+", "%%%%%%%%%%~%", "%%%%%%%%%%%%"), burn)
         val live = Levels.live(level)
         val lit = live.play(live.start(), "fire_0_0", Position(2, 0))!!
         assertEquals(2, lit.state.objectAt(Position(3, 0))?.burnMovesLeft)
         val waited = live.play(lit, "stone_7_0", Position(8, 0))!!
         assertEquals(1, waited.state.objectAt(Position(3, 0))?.burnMovesLeft)
-        val doused = live.play(waited, "water_10_0", Position(4, 0))!!
+        val doused = live.play(waited, "water_10_1", Position(4, 0))!!
         assertEquals("CHARCOAL", doused.state.objectAt(Position(3, 0))?.type)
         val tooLate = live.play(waited, "stone_7_0", Position(11, 0))!!
         assertEquals("ASH", tooLate.state.objectAt(Position(3, 0))?.type)
@@ -201,6 +201,18 @@ class MaterialsTest {
         }
         assertEquals(setOf("EMBER", "SEAWATER", "STEAM", "CLOUD", "WATER"), seen, "plain steam, a cloud and its fresh rain")
         assertTrue(state.objects.any { it.isRaining })
+    }
+
+    @Test
+    fun `a puddle or a snowball between two burning logs puts out only one of them`() {
+        val puddle = level(listOf("+....", ".B~B.", "%%%%%"), "$burn, \"~\": {\"type\": \"WATER\", \"amount\": 2}")
+        val one = steps(puddle, 1)
+        assertEquals(listOf("CHARCOAL", "WOOD"), one.objects.filter { it.type != "STEAM" }.sortedBy { it.position.x }.map { it.type })
+        assertEquals("BURNING", one.objects.single { it.type == "WOOD" }.state)
+        val snow = level(listOf("+....", ".BnB.", "%%%%%"), "$burn, \"n\": {\"type\": \"SNOW\"}")
+        val after = steps(snow, 3)
+        assertEquals(1, after.objects.count { it.type == "CHARCOAL" }, "three units of meltwater are enough for one fire")
+        assertEquals(1, after.objects.count { it.type == "WOOD" && it.state == "BURNING" })
     }
 
     @Test

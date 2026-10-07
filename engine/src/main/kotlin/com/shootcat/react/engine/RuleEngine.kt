@@ -258,7 +258,16 @@ class RuleEngine(
         budget: Budget,
     ): Boolean {
         val target = world.byId(match.target.id) ?: return false
-        val source = match.sources.firstOrNull()?.let { world.byId(it.id) }
+        // An effect that uses up its source (water putting out a fire, salt dissolving) needs that source
+        // still there, still matching and with enough of it: one puddle cannot put out two fires at once.
+        val usesSource = match.rule.trigger == Trigger.TOUCH && (effect.sourceConsume > 0 || effect.sourceState != null)
+        val present = match.sources.mapNotNull { world.byId(it.id) }
+        val source = if (!usesSource) {
+            present.firstOrNull()
+        } else {
+            present.firstOrNull { matchesSource(it, match.rule.conditions) && (!it.isFluid || it.amount >= effect.sourceConsume) }
+        }
+        if (usesSource && match.sources.isNotEmpty() && source == null) return false
         val changesState = effect.targetState != null && effect.targetState != target.state
         val spawns = effect.spawnObject != null && (effect.targetState == null || changesState)
         val transforms = effect.transform != null && effect.transform != target.type
