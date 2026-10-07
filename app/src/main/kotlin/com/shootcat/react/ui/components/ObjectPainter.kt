@@ -127,8 +127,8 @@ private fun DrawScope.drawCampfire(tl: Offset, c: Float, alpha: Float, time: Flo
 // ------------------------------------------------------------------ wood
 
 private fun woodColors(obj: GameObject): Pair<Color, Color> {
-    val fuel = obj.int(Props.FUEL, 1).coerceAtLeast(1)
-    val burnt = if (obj.state == "BURNING") (obj.burnt.toFloat() / fuel).coerceIn(0f, 1f) else 0f
+    val moves = obj.int(Props.BURN_MOVES, 1).coerceAtLeast(1)
+    val burnt = if (obj.state == "BURNING") (obj.burnt.toFloat() / moves).coerceIn(0f, 1f) else 0f
     return when (obj.state) {
         "CHARRED" -> Palette.charcoal to Color(0xFF151110)
         "BURNING" -> lerp(Palette.wood, Palette.charcoal, burnt) to lerp(Palette.woodDark, Color(0xFF151110), burnt)
@@ -162,12 +162,41 @@ private fun DrawScope.drawFlamesOnTop(left: Float, right: Float, top: Float, c: 
     }
 }
 
+/** Flames shrink with every move something burns; a full flame has all its moves left. */
+private fun flameStrength(obj: GameObject): Float {
+    val moves = obj.int(Props.BURN_MOVES)
+    return if (moves <= 0) 1f else 0.55f + 0.45f * obj.burnMovesLeft / moves
+}
+
+/**
+ * How many more moves something burns before it crumbles to ash: glowing dots on a small dark badge
+ * in the cell's lower left corner, one per move.
+ */
+private fun DrawScope.drawBurnMoves(tl: Offset, c: Float, alpha: Float, time: Float, left: Int) {
+    if (left <= 0) return
+    val r = c * 0.07f
+    val gap = c * 0.19f
+    val w = gap * (left - 1) + r * 3.6f
+    val h = r * 3f
+    val origin = Offset(tl.x + c * 0.03f, tl.y + c - h - c * 0.03f)
+    drawRoundRect(Color(0xCC1E1410), origin, Size(w, h), CornerRadius(h / 2), alpha = alpha)
+    for (i in 0 until left) {
+        val center = Offset(origin.x + r * 1.8f + gap * i, origin.y + h / 2)
+        val glow = 0.8f + 0.2f * sin(time * TAU * 2f + i * 1.3f)
+        drawCircle(Palette.fire.copy(alpha = 0.5f), r * 1.6f, center, alpha = alpha * glow)
+        drawCircle(Palette.fireCore, r, center, alpha = alpha)
+    }
+}
+
 private fun DrawScope.drawLog(tl: Offset, c: Float, alpha: Float, time: Float, obj: GameObject) {
     val (light, dark) = woodColors(obj)
     val h = c * 0.42f
     val origin = Offset(tl.x + c * 0.06f, tl.y + c - h - c * 0.04f)
     drawLogShape(origin, c * 0.88f, h, light, dark, alpha, obj.state == "CHARRED")
-    if (obj.state == "BURNING") drawFlamesOnTop(origin.x, origin.x + c * 0.88f, origin.y, c, time, alpha, 1f)
+    if (obj.state == "BURNING") {
+        drawFlamesOnTop(origin.x, origin.x + c * 0.88f, origin.y, c, time, alpha, flameStrength(obj))
+        drawBurnMoves(tl, c, alpha, time, obj.burnMovesLeft)
+    }
 }
 
 /** Two logs below, one on top. */
@@ -178,7 +207,10 @@ private fun DrawScope.drawPile(tl: Offset, c: Float, alpha: Float, time: Float, 
     drawLogShape(Offset(tl.x + c * 0.02f, tl.y + c - h - c * 0.02f), c * 0.52f, h, light, dark, alpha, charred)
     drawLogShape(Offset(tl.x + c * 0.46f, tl.y + c - h - c * 0.02f), c * 0.52f, h, light, dark, alpha, charred)
     drawLogShape(Offset(tl.x + c * 0.18f, tl.y + c - 2 * h - c * 0.02f), c * 0.64f, h, light, dark, alpha, charred)
-    if (obj.state == "BURNING") drawFlamesOnTop(tl.x + c * 0.1f, tl.x + c * 0.9f, tl.y + c - 2 * h, c, time, alpha, 1.3f)
+    if (obj.state == "BURNING") {
+        drawFlamesOnTop(tl.x + c * 0.1f, tl.x + c * 0.9f, tl.y + c - 2 * h, c, time, alpha, 1.3f * flameStrength(obj))
+        drawBurnMoves(tl, c, alpha, time, obj.burnMovesLeft)
+    }
 }
 
 // ------------------------------------------------------------------ ice, stone, minerals
@@ -355,11 +387,13 @@ private fun DrawScope.drawTree(tl: Offset, c: Float, alpha: Float, time: Float, 
         drawCircle(Brush.radialGradient(listOf(light, dark), center - Offset(c * 0.06f, c * 0.08f), r * c * 1.3f), r * c, center, alpha = alpha)
     }
     if (burning) {
+        val strength = flameStrength(obj)
         for (i in 0..2) {
             val fx = cx + (i - 1) * c * 0.24f
             val flicker = 0.8f + 0.25f * sin(time * TAU * 3f + i * 1.7f)
-            drawFlame(fx, ground - c * 0.78f, c * 0.6f * flicker, c * 0.14f, c * 0.03f * sin(time * TAU * 2f + i), alpha)
+            drawFlame(fx, ground - c * 0.78f, c * 0.6f * flicker * strength, c * 0.14f, c * 0.03f * sin(time * TAU * 2f + i), alpha)
         }
+        drawBurnMoves(tl, c, alpha, time, obj.burnMovesLeft)
     }
 }
 

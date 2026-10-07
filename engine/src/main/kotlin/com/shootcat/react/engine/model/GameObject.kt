@@ -26,6 +26,13 @@ object Props {
     const val CONDUCTS = "conducts"
     /** Steps a burning object lasts before it is used up. */
     const val FUEL = "fuel"
+    /**
+     * Burns for this many player moves instead (the move it caught fire in counts), so the player has
+     * the moves in between to put it out …
+     */
+    const val BURN_MOVES = "burn_moves"
+    /** … and then crumbles into this type (ash). */
+    const val BURNS_INTO = "burns_into"
     /** State a burnt-out object ends up in. */
     const val BURNT_STATE = "burnt_state"
     /** A barrier that gas pressure pushes along when the pressure difference is high enough. */
@@ -70,7 +77,7 @@ const val LIQUID_DENSITY = 10
 /**
  * Every thing in the world is a [GameObject]: a type, a state, a position and properties.
  * Liquids and gases additionally carry an [amount] (how full their cell is), conductors a
- * temperature [temp] and burning things the number of steps they have [burnt]. Behaviour never
+ * temperature [temp] and burning things the number of steps (or moves) they have [burnt]. Behaviour never
  * depends on the id.
  */
 data class GameObject(
@@ -123,6 +130,13 @@ data class GameObject(
         get() {
             val heat = int(Props.HEAT)
             return if (heat > 0 && inState(Props.HEAT_STATE)) heat else 0
+        }
+
+    /** Moves this thing still burns before it crumbles to [Props.BURNS_INTO]; 0 if it is not burning down. */
+    val burnMovesLeft: Int
+        get() {
+            val moves = int(Props.BURN_MOVES)
+            return if (moves > 0 && heatOutput > 0) (moves - burnt).coerceAtLeast(0) else 0
         }
 
     /** Burns with an open flame right now. */

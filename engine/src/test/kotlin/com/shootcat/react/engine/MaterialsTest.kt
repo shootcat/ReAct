@@ -150,4 +150,48 @@ class MaterialsTest {
         assertEquals("COLD", state.objectAt(Position(2, 1))?.state)
         assertTrue(cooledAfter in 3..12, "cooled after $cooledAfter steps")
     }
+
+    private val burn = "\"F\": {\"type\": \"FIRE\", \"isMovable\": true}, \"W\": {\"type\": \"WOOD\", \"isMovable\": true}, " +
+        "\"~\": {\"type\": \"WATER\", \"amount\": 3, \"isMovable\": true}, \"s\": {\"type\": \"SNOW\", \"isMovable\": true}, " +
+        "\"B\": {\"type\": \"WOOD\", \"state\": \"BURNING\", \"isMovable\": true}"
+
+    @Test
+    fun `wood burns through the move it caught fire in and one more, then crumbles to ash`() {
+        val level = level(listOf("F..+W..S+.", "%%%%%%%%%%"), burn)
+        val live = Levels.live(level)
+        val lit = live.play(live.start(), "fire_0_0", Position(3, 0))!!
+        val wood = lit.state.objectAt(Position(4, 0))!!
+        assertEquals("BURNING", wood.state, "a whole move of settling does not burn it down")
+        assertEquals(1, wood.burnMovesLeft, "one move left to put it out")
+        val later = live.play(lit, "stone_7_0", Position(8, 0))!!
+        assertTrue(later.state.objects.none { it.type == "WOOD" })
+        val ash = later.state.objectAt(Position(4, 0))!!
+        assertEquals("ASH", ash.type)
+        assertTrue(ash.isMovable)
+        assertEquals("ACTIVE", later.state.objectAt(Position(3, 0))?.state, "the fire itself burns on")
+    }
+
+    @Test
+    fun `a burning tree can still be put out two moves after it caught fire`() {
+        val level = level(listOf("F.+t+..S+.~+", "%%%%%%%%%%%%"), burn)
+        val live = Levels.live(level)
+        val lit = live.play(live.start(), "fire_0_0", Position(2, 0))!!
+        assertEquals(2, lit.state.objectAt(Position(3, 0))?.burnMovesLeft)
+        val waited = live.play(lit, "stone_7_0", Position(8, 0))!!
+        assertEquals(1, waited.state.objectAt(Position(3, 0))?.burnMovesLeft)
+        val doused = live.play(waited, "water_10_0", Position(4, 0))!!
+        assertEquals("CHARCOAL", doused.state.objectAt(Position(3, 0))?.type)
+        val tooLate = live.play(waited, "stone_7_0", Position(11, 0))!!
+        assertEquals("ASH", tooLate.state.objectAt(Position(3, 0))?.type)
+    }
+
+    @Test
+    fun `snow next to burning wood melts and its water puts the wood out in the same move`() {
+        val level = level(listOf("s..+B..", "%%%%%%%"), burn)
+        val live = Levels.live(level)
+        val run = live.play(live.start(), "snow_0_0", Position(3, 0))!!
+        assertEquals(1, run.moves.size)
+        assertTrue(run.state.objects.none { it.type == "SNOW" || it.type == "WOOD" || it.type == "ASH" })
+        assertEquals("CHARCOAL", run.state.objectAt(Position(4, 0))?.type)
+    }
 }

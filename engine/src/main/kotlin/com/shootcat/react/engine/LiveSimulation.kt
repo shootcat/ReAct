@@ -3,6 +3,7 @@ package com.shootcat.react.engine
 import com.shootcat.react.engine.model.GameState
 import com.shootcat.react.engine.model.LevelData
 import com.shootcat.react.engine.model.Position
+import com.shootcat.react.engine.model.Props
 
 /** One thing the player did: dragged [objectId] from [from] and dropped it on [to]. */
 data class PlayerMove(val objectId: String, val from: Position, val to: Position)
@@ -26,6 +27,8 @@ data class Run(
     val latched: Set<Int> = emptySet(),
     /** For how many steps in a row all main goals have held. */
     val metFor: Int = 0,
+    /** Moves whose end the burning things have already been aged for (see [Props.BURN_MOVES]). */
+    val burnCounted: Int = 0,
 ) {
     val movedObjects: Set<String> get() = moves.map { it.objectId }.toSet()
 }
@@ -41,6 +44,10 @@ data class Tick(val run: Run, val events: List<RuleEvent>, val cues: List<Cue> =
  * After every step all goals are checked. The level is solved once all main goals hold and either the
  * world has come to rest or they have held for [STABLE_STEPS] steps in a row – so a pond that only
  * fills for a moment, or a tree the fire is still creeping towards, does not count yet.
+ *
+ * Wood and trees burn for a number of moves, not steps ([Props.BURN_MOVES]): when the world has come
+ * to rest after a move, everything burning has burnt through one more move, and what has burnt down
+ * crumbles to ash. Until then it can still be put out.
  */
 class LiveSimulation(private val level: LevelData, private val engine: RuleEngine) {
 
@@ -77,6 +84,7 @@ class LiveSimulation(private val level: LevelData, private val engine: RuleEngin
         }
         // Nothing moves or changes any more: the world is at rest until the next move.
         if (step.state.objects == run.state.objects) {
+            if (run.burnCounted < run.moves.size) return burnDown(run)
             val solved = goalsReached(run.state, run.moves.size, run.latched)
             return Tick(finish(run.copy(active = false), solved), emptyList())
         }
@@ -93,7 +101,35 @@ class LiveSimulation(private val level: LevelData, private val engine: RuleEngin
             metFor = metFor,
         )
         val solved = met && (metFor >= STABLE_STEPS || !next.active)
+        if (!solved && !next.active && next.burnCounted < next.moves.size) {
+            val burnt = burnDown(next)
+            return Tick(burnt.run, step.events, step.cues + burnt.cues)
+        }
         return Tick(finish(next, solved), step.events, step.cues)
+    }
+
+    /**
+     * The moves since the last count are over: everything burning has burnt through them, and what has
+     * burnt for its full number of moves crumbles into ash. The world then settles once more.
+     */
+    private fun burnDown(run: Run): Tick {
+        val moves = run.moves.size - run.burnCounted
+        val world = MutableWorld(run.state)
+        for (o in run.state.objects) {
+            if (o.burnMovesLeft <= 0) continue
+            val burnt = o.burnt + moves
+            val ash = o.string(Props.BURNS_INTO)
+            if (burnt < o.int(Props.BURN_MOVES) || ash == null) {
+                world.setBurnt(o.id, burnt)
+                continue
+            }
+            world.remove(o.id)
+            val loose = o.isMovable || engine.types[ash]?.properties?.get(Props.GRAVITY) == "true"
+            world.spawn(ash, o.position, engine.types, isMovable = loose)
+            world.cue(BURN_OUT_SOUND, o.position)
+        }
+        val next = run.copy(state = world.snapshot(), active = true, stepsSinceMove = 0, burnCounted = run.moves.size)
+        return Tick(next, emptyList(), world.cues)
     }
 
     private fun finish(run: Run, solved: Boolean): Run =
@@ -120,5 +156,8 @@ class LiveSimulation(private val level: LevelData, private val engine: RuleEngin
     companion object {
         /** Steps the main goals have to hold in a row while the world is still moving. */
         const val STABLE_STEPS = 12
+
+        /** Heard when something has burnt down to ash. */
+        const val BURN_OUT_SOUND = "crumble"
     }
 }
