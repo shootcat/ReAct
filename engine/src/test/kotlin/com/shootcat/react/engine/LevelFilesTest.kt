@@ -27,7 +27,7 @@ class LevelFilesTest {
         for (id in Levels.allLevelIds) {
             val level = Levels.level(id)
             val fields = assertNotNull(level.placement, "$id uses marked placement")
-            assertTrue(fields.size in 3..12, "$id has ${fields.size} placement fields")
+            assertTrue(fields.size in 3..16, "$id has ${fields.size} placement fields")
         }
     }
 

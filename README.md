@@ -14,7 +14,7 @@ Drei Messpunkte, jeder aus einem anderen Gebiet. Der Spieler kennt alle Elemente
 |---|---|---|---|---|
 | t_01 „Kochstelle“ | Wald, leicht | Wasser im Becken kocht, der Wald brennt nicht | Glut erhitzt, ohne zu zünden | fertig, 4 Züge |
 | t_02 „Süßwasser“ | Küste, Mitte | Becken auf der Klippe voll Süßwasser, die Hütte brennt nicht | Verdunsten entsalzt | fertig, 5 Züge |
-| t_03 „Tiefe Schmelze“ | Mine, Obergrenze | Glas herstellen, der Wald brennt nicht | Metall leitet Hitze durch die Wand; es gibt nur eine Flamme | in Arbeit |
+| t_03 „Tiefe Schmelze“ | Mine, Obergrenze | Glas herstellen, der Wald brennt nicht | Metall leitet Hitze durch die Wand; es gibt nur eine Flamme | fertig, 9 Züge |
 
 ## APK herunterladen
 
@@ -87,19 +87,21 @@ Die Musterlösungen aller Level stehen in `engine/src/test/resources/walkthrough
 
 ## Schwierigkeit
 
-Für Level mit Ablagefeldern misst `DifficultyReportTest` per vollständiger Suche (`LevelAnalysis`, jeder Zug gefolgt vom Einschwingen der Welt, Züge mit gleichem Ergebnis zählen einmal):
+`DifficultyReportTest` misst die Testlevel nach Leitfaden V2 (5.2) mit `LevelAnalysis`. Jeder Zug wird gefolgt vom Einschwingen der Welt; Züge mit gleichem Ergebnis zählen einmal.
 
-1. **Mindestzüge**, bewiesen durch Breitensuche.
+1. **Mindestzüge**, bewiesen durch Breitensuche. Level 1 und 2 werden vollständig durchsucht. Bei Level 3 wächst die Zahl der Welten pro Zug etwa um den Faktor 15 bis 20; vollständig durchsucht wird bis 4 Züge (im Test, einige Minuten). Die Musterlösung mit 9 Zügen zeigt, dass es lösbar ist.
 2. **Lösungen**: Anzahl verschiedener Lösungen in Mindestlänge; Reihenfolge-Varianten zählen einzeln.
 3. **Sackgassen**: Anteil der möglichen ersten Züge, nach denen das Level nicht mehr lösbar ist (Suche bis Mindestzüge plus zwei).
-4. **Naheliegender Zug**: ein bewegliches Objekt auf das Ablagefeld, das dem Hauptziel am nächsten liegt. Ab Level 3 darf er keine Mindestlösung beginnen.
-5. **Köder**: bewegliche Objekte, die in keiner Mindestlösung vorkommen, oder solche, die die Lösung für etwas anderes braucht als ihren offensichtlichen Zweck. Letztere stehen mit Begründung in `REPURPOSED` im Test. Ab Level 5 Pflicht.
+4. **Naheliegender Zug**: ein bewegliches Objekt auf das Ablagefeld, das dem Hauptziel am nächsten liegt. Er darf keine Mindestlösung beginnen.
+5. **Köder**: bewegliche Objekte, die in keiner Mindestlösung vorkommen.
+6. **Ablagefelder pro Zug**: Level 1 und 2 mindestens 2, Level 3 mindestens 1,5.
+7. **Zufallsspiele** (nur Level 3): 3000 Spiele aus zufälligen erlaubten Zügen, je Mindestzüge plus drei. Höchstens 5 % davon dürfen das Level lösen.
 
-Die Suche verwirft Welten, in denen ein Hauptziel nicht mehr erreichbar ist, etwa wenn der Samen verbrannt ist. Welten, die sich nur in den Nummern selbst entstandener Dinge unterscheiden (Schmelzwasser, Dampf, Eis), zählt sie als eine.
+Die Suche verwirft Welten, in denen ein Hauptziel nicht mehr erreichbar ist, etwa wenn der Wald brennt. Welten, die sich nur in den Nummern selbst entstandener Dinge unterscheiden (Holzkohle, Dampf, Schmelzwasser), zählt sie als eine. Die Tabelle schreibt der Test nach `engine/build/difficulty.md`.
 
-Die Tabelle für die Testlevel schreibt der Test nach `engine/build/difficulty.md`.
-
-Der Test prüft die Kurve je Levelnummer (1–2: 2–3 Züge; 3–4: 3–4 Züge, mindestens 30 % Sackgassen; 5–7: 4–6 Züge, 40 %; 8–10: 6–8 Züge, 50 %) und schreibt die Tabelle nach `engine/build/difficulty.md`. `WalkthroughTest` beweist die Mindestzugzahl jedes Levels vollständig.
+`WalkthroughTest` beweist die Mindestzugzahl vollständig, wenn sie höchstens 7 beträgt. `TrapsTest` spielt jede Falle aus dem Leitfaden nach und zeigt, dass das Level danach nicht mehr lösbar ist:
+- bei Level 1 und 2 durch vollständige Suche über 6 weitere Züge;
+- bei Level 3 durch die Materialbilanz (was verbraucht ist, kommt nicht zurück) und eine vollständige Suche über 3 weitere Züge.
 
 ## Bauen und testen
 

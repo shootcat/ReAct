@@ -22,6 +22,8 @@ dependencies {
 }
 
 tasks.test {
+    // The search over level 3 keeps tens of thousands of worlds in memory.
+    maxHeapSize = "3g"
     // The level tests load the real level files that ship with the app.
     systemProperty("react.levels.dir", file("../app/src/main/assets/levels").absolutePath)
     testLogging {

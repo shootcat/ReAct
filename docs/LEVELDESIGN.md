@@ -108,3 +108,76 @@ Das Feld am Becken ist das einzige direkt am Hauptziel; es ist die Falle für da
 
 **Erwartung:** einige Minuten Nachdenken.
 
+## t_03 „Tiefe Schmelze“ (Mine, Obergrenze)
+
+![Startzustand](screenshots/test/t_03.png)
+
+**Einsicht in zwei Teilen:** Metall leitet Hitze durch die Wand. Und es gibt nur eine Flamme: Alles, was angezündet werden muss, muss brennen, bevor das Feuer zu Glut wird.
+
+**Ziele:** Stelle Glas her (`produce`, mindestens 1 Glas). Der Wald darf nicht brennen (`preserve`, die zwei Bäume oben links).
+
+**Material:**
+- ein Baum am Waldrand und ein Stein;
+- ein zweites Holzstück, Erz, ein Lagerfeuer;
+- eine Pfütze (2 Einheiten) und ein Schneeball;
+- als Köder Salz und Erde.
+
+**Karte:**
+- Oben: Wald, Randbaum, Stein, Salz und der Schneeball an der Kante eines Schachts.
+- Darunter ein Stollen mit dem Lagerfeuer, dem zweiten Holz und der Pfütze in einer Nische.
+- Tiefer ein Stollen mit Erz, Erde und dem Feld über dem Wandschlitz.
+- Ganz unten die geschlossene Sandkammer. Keine Hitzequelle kommt hinein. Der Schlitz nimmt einen Block auf; zwischen ihm und dem Sand liegt eine Wandzelle.
+
+**Kette:**
+1. Stein auf den Randbaum: Holz. Der Stein bleibt liegen.
+2. Das Holz vom Waldrand weg ans Lagerfeuer: Es brennt.
+3. Die Pfütze daneben löscht es zu Holzkohle.
+4. Das zweite Holz ans Feuer: Es brennt.
+5. Der Schneeball daneben schmilzt in der Hitze; sein Wasser löscht das Holz im selben Zug.
+6. Feuer auf die eine Holzkohle: Glut.
+7. Erz auf die andere: Schmelzgut.
+8. Schmelzgut in den Schlitz.
+9. Glut darauf. Das Schmelzgut wird zu Metall, das Metall wird heiß, seine Hitze geht durch die Wand und schmilzt den Sand dahinter zu Glas.
+
+**Musterlösung (9 Züge):** `stone_6_4@2,4`, `tree_2_4@4,7`, `water_2_8@3,7`, `wood_1_7@6,7`, `snow_9_4@7,7`, `fire_5_7@4,7`, `ore_1_10@6,7`, `charcoal#7@6,10`, `charcoal#1@6,10`. Das gefällte Holz behält die Kennung des Baums; das Schmelzgut heißt nach der Holzkohle, auf die das Erz fiel.
+
+**Fallen** (je ein Test in `TrapsTest`):
+- *Glut zu früh:* Feuer auf die erste Holzkohle, bevor das zweite Holz brennt. Danach gibt es keine Flamme mehr, das zweite Holz zündet nie. Ohne zweite Holzkohle kein Schmelzgut, also kein Metall.
+- *Randbaum anzünden:* Feuer neben den Randbaum, und der Wald brennt mit.
+- *Salz auf den Schneeball,* um Wasser zu gewinnen: Das Schmelzwasser läuft in den Schacht. Es bleibt nur die Pfütze, aber zwei Hölzer müssen gelöscht werden.
+- *Erde und Pfütze zu Schlamm:* Es bleibt nur der Schneeball zum Löschen.
+- *Beide Hölzer gleichzeitig brennen lassen:* Im nächsten Zug lässt sich nur eines löschen, das andere zerfällt zu Asche.
+- Ohne eigenen Test, aber gleich endgültig: einen Baum des Waldes fällen (der Wald ist dann nicht mehr ganz).
+
+**Köder:** Salz (lockt mit „Salz taut Schnee“) und Erde (lockt mit der Pfütze daneben). Dazu das Feld neben dem Schlitzfeld: Glut dort liegt „neben dem Schlitz“, berührt das Schmelzgut aber nicht.
+
+**Ablagefelder:** 14 bei 9 Zügen (1,6 pro Zug). Falsch-Felder:
+- neben dem Randbaum (für das Feuer);
+- über dem Wald (Stein auf einen Waldbaum);
+- über dem Lagerfeuer (Pfütze oder Schneeball dort löschen die einzige Flamme);
+- neben dem Schneeball (für das Salz);
+- neben dem Schlitzfeld (für die Glut).
+
+**Kennzahlen (DifficultyReport):**
+- Mindestzüge 9. Vollständig durchsucht und bewiesen: keine Lösung mit bis zu 4 Zügen.
+- 0 von 3000 Zufallsspielen mit 12 Zügen lösen das Level.
+- Eine vollständige Suche bis 6 Züge, wie der Leitfaden sie vorsieht, ist nicht machbar. Die Zahl der Welten wächst pro Zug um den Faktor 15 bis 20: 74, 2 600, 57 000 und 880 000 nach einem bis vier Zügen. Bei 6 Zügen wären es etwa 200 Millionen Welten, mit Stunden Rechenzeit und weit mehr Speicher, als ein Test hat.
+- Zusätzlich vollständig geprüft: Nach den ersten vier Zügen der Musterlösung gibt es keinen Rest in 4 Zügen, nach den ersten fünf keinen in 3.
+
+**Warum es keine Lösung unter 9 Zügen gibt (Zählbegründung):**
+1. *Zwei Holzkohlen nötig:* Glut und Schmelzgut verbrauchen je eine. Holz gibt es zweimal: das zweite Holzstück und den Randbaum. Der Randbaum lässt sich nicht als Baum anzünden und löschen, weil der Wald im nächsten Schritt mitbrennt. Also muss er gefällt werden (1 Zug).
+2. *Beide Hölzer müssen bewegt werden:* Das gefällte Holz liegt am Waldrand und muss weg, bevor es brennt. Neben dem zweiten Holz liegt kein Feld, also kann man das Feuer nicht zu ihm bringen (2 Züge, die zugleich anzünden können).
+3. *Zwei Löschzüge:* Jede Wasserquelle löscht nur einmal (Pfütze 2 Einheiten, Schneeball 3). Kein Zug zündet an und löscht zugleich mit Wasser, das erst bewegt werden muss (2 Züge).
+4. *Zwei Verschmelzungen:* Feuer auf Holzkohle und Erz auf Holzkohle (2 Züge).
+5. *Zwei Platzierungen:* Schmelzgut in den Schlitz und Glut darauf. Was nicht an Ort und Stelle entsteht, muss getragen werden. Heißes Metall lässt sich nicht tragen (2 Züge).
+
+Zusammen sind das 9 Züge.
+
+**Ehrlichkeitsprüfung.** Drei Abkürzungen hat der Bau aufgedeckt; alle sind beseitigt:
+- *Pfütze löscht zwei Hölzer:* Eine Pfütze zwischen zwei brennenden Hölzern löschte beide. Die Engine zieht den Verbrauch jetzt vor dem zweiten Löschen ab: Was weniger als 2 Einheiten hat, löscht nicht.
+- *Gesalzenes Schmelzwasser bleibt brauchbar:* Gesalzener Schnee hinterließ Schmelzwasser, das sich zu 2 Einheiten zusammenschieben ließ. Jetzt ist es ein formfester Schneeball an der Schachtkante; sein Schmelzwasser läuft unerreichbar in den Schacht.
+- *Heißes Metall tragen (8 statt 9 Züge):* Schmelzgut ließ sich gleich neben der frischen Glut zu Metall schmelzen und das heiße Metall in den Schlitz tragen. Jetzt gilt: Glühendes Metall kann man nicht anfassen, erst abgekühlt wieder.
+- *Offensichtlicher?* Die erste Idee, Glut oder Feuer in den Schlitz, schmilzt nichts, denn nur Metall gibt Hitze durch die Wand. Die zweite Idee, zuerst Glut zu machen, verbrennt die einzige Flamme zu früh.
+
+**Erwartung:** zehn Minuten oder mehr, ohne unfair zu wirken.
+

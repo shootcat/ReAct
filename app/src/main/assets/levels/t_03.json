@@ -1,0 +1,90 @@
+{
+ "id": "t_03",
+ "title": "Tiefe Schmelze",
+ "world": 1,
+ "intro": "Tief im Fels liegt Sand in einer geschlossenen Kammer. Daraus soll Glas werden. Der Wald oben darf nicht brennen.",
+ "look": 5,
+ "placement": "marked",
+ "map": [
+  "...........",
+  "...........",
+  "...........",
+  ".+.+.......",
+  "TTt+.+Sk+n.",
+  "##########.",
+  "%%%%%+%%%%.",
+  "%W.++F++..%",
+  "%%~%%%%%%%%",
+  "%%%%%%%%%%%",
+  "%R+..+++E.%",
+  "%%%%%%.%%%%",
+  "%%%%%%%%%%%",
+  "%%%%,,,,%%%",
+  "%%%%%%%%%%%"
+ ],
+ "legend": {
+  "F": {
+   "type": "FIRE",
+   "isMovable": true
+  },
+  "W": {
+   "type": "WOOD",
+   "isMovable": true
+  },
+  "~": {
+   "type": "WATER",
+   "amount": 2,
+   "isMovable": true
+  },
+  "n": {
+   "type": "SNOW",
+   "state": "BALL",
+   "isMovable": true
+  },
+  "S": {
+   "type": "STONE",
+   "isMovable": true
+  },
+  "R": {
+   "type": "ORE",
+   "isMovable": true
+  },
+  "k": {
+   "type": "SALT",
+   "isMovable": true
+  },
+  "E": {
+   "type": "EARTH",
+   "isMovable": true
+  },
+  "T": {
+   "type": "TREE"
+  },
+  "t": {
+   "type": "TREE"
+  },
+  ",": {
+   "type": "SAND"
+  }
+ },
+ "goals": [
+  {
+   "type": "produce",
+   "element": "GLASS",
+   "text": "Stelle Glas her"
+  },
+  {
+   "type": "preserve",
+   "types": [
+    "TREE"
+   ],
+   "area": [
+    0,
+    3,
+    1,
+    4
+   ],
+   "text": "Der Wald darf nicht brennen"
+  }
+ ]
+}

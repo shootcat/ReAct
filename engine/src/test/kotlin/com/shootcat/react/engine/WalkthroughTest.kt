@@ -80,14 +80,19 @@ class WalkthroughTest {
 
     /**
      * With marked placement the search is complete up to the declared minimum; levels that may be built on
-     * anywhere are only searched [PROOF_DEPTH] moves deep.
+     * anywhere are only searched [PROOF_DEPTH] moves deep. A level whose minimum is beyond [COMPLETE_LIMIT]
+     * is too big for that: the DifficultyReportTest searches it completely as deep as is affordable.
      */
     @Test
     fun `no level can be solved with fewer moves than declared`() {
         for ((id, min) in minimum) {
             val level = Levels.level(id)
             val complete = level.placement != null
-            val depth = if (complete) min - 1 else minOf(min - 1, PROOF_DEPTH)
+            val depth = when {
+                !complete -> minOf(min - 1, PROOF_DEPTH)
+                min - 1 <= COMPLETE_LIMIT -> min - 1
+                else -> 0
+            }
             if (depth < 1) continue
             val shortcut = if (complete) {
                 LevelAnalysis(level, Levels.engine(level)).shortest(depth)?.map { it.objectId to it.to }
@@ -110,7 +115,7 @@ class WalkthroughTest {
             val next = Collections.synchronizedList(mutableListOf<Pair<List<Pair<String, Position>>, Run>>())
             val found = Collections.synchronizedList(mutableListOf<List<Pair<String, Position>>>())
             val jobs = frontier.flatMap { (moves, run) ->
-                run.state.objects.filter { it.isMovable }.flatMap { o -> cells.map { Triple(moves, run, o.id to it) } }
+                run.state.objects.filter { it.canBePickedUp }.flatMap { o -> cells.map { Triple(moves, run, o.id to it) } }
             }
             jobs.parallelStream().forEach { (moves, run, move) ->
                 if (found.isNotEmpty()) return@forEach
@@ -129,5 +134,6 @@ class WalkthroughTest {
 
     private companion object {
         const val PROOF_DEPTH = 2
+        const val COMPLETE_LIMIT = 6
     }
 }
