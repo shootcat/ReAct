@@ -37,6 +37,11 @@ data class RuleConditions(
     val sourceHot: Boolean = false,
     /** With [sourceHot]: the heat the source must give off at least (a big fire boils water, embers do not). */
     val minHeat: Int = 1,
+    /**
+     * With [sourceHot]: the source must burn with an open flame (fire, burning wood). Embers and hot metal
+     * are hot but have no flame, so they never set anything alight.
+     */
+    val sourceFlame: Boolean = false,
     /** A liquid or gas source must hold at least this much (only deep water douses a big fire). */
     val sourceMinAmount: Int = 0,
     /** A liquid or gas target must hold at least this much (only a full cell of water freezes). */

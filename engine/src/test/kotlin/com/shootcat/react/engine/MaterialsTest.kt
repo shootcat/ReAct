@@ -72,4 +72,24 @@ class MaterialsTest {
         val after = Levels.engine(level).step(level.initialState()).state
         assertEquals("CHARCOAL", after.objectAt(Position(2, 1))?.type)
     }
+
+    @Test
+    fun `only an open flame sets wood alight, glowing heat does not`() {
+        val legend = "\"W\": {\"type\": \"WOOD\", \"isMovable\": true}, \"F\": {\"type\": \"FIRE\", \"isMovable\": true}, " +
+            "\"G\": {\"type\": \"EMBER_ROCK\"}"
+        val flame = level(listOf("+...", ".FW.", "%%%%"), legend)
+        val lit = Levels.engine(flame).step(flame.initialState()).state
+        assertEquals("BURNING", lit.objectAt(Position(2, 1))?.state)
+        val glow = level(listOf("+...", ".GW.", "%%%%"), legend)
+        val warm = Levels.engine(glow).step(glow.initialState()).state
+        assertEquals("DRY", warm.objectAt(Position(2, 1))?.state, "embers are hot but have no flame")
+    }
+
+    @Test
+    fun `dropping wood next to glowing heat is no reaction, next to a flame it is`() {
+        val legend = "\"W\": {\"type\": \"WOOD\", \"isMovable\": true}, \"f\": {\"type\": \"FIRE\"}, \"G\": {\"type\": \"EMBER_ROCK\"}"
+        val start = level(listOf("W.+f+G..", "%%%%%%%%"), legend).initialState()
+        assertIs<Drop.NextTo>(drops.resolve(start, "wood_0_0", Position(3, 0)))
+        assertNull(drops.resolve(start, "wood_0_0", Position(5, 0)), "wood dropped on embers bounces off")
+    }
 }

@@ -467,7 +467,8 @@
    "conditions": {
     "source_hot": true,
     "target": "WOOD",
-    "target_state": "DRY"
+    "target_state": "DRY",
+    "source_flame": true
    },
    "effect": {
     "target_state": "BURNING"
@@ -482,7 +483,8 @@
    "conditions": {
     "source_hot": true,
     "target": "WOOD_PILE",
-    "target_state": "DRY"
+    "target_state": "DRY",
+    "source_flame": true
    },
    "effect": {
     "target_state": "BURNING"
@@ -497,7 +499,8 @@
    "conditions": {
     "source_hot": true,
     "target": "TREE",
-    "target_state": "GREEN"
+    "target_state": "GREEN",
+    "source_flame": true
    },
    "effect": {
     "target_state": "BURNING"

@@ -80,7 +80,12 @@ object Reactions {
 
     private fun sourceToken(rule: Rule, types: TypeCatalog): ReactionToken {
         if (rule.conditions.sourceHot && rule.conditions.source == null) {
-            return ReactionToken(if (rule.conditions.minHeat >= STRONG_HEAT) "Große Hitze" else "Hitze", symbol = ReactionSymbol.HEAT)
+            val label = when {
+                rule.conditions.sourceFlame -> "Flamme"
+                rule.conditions.minHeat >= STRONG_HEAT -> "Große Hitze"
+                else -> "Hitze"
+            }
+            return ReactionToken(label, symbol = ReactionSymbol.HEAT)
         }
         val source = rule.conditions.source ?: return ReactionToken("?")
         return ReactionToken(types.name(source), source, rule.conditions.sourceState)
@@ -112,10 +117,12 @@ object Reactions {
     /** Types that react with [type] on touch (either way round). Used for the subtle reaction preview. */
     fun touchPartners(type: String, rules: List<Rule>, types: TypeCatalog): Set<String> {
         fun canBeHot(t: String) = (types[t]?.properties?.get(Props.HEAT)?.toIntOrNull() ?: 0) > 0
+        fun canFlame(t: String) = canBeHot(t) && types[t]?.properties?.get(Props.FLAME) == "true"
         return rules.filter { it.trigger == Trigger.TOUCH }.flatMap { rule ->
             val c = rule.conditions
             val sources = when {
                 c.source != null -> listOf(c.source)
+                c.sourceFlame -> types.all.map { it.id }.filter(::canFlame)
                 c.sourceHot -> types.all.map { it.id }.filter(::canBeHot)
                 else -> emptyList()
             }

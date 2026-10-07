@@ -305,8 +305,9 @@ object LevelLoader {
             targetState = conditions.targetState,
             minLoad = conditions.minLoad,
             direction = enumValue<LoadDirection>(conditions.direction, "rule '$id' direction"),
-            sourceHot = conditions.sourceHot,
+            sourceHot = conditions.sourceHot || conditions.sourceFlame,
             minHeat = conditions.minHeat,
+            sourceFlame = conditions.sourceFlame,
             sourceMinAmount = conditions.sourceMinAmount,
             targetMinAmount = conditions.targetMinAmount,
         ),
@@ -393,6 +394,7 @@ object LevelLoader {
         val direction: String = "DOWN",
         @SerialName("source_hot") val sourceHot: Boolean = false,
         @SerialName("min_heat") val minHeat: Int = 1,
+        @SerialName("source_flame") val sourceFlame: Boolean = false,
         @SerialName("source_min_amount") val sourceMinAmount: Int = 0,
         @SerialName("target_min_amount") val targetMinAmount: Int = 0,
     )

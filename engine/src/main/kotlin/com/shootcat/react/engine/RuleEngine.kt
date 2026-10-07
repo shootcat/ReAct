@@ -227,6 +227,7 @@ class RuleEngine(
         (c.source == null || o.type == c.source) &&
             (c.sourceState == null || o.state == c.sourceState) &&
             (!c.sourceHot || (o.heatOutput > 0 && o.heatOutput >= c.minHeat)) &&
+            (!c.sourceFlame || o.isFlame) &&
             (c.sourceMinAmount <= 0 || o.amount >= c.sourceMinAmount)
 
     /** Without an explicit source, any object in one of its type's signal states sends a signal. */

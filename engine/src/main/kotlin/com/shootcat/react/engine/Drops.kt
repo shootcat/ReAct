@@ -85,6 +85,7 @@ class Drops(private val types: TypeCatalog, private val rules: List<Rule>, priva
         if (c.source != null && source.type != c.source) return false
         if (c.sourceState != null && source.state != c.sourceState) return false
         if (c.sourceHot && source.heatOutput < c.minHeat) return false
+        if (c.sourceFlame && !source.isFlame) return false
         if (c.sourceMinAmount > 0 && source.amount < c.sourceMinAmount) return false
         return c.source != null || c.sourceHot
     }
