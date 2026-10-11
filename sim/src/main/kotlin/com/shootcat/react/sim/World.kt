@@ -7,7 +7,13 @@ object Flag {
     const val BURNING = 1
     const val WET = 2
 
-    /** Falling speed, 0..7, in bits 4 to 6. */
+    /** A cell of a structure that is falling right now: it does not catch hold of anchored ground on the way. */
+    const val FALLING = 4
+
+    /** Anchored level ground, whatever its material: structures touching it stand (3.1). */
+    const val ANCHORED = 8
+
+    /** Falling speed, 0..7, in bits 4 to 6 (of a whole structure for solid cells). */
     const val VEL_SHIFT = 4
     const val VEL_MASK = 0x70
 }
@@ -32,7 +38,8 @@ object Event {
  * One [step] first lets heat flow between neighbours, then updates every cell from the bottom row to the
  * top, each row in the opposite direction of the one before. A particle that moved in this step is stamped
  * and not moved again. The world is cut into chunks of 32 × 32 cells; only chunks in which something
- * happened in the step before are updated, the rest sleep.
+ * happened in the step before are updated, the rest sleep. Last, structures of solid material that are not
+ * anchored fall as a whole (Leitfaden V3, 3.1).
  *
  * Everything that looks random comes from one xorshift generator seeded per world and consumed in a fixed
  * order, and all arithmetic is plain float addition and multiplication (no `exp`, no `sin`): the same
@@ -88,6 +95,19 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     private val fireId = materials.idOrNull("fire") ?: AIR
     private val smokeId = materials.idOrNull("smoke") ?: AIR
     private val steamId = materials.idOrNull("steam") ?: AIR
+
+    // structures (3.1): which structure a solid cell belongs to (number + 1), and the loose ones
+    private val owner = IntArray(size)
+    private var structuresDirty = true
+    private val loose = ArrayList<IntArray>()
+    private val looseDensity = ArrayList<Float>()
+    private val fillStack = IntArray(size)
+    private var fillCells = IntArray(256)
+    private var fillTop = 0
+    private var fillAnchored = false
+
+    /** How many structures are not anchored (they fall, or lie on something that holds them). */
+    val looseStructures: Int get() = loose.size
 
     init {
         temp.fill(ambient)
@@ -151,7 +171,8 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
                 val x = cx + dx
                 if (x < 0 || x >= width || dx * dx + dy * dy > r2) continue
                 val i = y * width + x
-                if (mat[i].toInt() == AIR) continue
+                val m = mat[i].toInt()
+                if (m == AIR || isGround(i, m)) continue
                 clear(x, y, i)
                 n++
             }
@@ -171,19 +192,35 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         wake(x, y)
     }
 
+    /** Marks a cell as anchored level ground (or not), whatever it is made of. */
+    fun setAnchored(x: Int, y: Int, anchored: Boolean) {
+        val i = y * width + x
+        flags[i] = (if (anchored) flags[i].toInt() or Flag.ANCHORED else flags[i].toInt() and Flag.ANCHORED.inv()).toByte()
+        structuresDirty = true
+        wake(x, y)
+    }
+
+    /** Anchored level ground the player can never take away: rock, or anything marked anchored by the level. */
+    private fun isGround(i: Int, m: Int) = kindOf[m] == Kind.STATIC || (flags[i].toInt() and Flag.ANCHORED) != 0
+
     fun setTemperature(x: Int, y: Int, t: Float) {
         temp[y * width + x] = t
         wakeHeat(x, y)
     }
 
-    /** Everything becomes air at the temperature of the surroundings; time and chance go on. */
+    /** Everything but the anchored ground becomes air at the temperature of the surroundings; time and chance go on. */
     fun clearAll() {
-        mat.fill(AIR.toByte())
-        temp.fill(ambient)
-        life.fill(0)
-        flags.fill(0)
+        for (i in 0 until size) {
+            val m = mat[i].toInt()
+            if (m == AIR || isGround(i, m)) continue
+            mat[i] = AIR.toByte()
+            temp[i] = ambient
+            life[i] = 0
+            flags[i] = 0
+        }
         pending.fill(true)
         heatPending.fill(true)
+        structuresDirty = true
     }
 
     /** Wakes the whole world, e.g. after building it cell by cell. */
@@ -213,6 +250,8 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         awakeChunks = n
         heat()
         if (n > 0) update()
+        if (structuresDirty) findStructures()
+        dropLoose()
         step++
     }
 
@@ -227,6 +266,8 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         val tp = temp
         val pa = materials.pairA
         val pb = materials.pairB
+        val ra = materials.riseA
+        val rb = materials.riseB
         val n = materials.count
         for (cy in 0 until chunksY) {
             for (cx in 0 until chunksX) {
@@ -258,16 +299,20 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
                                 }
                             }
                         }
-                        // lower neighbour
+                        // lower neighbour; out of a hotter gas below, heat rises faster
                         if (y < h - 1) {
                             val j = i + w
                             val d = tp[j] - tp[i]
                             if (d > EPS || d < -EPS) {
-                                val k = ma * n + m[j].toInt()
-                                val da = pa[k] * d
+                                val mj = m[j].toInt()
+                                val k = ma * n + mj
+                                val up = d > 0f && kindOf[mj] == Kind.GAS
+                                val ka = if (up) ra[k] else pa[k]
+                                val kb = if (up) rb[k] else pb[k]
+                                val da = ka * d
                                 tp[i] += da
-                                tp[j] -= pb[k] * d
-                                if (da > HEAT_WAKE || da < -HEAT_WAKE || d * pb[k] > HEAT_WAKE || d * pb[k] < -HEAT_WAKE) {
+                                tp[j] -= kb * d
+                                if (da > HEAT_WAKE || da < -HEAT_WAKE || d * kb > HEAT_WAKE || d * kb < -HEAT_WAKE) {
                                     hot = true
                                     if (y == y1) wakeChunk(cx, cy + 1)
                                 }
@@ -392,7 +437,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         val mt = materials
         val m = mat[i].toInt()
         val f = flags[i].toInt()
-        if (mt.inert[m] && f == 0) return
+        if (mt.inert[m] && (f and (Flag.BURNING or Flag.WET)) == 0) return
 
         // fire (4.2: ignition is a temperature threshold, and burning needs air)
         if (f and Flag.BURNING != 0) {
@@ -403,8 +448,8 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
                 life[i] = burnLife(m).toShort()
                 events[Event.IGNITE]++
                 wake(x, y)
-            } else if (mt.quenchProduct[m] != m && chance(SUFFOCATE)) {
-                // hot enough to burn but no air to burn with: it chars, as wood does in a charcoal kiln
+            } else if (mt.quenchProduct[m] != m && temp[i] >= mt.igniteTemp[m] + CHAR_OVER && chance(CHAR_CHANCE)) {
+                // well above burning heat but no air to burn with: it slowly chars, as wood does in a charcoal kiln
                 change(x, y, i, mt.quenchProduct[m])
                 return
             }
@@ -585,6 +630,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     }
 
     private fun spawn(x: Int, y: Int, i: Int, m: Int, t: Float) {
+        if (kindOf[m] == Kind.SOLID || kindOf[mat[i].toInt()] == Kind.SOLID) structuresDirty = true
         mat[i] = m.toByte()
         temp[i] = t
         life[i] = initLife(m).toShort()
@@ -594,6 +640,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     }
 
     private fun clear(x: Int, y: Int, i: Int) {
+        if (kindOf[mat[i].toInt()] == Kind.SOLID) structuresDirty = true
         mat[i] = AIR.toByte()
         temp[i] = ambient
         life[i] = 0
@@ -603,10 +650,11 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
 
     /** The cell turns into [product] and keeps its temperature. */
     private fun change(x: Int, y: Int, i: Int, product: Int) {
+        if (kindOf[product] == Kind.SOLID || kindOf[mat[i].toInt()] == Kind.SOLID) structuresDirty = true
         mat[i] = product.toByte()
         life[i] = initLife(product).toShort()
         variant[i] = next().toByte()
-        flags[i] = (if (materials.spawnBurning[product]) Flag.BURNING else 0).toByte()
+        flags[i] = ((if (materials.spawnBurning[product]) Flag.BURNING else 0) or (flags[i].toInt() and Flag.ANCHORED)).toByte()
         stamp[i] = mark
         wakeHeat(x, y)
     }
@@ -655,7 +703,8 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             return true
         }
         val v = (flags[i].toInt() and Flag.VEL_MASK) shr Flag.VEL_SHIFT
-        val maxFall = 1 + (v shr 1)
+        // a falling liquid stays a stream instead of breaking into drops with holes between them
+        val maxFall = if (kindOf[m] == Kind.LIQUID) 1 + (minOf(v, 2) shr 1) else 1 + (v shr 1)
         var j = below
         var ny = y + 1
         var d = 1
@@ -716,27 +765,59 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         flow(x, y, i, m, -d)
     }
 
-    /** Flows sideways as far as [MaterialTable.spread] allows, stopping early above a drop. */
+    /**
+     * Flows sideways towards the nearest place within [MaterialTable.reach] where it can sink lower, at most
+     * [MaterialTable.spread] cells per step. Liquid with no lower place in reach is level and lies still (3.3).
+     * At the surface it looks past other cells of the same liquid, so a ripple glides over to the low place.
+     */
     private fun flow(x: Int, y: Int, i: Int, m: Int, d: Int): Boolean {
-        val spread = materials.spread[m]
+        if (y >= height - 1) return false
+        val reach = materials.reach[m]
+        val surface = y == 0 || mat[i - width].toInt() != m
+        val a = dropDistance(x, i, m, d, reach, surface)
+        val b = dropDistance(x, i, m, -d, if (a > 0) a else reach, surface)
+        val dir: Int
+        val dist: Int
+        if (a > 0 && (b == 0 || a <= b)) {
+            dir = d
+            dist = a
+        } else if (b > 0) {
+            dir = -d
+            dist = b
+        } else {
+            return false
+        }
+        var k = minOf(dist, materials.spread[m])
+        while (k > 0 && !yields(m, mat[i + dir * k].toInt())) k--
+        if (k == 0) {
+            // the way is taken by liquid moving the same way: wait for it, awake
+            wake(x, y)
+            return false
+        }
+        val tx = x + dir * k
+        swap(i, i + dir * k, x, y, tx, y)
+        if (materials.wets[m]) erode(tx, y, dir)
+        return true
+    }
+
+    /** How far sideways in direction [d] the liquid finds a place to sink, or 0 if not within [reach]. */
+    private fun dropDistance(x: Int, i: Int, m: Int, d: Int, reach: Int, throughSame: Boolean): Int {
         val w = width
-        var target = -1
-        var tx = x
         var k = 1
-        while (k <= spread) {
+        while (k <= reach) {
             val nx = x + d * k
-            if (nx < 0 || nx >= w) break
+            if (nx < 0 || nx >= w) return 0
             val j = i + d * k
-            if (!yields(m, mat[j].toInt())) break
-            target = j
-            tx = nx
-            if (y < height - 1 && yields(m, mat[j + w].toInt())) break
+            val q = mat[j].toInt()
+            if (q == m && throughSame) {
+                k++
+                continue
+            }
+            if (!yields(m, q)) return 0
+            if (yields(m, mat[j + w].toInt())) return k
             k++
         }
-        if (target < 0) return false
-        swap(i, target, x, y, tx, y)
-        if (materials.wets[m]) erode(tx, y, d)
-        return true
+        return 0
     }
 
     /**
@@ -775,7 +856,11 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         val f = flags[j].toInt()
         // burning ground does not soak: the heat boils the water first
         if (f and (Flag.WET or Flag.BURNING) != 0) return false
-        if (!chance(ab[mat[j].toInt()])) return false
+        if (!chance(ab[mat[j].toInt()])) {
+            // still soaking in: stay awake even when the water lies still
+            wake(x, y)
+            return false
+        }
         flags[j] = (f or Flag.WET).toByte()
         wake(jx, jy)
         clear(x, y, i)
@@ -814,6 +899,132 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     private fun rises(m: Int, q: Int): Boolean =
         q != m && kindOf[q] == Kind.GAS && densityOf[q] > densityOf[m]
 
+    // ------------------------------------------------------------------ structures (3.1)
+
+    /**
+     * Finds every structure: a 4-connected group of solid cells. One that touches anchored ground stands;
+     * the others are loose. Runs only when solid cells were added, removed, changed or moved.
+     */
+    private fun findStructures() {
+        structuresDirty = false
+        owner.fill(0)
+        loose.clear()
+        looseDensity.clear()
+        val w = width
+        var id = 0
+        for (i in 0 until size) {
+            if (owner[i] != 0 || kindOf[mat[i].toInt()] != Kind.SOLID) continue
+            id++
+            var count = 0
+            var falling = false
+            var mass = 0f
+            fillTop = 0
+            fillAnchored = false
+            fillStack[fillTop++] = i
+            owner[i] = id
+            while (fillTop > 0) {
+                val c = fillStack[--fillTop]
+                if (count == fillCells.size) fillCells = fillCells.copyOf(count * 2)
+                fillCells[count++] = c
+                val fc = flags[c].toInt()
+                if (fc and Flag.ANCHORED != 0) fillAnchored = true
+                if (fc and Flag.FALLING != 0) falling = true
+                mass += densityOf[mat[c].toInt()]
+                val x = c % w
+                if (x > 0) visit(c - 1, id)
+                if (x < w - 1) visit(c + 1, id)
+                if (c >= w) visit(c - w, id)
+                if (c < size - w) visit(c + w, id)
+            }
+            if (!fillAnchored || falling) {
+                val cells = fillCells.copyOf(count)
+                // bottom cells first, so each falls into the place the one below has just left
+                cells.sort()
+                cells.reverse()
+                loose += cells
+                looseDensity += mass / count
+            }
+        }
+    }
+
+    /** A neighbour in the flood fill: solid ones join the structure, anchored ground anchors it. */
+    private fun visit(n: Int, id: Int) {
+        val mn = mat[n].toInt()
+        if (kindOf[mn] == Kind.SOLID) {
+            if (owner[n] == 0) {
+                owner[n] = id
+                fillStack[fillTop++] = n
+            }
+        } else if (materials.anchored[mn] || (flags[n].toInt() and Flag.ANCHORED) != 0) {
+            fillAnchored = true
+        }
+    }
+
+    /**
+     * Every loose structure falls as a whole, without turning, as long as there is room below it: air, gas,
+     * or a liquid lighter than the structure (a wooden raft rests on water, a stone sinks).
+     */
+    private fun dropLoose() {
+        if (loose.isEmpty()) return
+        var moved = false
+        for ((s, cells) in loose.withIndex()) {
+            val speed = (flags[cells[0]].toInt() and Flag.VEL_MASK) shr Flag.VEL_SHIFT
+            val steps = 1 + speed / 3
+            var fell = 0
+            while (fell < steps && canFall(cells, looseDensity[s])) {
+                shiftDown(cells)
+                fell++
+            }
+            if (fell > 0) {
+                moved = true
+                val f = Flag.FALLING or (minOf(7, speed + 1) shl Flag.VEL_SHIFT)
+                for (c in cells) flags[c] = ((flags[c].toInt() and (Flag.FALLING or Flag.VEL_MASK).inv()) or f).toByte()
+            } else if (speed > 0 || flags[cells[0]].toInt() and Flag.FALLING != 0) {
+                // landed: from now on it may catch hold of anchored ground it touches
+                for (c in cells) flags[c] = (flags[c].toInt() and (Flag.FALLING or Flag.VEL_MASK).inv()).toByte()
+                moved = true
+            }
+        }
+        // what moved may now touch other structures or anchored ground
+        if (moved) structuresDirty = true
+    }
+
+    private fun canFall(cells: IntArray, density: Float): Boolean {
+        val w = width
+        for (c in cells) {
+            val b = c + w
+            if (b >= size) return false
+            if (owner[b] == owner[c] && owner[b] != 0) continue
+            val q = mat[b].toInt()
+            if (q == AIR) continue
+            val k = kindOf[q]
+            if (k == Kind.GAS) continue
+            if (k == Kind.LIQUID && densityOf[q] < density) continue
+            return false
+        }
+        return true
+    }
+
+    /** Moves the structure down by one cell; whatever was below it rises to the top of each column. */
+    private fun shiftDown(cells: IntArray) {
+        val w = width
+        for (k in cells.indices) {
+            val c = cells[k]
+            val b = c + w
+            val m = mat[c]; mat[c] = mat[b]; mat[b] = m
+            val t = temp[c]; temp[c] = temp[b]; temp[b] = t
+            val l = life[c]; life[c] = life[b]; life[b] = l
+            val v = variant[c]; variant[c] = variant[b]; variant[b] = v
+            val f = flags[c]; flags[c] = flags[b]; flags[b] = f
+            val o = owner[c]; owner[c] = owner[b]; owner[b] = o
+            cells[k] = b
+            val x = c % w
+            val y = c / w
+            wakeHeat(x, y)
+            wakeHeat(x, y + 1)
+        }
+    }
+
     // ------------------------------------------------------------------ snapshots (undo, 4.7)
 
     class Snapshot internal constructor(
@@ -845,6 +1056,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         stamp.fill(0)
         rng = s.rng
         step = s.step
+        structuresDirty = true
     }
 
     /** A fingerprint of the complete state, for determinism tests. */
@@ -888,6 +1100,10 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         private const val AIR_SNAP = 0.5f
 
         private const val SUFFOCATE = 0.05f
+
+        /** Charring without air starts this far above the ignition point, and slowly. */
+        private const val CHAR_OVER = 80f
+        private const val CHAR_CHANCE = 0.006f
         private const val SINK_CHANCE = 0.55f
         private const val ERODE = 0.05f
         private const val DRY_TEMP = 100f

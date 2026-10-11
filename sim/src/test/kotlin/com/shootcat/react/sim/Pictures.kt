@@ -18,6 +18,11 @@ object Pictures {
         val haze = IntArray(lw * lh)
         val light = IntArray(lw * lh)
         renderer.renderLayers(haze, light)
+        val fw = renderer.flameWidth
+        val fh = renderer.flameHeight
+        val flames = IntArray(fw * fh)
+        renderer.renderFlames(flames)
+        val flameBlock = (Renderer.FLAME_BLOCK * scale).toFloat()
         val img = BufferedImage(world.width * scale, world.height * scale, BufferedImage.TYPE_INT_RGB)
         val block = (Renderer.BLOCK * scale).toFloat()
         for (py in 0 until img.height) for (px in 0 until img.width) {
@@ -25,6 +30,8 @@ object Pictures {
             val h = sample(haze, lw, lh, px / block - 0.5f, py / block - 0.5f)
             val a = h[0] / 255f
             c = Renderer.mix(c, (h[1].toInt() shl 16) or (h[2].toInt() shl 8) or h[3].toInt(), a)
+            val fl = sample(flames, fw, fh, px / flameBlock - 0.5f, py / flameBlock - 0.5f)
+            c = Renderer.mix(c, (fl[1].toInt() shl 16) or (fl[2].toInt() shl 8) or fl[3].toInt(), fl[0] / 255f)
             val l = sample(light, lw, lh, px / block - 0.5f, py / block - 0.5f)
             c = Renderer.mix(c, (l[1].toInt() shl 16) or (l[2].toInt() shl 8) or l[3].toInt(), l[0] / 255f)
             img.setRGB(px, py, c and 0xFFFFFF)

@@ -26,15 +26,18 @@ class SimRunner(val session: Session, backdrop: IntArray) {
     val layerWidth get() = renderer.layerWidth
     val layerHeight get() = renderer.layerHeight
 
-    /** One finished picture: the cells, and the soft haze and glow layers ([Renderer.renderLayers]). */
-    class Frame(size: Int, layerSize: Int) {
+    /** One finished picture: the cells, the soft haze and glow layers and the flame layer. */
+    class Frame(size: Int, layerSize: Int, flameSize: Int) {
         val pixels = IntArray(size)
         val haze = IntArray(layerSize)
         val light = IntArray(layerSize)
+        val flames = IntArray(flameSize)
     }
 
     private val lock = Any()
-    private fun newFrame() = Frame(session.world.size, renderer.layerWidth * renderer.layerHeight)
+    val flameWidth get() = renderer.flameWidth
+    val flameHeight get() = renderer.flameHeight
+    private fun newFrame() = Frame(session.world.size, renderer.layerWidth * renderer.layerHeight, renderer.flameWidth * renderer.flameHeight)
     private var back = newFrame()
     private var ready = newFrame()
     private var front = newFrame()
@@ -172,6 +175,7 @@ class SimRunner(val session: Session, backdrop: IntArray) {
             if (dirty && after - lastRender >= FRAME_NANOS) {
                 renderer.render(back.pixels, frameNumber++)
                 renderer.renderLayers(back.haze, back.light)
+                renderer.renderFlames(back.flames)
                 synchronized(lock) {
                     val t = back
                     back = ready

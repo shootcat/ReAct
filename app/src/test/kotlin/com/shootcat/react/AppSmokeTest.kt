@@ -114,6 +114,25 @@ class AppSmokeTest {
         shot("08_einstellungen")
     }
 
+    /** The supply bar with large system font, scrolled half way: no label may run into another (3.4). */
+    @Test
+    @Config(sdk = [34], qualifiers = "w411dp-h891dp-xxhdpi", fontScale = 1.3f)
+    fun materialBarWithLargeFont(): Unit = ActivityScenario.launch(MainActivity::class.java).use {
+        compose.waitForIdle()
+        compose.onNodeWithText("Spielplatz").performClick()
+        run(500)
+        compose.onNodeWithTag("material_bar").performTouchInput {
+            down(Offset(width * 0.9f, height / 2f))
+            for (k in 1..10) {
+                moveTo(Offset(width * (0.9f - 0.05f * k), height / 2f))
+                advanceEventTime(16)
+            }
+            up()
+        }
+        run(500)
+        shot("09_leiste_grosse_schrift")
+    }
+
     /** The screen position of cell (x, y) inside the world view, as the view fits the world in. */
     private fun TouchInjectionScope.cellToOffset(x: Int, y: Int): Offset {
         val s = min(width / Terrain.WIDTH.toFloat(), height / Terrain.HEIGHT.toFloat())

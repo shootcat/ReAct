@@ -12,6 +12,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,6 +35,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -46,6 +48,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
@@ -59,6 +62,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -86,7 +90,8 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /** Materials in the bar, in this order (Leitfaden V3, Phase 1). */
-private val BAR = listOf("sand", "earth", "water", "wood", "fire", "lava", "stone", "rock", "steam", "smoke")
+/** Rock is level ground and never in the player's hands (Leitfaden V3, 3.1.6). */
+private val BAR = listOf("sand", "earth", "water", "wood", "fire", "lava", "stone", "rubble", "steam", "smoke")
 
 /** Brush radii in cells. */
 private val BRUSHES = listOf(1, 3, 6, 10)
@@ -269,6 +274,10 @@ private fun WorldView(
     val bitmap = remember(runner) { Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888) }
     val hazeBitmap = remember(runner) { Bitmap.createBitmap(lw, lh, Bitmap.Config.ARGB_8888) }
     val lightBitmap = remember(runner) { Bitmap.createBitmap(lw, lh, Bitmap.Config.ARGB_8888) }
+    val fw = runner.flameWidth
+    val fh = runner.flameHeight
+    val flameBitmap = remember(runner) { Bitmap.createBitmap(fw, fh, Bitmap.Config.ARGB_8888) }
+    val flameImage = remember(flameBitmap) { flameBitmap.asImageBitmap() }
     val image = remember(bitmap) { bitmap.asImageBitmap() }
     val hazeImage = remember(hazeBitmap) { hazeBitmap.asImageBitmap() }
     val lightImage = remember(lightBitmap) { lightBitmap.asImageBitmap() }
@@ -282,6 +291,7 @@ private fun WorldView(
                 bitmap.setPixels(f.pixels, 0, w, 0, 0, w, h)
                 hazeBitmap.setPixels(f.haze, 0, lw, 0, 0, lw, lh)
                 lightBitmap.setPixels(f.light, 0, lw, 0, 0, lw, lh)
+                flameBitmap.setPixels(f.flames, 0, fw, 0, 0, fw, fh)
                 frames++
             }
             delay(POLL_MILLIS)
@@ -406,11 +416,13 @@ private fun WorldView(
         val dstSize = IntSize((w * s).roundToInt(), (h * s).roundToInt())
         drawImage(image, dstOffset = dstOffset, dstSize = dstSize, filterQuality = FilterQuality.None)
         drawImage(hazeImage, dstOffset = dstOffset, dstSize = dstSize, filterQuality = FilterQuality.Low)
+        drawImage(flameImage, dstOffset = dstOffset, dstSize = dstSize, filterQuality = FilterQuality.Low)
         drawImage(lightImage, dstOffset = dstOffset, dstSize = dstSize, filterQuality = FilterQuality.Low)
     }
 }
 
 private const val STROKE_DELAY_MILLIS = 70L
+private val CHIP_WIDTH = 72.dp
 private const val POLL_MILLIS = 6L
 private const val TAP = 1
 private const val TWO = 2
@@ -513,25 +525,36 @@ private fun BrushSelector(current: Int, onSelect: (Int) -> Unit) {
 /** The supply bar: every material with its colour, the amount left (unlimited here) and its cost. */
 @Composable
 private fun MaterialBar(materials: MaterialTable, tool: Int, onTool: (Int) -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        for (id in BAR) {
-            val m = materials.idOrNull(id) ?: continue
-            MaterialChip(
-                name = materials.spec(m).name,
-                detail = "∞ · ${materials.cost[m]} P",
-                selected = tool == m,
-                onClick = { onTool(m) },
-            ) { Swatch(materials.color[m], materials.colorVariance[m], m) }
+    // no stretching at the ends: the overscroll stretch squeezed the labels into each other
+    CompositionLocalProvider(LocalOverscrollFactory provides null) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .testTag("material_bar")
+                .clipToBounds()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            MaterialChips(materials, tool, onTool)
         }
-        MaterialChip(name = "Radierer", detail = "nur hier", selected = tool == Session.ERASER, onClick = { onTool(Session.ERASER) }) {
-            Box(Modifier.size(30.dp).clip(RoundedCornerShape(8.dp)).border(2.dp, Palette.textDim, RoundedCornerShape(8.dp)))
-        }
+    }
+}
+
+@Composable
+private fun MaterialChips(materials: MaterialTable, tool: Int, onTool: (Int) -> Unit) {
+    for (id in BAR) {
+        val m = materials.idOrNull(id) ?: continue
+        MaterialChip(
+            name = materials.spec(m).name,
+            detail = "∞ · ${materials.cost[m]} P",
+            selected = tool == m,
+            onClick = { onTool(m) },
+        ) { Swatch(materials.color[m], materials.colorVariance[m], m) }
+    }
+    MaterialChip(name = "Radierer", detail = "nur hier", selected = tool == Session.ERASER, onClick = { onTool(Session.ERASER) }) {
+        Box(Modifier.size(30.dp).clip(RoundedCornerShape(8.dp)).border(2.dp, Palette.textDim, RoundedCornerShape(8.dp)))
     }
 }
 
@@ -545,7 +568,8 @@ private fun MaterialChip(
 ) {
     Column(
         Modifier
-            .width(70.dp)
+            .width(CHIP_WIDTH)
+            .clipToBounds()
             .clip(RoundedCornerShape(14.dp))
             .background(if (selected) Palette.surfaceHigh else Palette.surface)
             .border(2.dp, if (selected) Palette.accent else Color.Transparent, RoundedCornerShape(14.dp))
@@ -556,8 +580,28 @@ private fun MaterialChip(
     ) {
         icon()
         Spacer(Modifier.height(4.dp))
-        Text(name, color = Palette.text, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(detail, color = Palette.textDim, fontSize = 10.sp, maxLines = 1)
+        Text(
+            name,
+            color = Palette.text,
+            fontSize = 12.sp,
+            lineHeight = 15.sp,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.width(CHIP_WIDTH - 8.dp),
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            detail,
+            color = Palette.textDim,
+            fontSize = 10.sp,
+            lineHeight = 13.sp,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.width(CHIP_WIDTH - 8.dp),
+            textAlign = TextAlign.Center,
+        )
     }
 }
 

@@ -4,22 +4,27 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-/** How a material moves (Leitfaden V3, 4.3). */
+/** How a material moves (Leitfaden V3, 6.3). */
 object Kind {
+    /** Level ground that never moves (rock). */
     const val STATIC = 0
     const val POWDER = 1
     const val LIQUID = 2
     const val GAS = 3
 
-    /** Coherent objects (4.5) come in a later phase; until then they stay put like static material. */
-    const val BODY = 4
+    /** Firm material that forms structures: they stand if anchored, otherwise fall as a whole (3.1). */
+    const val SOLID = 4
+
+    /** Plants and animals (phase 2b). */
+    const val LIFE = 5
 
     fun parse(name: String): Int = when (name) {
         "static" -> STATIC
         "powder" -> POWDER
         "liquid" -> LIQUID
         "gas" -> GAS
-        "body" -> BODY
+        "solid" -> SOLID
+        "life" -> LIFE
         else -> error("unknown kind '$name'")
     }
 }
@@ -31,6 +36,8 @@ data class MaterialSpec(
     val name: String,
     val kind: String,
     val density: Float,
+    /** Anchored ground: structures that touch it stand (3.1). */
+    val anchored: Boolean = false,
     val flammable: Boolean = false,
     @SerialName("ignite_temp") val igniteTemp: Float? = null,
     @SerialName("burn_time") val burnTime: Float? = null,
@@ -80,6 +87,8 @@ data class MaterialSpec(
     @SerialName("wet_friction") val wetFriction: Float? = null,
     /** Liquids: how many cells they flow sideways per step at most. */
     val spread: Int = 1,
+    /** Liquids: how far sideways they look for a lower place to flow to; level liquid lies still. */
+    val reach: Int = 16,
     /** Liquids: chance per step of not flowing sideways at all. */
     val viscosity: Float = 0f,
 )
@@ -107,6 +116,7 @@ class MaterialTable(val specs: List<MaterialSpec>, val ambient: Float) {
 
     val kind = IntArray(count) { Kind.parse(specs[it].kind) }
     val density = FloatArray(count) { specs[it].density }
+    val anchored = BooleanArray(count) { specs[it].anchored }
     val flammable = BooleanArray(count) { specs[it].flammable }
     val igniteTemp = FloatArray(count) { specs[it].igniteTemp ?: Float.MAX_VALUE }
 
@@ -140,6 +150,7 @@ class MaterialTable(val specs: List<MaterialSpec>, val ambient: Float) {
     val friction = FloatArray(count) { specs[it].friction }
     val wetFriction = FloatArray(count) { specs[it].wetFriction ?: specs[it].friction }
     val spread = IntArray(count) { specs[it].spread.coerceAtLeast(1) }
+    val reach = IntArray(count) { maxOf(specs[it].reach, specs[it].spread, 1) }
     val viscosity = FloatArray(count) { specs[it].viscosity }
     val emitsLight = FloatArray(count) { specs[it].emitsLight }
     val opacity = FloatArray(count) { specs[it].opacity }
@@ -157,7 +168,7 @@ class MaterialTable(val specs: List<MaterialSpec>, val ambient: Float) {
 
     /** Nothing ever happens to it on its own: no movement, no fire, no phase change. */
     val inert = BooleanArray(count) {
-        (kind[it] == Kind.STATIC || kind[it] == Kind.BODY) && !flammable[it] &&
+        (kind[it] == Kind.STATIC || kind[it] == Kind.SOLID) && !flammable[it] &&
             meltTemp[it] == Float.MAX_VALUE && boilTemp[it] == Float.MAX_VALUE && freezeTemp[it] == -Float.MAX_VALUE &&
             lifetimeSteps[it] == 0
     }
@@ -171,6 +182,13 @@ class MaterialTable(val specs: List<MaterialSpec>, val ambient: Float) {
     val pairA = FloatArray(count * count)
     val pairB = FloatArray(count * count)
 
+    /**
+     * The same exchange upwards from a hotter gas below (hot air, flames, smoke): heat rises, so fire climbs
+     * faster than it spreads sideways (3.2).
+     */
+    val riseA = FloatArray(count * count)
+    val riseB = FloatArray(count * count)
+
     init {
         require(specs.isNotEmpty() && specs[0].id == "air") { "material 0 must be air" }
         require(count <= 127) { "at most 127 materials fit into a byte" }
@@ -183,6 +201,9 @@ class MaterialTable(val specs: List<MaterialSpec>, val ambient: Float) {
             val cb = heatCapacity[b]
             pairA[a * count + b] = alpha * cb / (ca + cb)
             pairB[a * count + b] = alpha * ca / (ca + cb)
+            val up = minOf(0.45f, k * CONVECTION)
+            riseA[a * count + b] = up * cb / (ca + cb)
+            riseB[a * count + b] = up * ca / (ca + cb)
         }
         for (s in specs) {
             listOfNotNull(s.burnProduct, s.quenchProduct, s.meltProduct, s.boilProduct, s.freezeProduct, s.decayProduct, s.dissolvedProduct, s.dissolvesIn)
@@ -197,6 +218,9 @@ class MaterialTable(val specs: List<MaterialSpec>, val ambient: Float) {
     companion object {
         const val AIR = 0
         const val STEPS_PER_SECOND = 60
+
+        /** How much better heat passes upwards out of a hotter gas than by plain conduction. */
+        const val CONVECTION = 3f
 
         private val json = Json { ignoreUnknownKeys = false }
 

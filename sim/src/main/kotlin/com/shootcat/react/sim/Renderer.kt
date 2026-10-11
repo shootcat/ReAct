@@ -41,17 +41,42 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
         }
     }
 
+    /** How many water cells lie above the current one, per column, while drawing top to bottom. */
+    private val depth = IntArray(world.width)
+
+    /** Flame colours from the cool red rim to the yellow-white core (3.2). */
+    private val flameRamp = IntArray(FLAME_STEPS).also { ramp ->
+        val stops = intArrayOf(0x8e1606, 0xd23a12, 0xff6a14, 0xff9a26, 0xffc848, 0xffe596)
+        for (k in ramp.indices) {
+            val p = k / (FLAME_STEPS - 1f) * (stops.size - 1)
+            val a = p.toInt().coerceAtMost(stops.size - 2)
+            ramp[k] = mix(stops[a] or OPAQUE, stops[a + 1] or OPAQUE, p - a)
+        }
+    }
+
     fun render(out: IntArray, frame: Int) {
         val w = world.width
+        val size = world.size
         val mat = world.mat
         val temp = world.temp
         val flags = world.flags
         val variant = world.variant
         val life = world.life
-        for (i in 0 until world.size) {
+        depth.fill(0)
+        var x = -1
+        for (i in 0 until size) {
+            x++
+            if (x == w) x = 0
             val m = mat[i].toInt()
+            if (m == water) depth[x]++ else depth[x] = 0
             if (m == AIR) {
-                out[i] = backdrop[i]
+                // gaps inside falling water or a flame are drawn filled, so streams and flames hold together
+                val up = if (i >= w) mat[i - w].toInt() else AIR
+                out[i] = if ((up == water || up == fire) && i < size - w && mat[i + w].toInt() == up) {
+                    if (up == water) mix(palette[water * SHADES + 8], backdrop[i], 0.35f) else mix(flameRamp[FLAME_STEPS / 3], backdrop[i], 0.5f)
+                } else {
+                    backdrop[i]
+                }
                 continue
             }
             val v = variant[i].toInt() and 0xFF
@@ -60,10 +85,17 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
             val t = temp[i]
             when (m) {
                 fire -> {
-                    val age = life[i] / mt.burnSteps[m].toFloat()
-                    val core = if (age > 0.66f) 0xffe98a else if (age > 0.33f) 0xffa22e else 0xd9481a
-                    c = mix(core or OPAQUE, c, 0.25f)
-                    out[i] = mix(c, backdrop[i], 1f - mt.opacity[m])
+                    // a flame body: hot and yellow inside, orange, red at the rim, flickering, cooler as it dies
+                    var n = 0
+                    if (x > 0 && mat[i - 1].toInt() == fire) n++
+                    if (x < w - 1 && mat[i + 1].toInt() == fire) n++
+                    if (i >= w && mat[i - w].toInt() == fire) n++
+                    if (i < size - w && mat[i + w].toInt() == fire) n++
+                    val age = (life[i] / mt.burnSteps[m].toFloat()).coerceIn(0f, 1.3f)
+                    val flick = ((v * 13 + frame * 5) and 15) / 15f
+                    val heat = (n * 0.17f + age * 0.35f + flick * 0.22f).coerceIn(0f, 1f)
+                    c = flameRamp[(heat * (FLAME_STEPS - 1)).toInt()]
+                    out[i] = mix(c, backdrop[i], if (n <= 1) 0.3f else 0.05f)
                     continue
                 }
                 lava -> {
@@ -72,9 +104,13 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
                     if (((v + frame) and 63) == 0) c = scale(c, 1.25f)
                 }
                 water -> {
-                    // the surface is lighter, the depth a little darker
-                    val above = if (i >= w) mat[i - w].toInt() else AIR
-                    if (above != water) c = scale(c, 1.3f) else if (i >= 6 * w && mat[i - 6 * w].toInt() == water) c = scale(c, 0.88f)
+                    // a light, gently moving edge at the surface; darker with depth
+                    val d = depth[x]
+                    c = when {
+                        d == 1 -> scale(c, 1.32f + 0.12f * wave((x * 3 + (frame shr 1)) and 63))
+                        d == 2 -> scale(c, 1.12f)
+                        else -> scale(c, 1f - minOf(d, 48) * 0.009f)
+                    }
                 }
                 wood -> {
                     // grain along the planks
@@ -90,10 +126,9 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
             }
             if (f and Flag.WET != 0) c = scale(c, 0.68f)
             if (f and Flag.BURNING != 0) {
-                // charred, with embers that flicker
-                c = scale(c, 0.55f)
+                // glowing embers under the flames: dark char with orange-red glow that flickers
                 val flick = ((v * 7 + frame * 3) and 31) / 31f
-                c = mix(glowAt(maxOf(t, 700f) + flick * 250f), c, 0.25f + 0.5f * flick)
+                c = mix(glowAt(maxOf(t, 650f) + flick * 300f), scale(c, 0.35f), 0.2f + 0.45f * (1f - flick))
             } else if (t > GLOW_FROM && m != lava && mt.kind[m] != Kind.GAS) {
                 val k = ((t - GLOW_FROM) / 650f).coerceIn(0f, 0.9f)
                 c = mix(glowAt(t), c, k)
@@ -160,10 +195,47 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
         }
     }
 
+    /** Width and height of the flame layer, in blocks of [FLAME_BLOCK] × [FLAME_BLOCK] cells. */
+    val flameWidth = (world.width + FLAME_BLOCK - 1) / FLAME_BLOCK
+    val flameHeight = (world.height + FLAME_BLOCK - 1) / FLAME_BLOCK
+    private val flameSum = FloatArray(flameWidth * flameHeight)
+    private val flameTmp = FloatArray(flameWidth * flameHeight)
+
+    /**
+     * The flame body (3.2), drawn smoothly over the pixels: where flames are dense they merge into one
+     * shape, yellow where they are thickest and youngest, orange, then red at the rim. Burning wood and
+     * embers below add to it. One pixel per block of [FLAME_BLOCK] × [FLAME_BLOCK] cells.
+     */
+    fun renderFlames(out: IntArray) {
+        val w = world.width
+        val mat = world.mat
+        val flags = world.flags
+        val life = world.life
+        flameSum.fill(0f)
+        val burnSteps = if (fire >= 0) mt.burnSteps[fire].toFloat() else 1f
+        for (y in 0 until world.height) {
+            val row = (y / FLAME_BLOCK) * flameWidth
+            var i = y * w
+            for (x in 0 until w) {
+                val m = mat[i].toInt()
+                if (m == fire) flameSum[row + x / FLAME_BLOCK] += 0.5f + 0.5f * (life[i] / burnSteps).coerceAtMost(1f)
+                else if (m != AIR && flags[i].toInt() and Flag.BURNING != 0) flameSum[row + x / FLAME_BLOCK] += 0.35f
+                i++
+            }
+        }
+        spread(flameSum, flameWidth, flameHeight, flameTmp)
+        for (b in out.indices) {
+            val f = flameSum[b]
+            out[b] = if (f < 0.6f) 0 else {
+                val c = flameRamp[((f - 0.6f) / 9f * (FLAME_STEPS - 1)).toInt().coerceIn(0, FLAME_STEPS - 1)]
+                val alpha = minOf(0.85f, (f - 0.6f) * 0.2f)
+                ((alpha * 255f).toInt() shl 24) or (c and 0xFFFFFF)
+            }
+        }
+    }
+
     /** Sum over the 3 × 3 neighbourhood of each block, in place. */
-    private fun spread(a: FloatArray) {
-        val w = layerWidth
-        val h = layerHeight
+    private fun spread(a: FloatArray, w: Int = layerWidth, h: Int = layerHeight, tmp: FloatArray = this.tmp) {
         for (y in 0 until h) for (x in 0 until w) {
             var sum = 0f
             for (dx in -1..1) sum += a[y * w + (x + dx).coerceIn(0, w - 1)]
@@ -176,6 +248,9 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
         }
     }
 
+    /** A triangle wave 0..1..0 over 0..63, for the shimmer of the water surface. */
+    private fun wave(p: Int): Float = (if (p < 32) p else 63 - p) / 31f
+
     private fun glowAt(t: Float): Int {
         val k = ((t - GLOW_FROM) / (GLOW_TO - GLOW_FROM) * (GLOW_STEPS - 1)).toInt().coerceIn(0, GLOW_STEPS - 1)
         return glow[k]
@@ -183,7 +258,9 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
 
     companion object {
         const val SHADES = 16
+        private const val FLAME_STEPS = 32
         const val BLOCK = 4
+        const val FLAME_BLOCK = 2
         private const val GLOW_STEPS = 128
         private const val GLOW_FROM = 450f
         private const val GLOW_TO = 1400f

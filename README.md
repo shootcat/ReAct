@@ -6,7 +6,7 @@ REACT wird ein Physik-Puzzle mit fein simulierter Materie, im Stil von Noita ode
 - Sand rieselt, Wasser fließt, Holz brennt, Lava erstarrt, Dampf steigt auf.
 - Was passiert, ergibt sich aus den **Eigenschaften** der Materialien (Dichte, Zündpunkt, Wärmeleitung …), nicht aus Rezepten.
 
-**Stand: Phase 1 „Spielplatz“.** Es ist eine freie Sandbox ohne Level und ohne Ziele. Sie wartet auf die Freigabe durch den Testspieler. Der Bericht dazu steht in [`docs/PHASE1.md`](docs/PHASE1.md).
+**Stand: Phase 1 „Spielplatz“ ist freigegeben; in Arbeit sind Phase 1b und 2** (Leitfaden V3, aktualisierte Fassung). Berichte: [`docs/PHASE1.md`](docs/PHASE1.md), [`docs/PHASE2.md`](docs/PHASE2.md).
 
 Die Raster-Version mit Leveln (Leitfaden V1 und V2) ist nicht mehr Teil dieses Branches. Sie liegt hier:
 - Commit `a7fc414` (Tag `grid-legacy`),
@@ -90,17 +90,18 @@ Die Einheiten stehen in der Datei.
 
 | Material | Art | Verhalten (aus den Werten) |
 |---|---|---|
-| Fels | fest | unzerstörbar, leitet Wärme |
-| Stein | Geröll | fällt nur senkrecht, schmilzt bei 1150 °C zu Lava |
+| Fels | Gelände | unzerstörbar, verankert Strukturen, nicht in der Leiste |
+| Stein | fest (Struktur) | steht, wenn er Fels berührt, sonst fällt er als Ganzes; schmilzt bei 1150 °C zu Lava |
+| Geröll | Pulver | schwer, rutscht kaum, schmilzt bei 1150 °C zu Lava |
 | Sand | Pulver | rieselt flach, sinkt in Wasser, saugt etwas Wasser auf, wird bei 1000 °C zu Glas |
 | Erde | Pulver | hält steile Hänge, nass rutscht sie, wird weggespült |
 | Wasser | flüssig | fließt, kocht bei 100 °C (mit Verdampfungswärme), löscht |
-| Holz | fest | zündet bei 280 °C an der Luft, brennt mit Flammen, gelöscht zu Holzkohle, abgebrannt zu etwas Asche |
+| Holz | fest (Struktur) | zündet bei 280 °C an der Luft, brennt mit Flammen über Glut, gelöscht zu Holzkohle, abgebrannt zu etwas Asche; als Floß bleibt es auf dem Wasser |
 | Feuer | Gas | brennende Flamme, steigt, heizt stark, braucht Luft |
 | Rauch | Gas | steigt langsam, verdrängt Luft, verweht nach oben |
 | Dampf | Gas | steigt schnell, kondensiert unter 90 °C zu Wasser |
 | Lava | flüssig | zäh, 1250 °C, erstarrt unter 850 °C (mit Erstarrungswärme) zu Stein |
-| Asche, Holzkohle, Glas | entstehen | Asche und Holzkohle schwimmen; Holzkohle glüht lange ohne Flamme; Glas ist durchsichtig |
+| Asche, Holzkohle, Glas | entstehen | Asche und Holzkohle schwimmen; Holzkohle glüht lange ohne Flamme; Glas ist fest und durchsichtig |
 
 ## Projektstruktur
 

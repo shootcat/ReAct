@@ -21,15 +21,21 @@
     },
     {
       "id": "rock", "name": "Fels", "kind": "static",
-      "density": 2700, "conductivity": 0.35, "heat_capacity": 2.0, "hardness": 1.0,
+      "density": 2700, "anchored": true, "conductivity": 0.35, "heat_capacity": 2.0, "hardness": 1.0,
       "color": "#5f5852", "color_variance": 0.22, "cost": 0
     },
     {
-      "id": "stone", "name": "Stein", "kind": "powder",
+      "id": "stone", "name": "Stein", "kind": "solid",
       "density": 2600, "conductivity": 0.3, "heat_capacity": 2.0, "hardness": 0.9,
-      "friction": 1.0,
       "melt_temp": 1150, "melt_product": "lava",
       "color": "#8c8781", "color_variance": 0.14, "cost": 2
+    },
+    {
+      "id": "rubble", "name": "Geröll", "kind": "powder",
+      "density": 2600, "conductivity": 0.3, "heat_capacity": 2.0, "hardness": 0.8,
+      "friction": 0.85,
+      "melt_temp": 1150, "melt_product": "lava",
+      "color": "#7d7873", "color_variance": 0.2, "cost": 1
     },
     {
       "id": "sand", "name": "Sand", "kind": "powder",
@@ -50,23 +56,23 @@
       "id": "water", "name": "Wasser", "kind": "liquid",
       "density": 1000, "conductivity": 0.3, "heat_capacity": 4.2,
       "boil_temp": 100, "boil_product": "steam", "latent_heat": 120,
-      "wets": true, "spread": 5,
-      "color": "#2f6fc4", "color_variance": 0.06, "opacity": 0.82, "cost": 1
+      "wets": true, "spread": 8, "reach": 40,
+      "color": "#2f6fc4", "color_variance": 0.025, "opacity": 0.85, "cost": 1
     },
     {
-      "id": "wood", "name": "Holz", "kind": "static",
+      "id": "wood", "name": "Holz", "kind": "solid",
       "density": 650, "conductivity": 0.08, "heat_capacity": 1.2, "hardness": 0.5,
       "flammable": true, "ignite_temp": 280, "burn_time": 4.5, "burn_temp": 750, "burn_heat": 45,
-      "flame": 0.22, "smoke": 0.08,
+      "flame": 0.9, "smoke": 0.01,
       "burn_product": "ash", "residue": 0.2, "quench_product": "charcoal",
       "absorbs": 0.002,
       "color": "#8a5a2c", "color_variance": 0.14, "cost": 2
     },
     {
       "id": "fire", "name": "Feuer", "kind": "gas",
-      "density": 0.7, "conductivity": 1.0, "heat_capacity": 1.0,
-      "flammable": true, "spawn_burning": true, "ignite_temp": 300, "burn_time": 0.6, "burn_temp": 900, "burn_heat": 60,
-      "residue": 0, "quench_product": "smoke",
+      "density": 0.75, "conductivity": 1.0, "heat_capacity": 1.0,
+      "flammable": true, "spawn_burning": true, "ignite_temp": 300, "burn_time": 0.42, "burn_temp": 950, "burn_heat": 60,
+      "burn_product": "smoke", "residue": 0.3, "quench_product": "smoke",
       "temp": 900, "emits_light": 1.0,
       "color": "#ffb02e", "color_variance": 0.2, "opacity": 0.92, "cost": 2
     },
@@ -87,7 +93,7 @@
       "id": "lava", "name": "Lava", "kind": "liquid",
       "density": 2600, "conductivity": 0.25, "heat_capacity": 2.0,
       "freeze_temp": 850, "freeze_product": "stone", "latent_heat": 300,
-      "spread": 1, "viscosity": 0.8,
+      "spread": 1, "reach": 6, "viscosity": 0.8,
       "temp": 1250, "emits_light": 0.8,
       "color": "#ff6a12", "color_variance": 0.16, "cost": 5
     },
@@ -106,7 +112,7 @@
       "color": "#2c2724", "color_variance": 0.18, "cost": 3
     },
     {
-      "id": "glass", "name": "Glas", "kind": "static",
+      "id": "glass", "name": "Glas", "kind": "solid",
       "density": 2500, "conductivity": 0.2, "heat_capacity": 1.9, "hardness": 0.7,
       "color": "#bfe3ea", "color_variance": 0.04, "opacity": 0.4, "cost": 3
     }

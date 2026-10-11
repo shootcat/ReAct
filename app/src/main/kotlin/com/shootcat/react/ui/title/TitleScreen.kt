@@ -129,6 +129,7 @@ private fun LiveScene(materials: MaterialTable, modifier: Modifier) {
         val dst = IntSize(size.width.toInt(), size.height.toInt())
         drawImage(scene.image, dstSize = dst, filterQuality = FilterQuality.None)
         drawImage(scene.hazeImage, dstSize = dst, filterQuality = FilterQuality.Low)
+        drawImage(scene.flameImage, dstSize = dst, filterQuality = FilterQuality.Low)
         drawImage(scene.lightImage, dstSize = dst, filterQuality = FilterQuality.Low)
     }
 }
@@ -147,6 +148,9 @@ private class TitleScene(materials: MaterialTable) {
     val image = bitmap.asImageBitmap()
     val hazeImage: ImageBitmap
     val lightImage: ImageBitmap
+    private val flames: IntArray
+    private val flameBitmap: Bitmap
+    val flameImage: ImageBitmap
     private val lava = materials.id("lava")
     private val sand = materials.id("sand")
     private val fire = materials.id("fire")
@@ -177,6 +181,9 @@ private class TitleScene(materials: MaterialTable) {
         lightBitmap = Bitmap.createBitmap(renderer.layerWidth, renderer.layerHeight, Bitmap.Config.ARGB_8888)
         hazeImage = hazeBitmap.asImageBitmap()
         lightImage = lightBitmap.asImageBitmap()
+        flames = IntArray(renderer.flameWidth * renderer.flameHeight)
+        flameBitmap = Bitmap.createBitmap(renderer.flameWidth, renderer.flameHeight, Bitmap.Config.ARGB_8888)
+        flameImage = flameBitmap.asImageBitmap()
     }
 
     fun advance() {
@@ -188,6 +195,8 @@ private class TitleScene(materials: MaterialTable) {
         if (world.step >= LOOP) world.restore(start)
         renderer.render(pixels, t)
         renderer.renderLayers(haze, light)
+        renderer.renderFlames(flames)
+        flameBitmap.setPixels(flames, 0, renderer.flameWidth, 0, 0, renderer.flameWidth, renderer.flameHeight)
         bitmap.setPixels(pixels, 0, W, 0, 0, W, H)
         hazeBitmap.setPixels(haze, 0, renderer.layerWidth, 0, 0, renderer.layerWidth, renderer.layerHeight)
         lightBitmap.setPixels(light, 0, renderer.layerWidth, 0, 0, renderer.layerWidth, renderer.layerHeight)
