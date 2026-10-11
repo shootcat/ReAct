@@ -219,7 +219,7 @@
       "dissolves_in": null, "dissolved_product": null,
       "spread": 2, "reach": 12, "viscosity": 0.5, "temp": 1250,
       "bucketable": false, "grabbable": false, "emits_light": 0.8, "blocks_light": true,
-      "color": "#ffb347", "color_variance": 0.08, "cost": 5
+      "color": "#ffe39a", "color_variance": 0.06, "pattern": "sheen", "cost": 5
     },
     {
       "id": "fire", "name": "Feuer", "kind": "gas", "density": 0.75, "anchored": false,

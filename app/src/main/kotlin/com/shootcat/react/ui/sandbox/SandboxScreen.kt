@@ -43,6 +43,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -52,6 +53,10 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -84,17 +89,27 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.ui.geometry.Size
+import kotlin.math.abs
 import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
 /** Materials in the bar, in this order (Leitfaden V3, Phase 1). */
-/** Rock is level ground and never in the player's hands (Leitfaden V3, 3.1.6). */
-private val BAR = listOf("sand", "earth", "water", "wood", "fire", "lava", "stone", "rubble", "steam", "smoke")
+/** The materials in the bar, by kind. Rock is level ground and never in the player's hands (Leitfaden V3, 3.1.6). */
+private val CATEGORIES = listOf(
+    "Lose" to listOf("sand", "earth", "gravel", "clay", "salt", "snow", "rubble", "ore_rubble", "charcoal", "ash"),
+    "Flüssig" to listOf("water", "saltwater", "lava", "molten_metal", "steam", "smoke"),
+    "Bauen" to listOf("wood", "brick", "stone", "glass", "metal", "ice"),
+    "Hitze" to listOf("fire", "ember", "lava"),
+)
 
-/** Brush radii in cells. */
-private val BRUSHES = listOf(1, 3, 6, 10)
+/** Brush radii in cells; 0 places a single particle. */
+private val BRUSHES = listOf(0, 1, 3, 6, 10)
+
+/** How the finger builds (Leitfaden V3, 4.1): paint, a line, a filled rectangle, a frame. */
+enum class BuildMode { BRUSH, LINE, RECT, FRAME }
 
 /**
  * The free sandbox (Leitfaden V3, Phase 1 and 4.7): the world drawn as scaled-up pixels, painting with one
@@ -106,8 +121,10 @@ fun SandboxScreen(
     materials: MaterialTable,
     settings: Settings,
     tool: Int,
+    mode: BuildMode,
     sound: SoundManager,
     onTool: (Int) -> Unit,
+    onMode: (BuildMode) -> Unit,
     onSettings: (Settings) -> Unit,
     onOpenSettings: () -> Unit,
     onBack: () -> Unit,
@@ -188,7 +205,7 @@ fun SandboxScreen(
 
         Box(Modifier.weight(1f).fillMaxWidth()) {
             val radius = if (settings.brush in BRUSHES) settings.brush else 3
-            WorldView(runner, tool, radius, materials, sound, Modifier.fillMaxSize())
+            WorldView(runner, tool, radius, mode, materials, sound, Modifier.fillMaxSize())
             if (settings.performance) PerformanceOverlay(stats, Modifier.align(Alignment.TopStart).padding(8.dp))
             if (speed == SimRunner.Speed.PAUSE) {
                 Text(
@@ -214,9 +231,18 @@ fun SandboxScreen(
                 speed = it
                 runner.speed = it
             }
+            ModeSelector(mode, onMode)
+        }
+        var category by rememberSaveable { mutableIntStateOf(CATEGORIES.indexOfFirst { (_, ids) -> materials.idOrNull(ids.first()) != null && ids.any { materials.idOrNull(it) == tool } }.coerceAtLeast(0)) }
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            CategoryTabs(category, Modifier.weight(1f)) { category = it }
             BrushSelector(settings.brush) { onSettings(settings.copy(brush = it)) }
         }
-        MaterialBar(materials, tool, onTool)
+        MaterialBar(materials, CATEGORIES[category].second, tool, onTool)
     }
 
     if (measuring) {
@@ -263,6 +289,7 @@ private fun WorldView(
     runner: SimRunner,
     tool: Int,
     radius: Int,
+    mode: BuildMode,
     materials: MaterialTable,
     sound: SoundManager,
     modifier: Modifier,
@@ -303,6 +330,10 @@ private fun WorldView(
     var pan by remember { mutableStateOf(Offset.Zero) }
     val currentTool by rememberUpdatedState(tool)
     val currentRadius by rememberUpdatedState(radius)
+    val currentMode by rememberUpdatedState(mode)
+
+    /** The shape being built: start and end cell, shown before the finger lets go (4.1.5). */
+    var preview by remember { mutableStateOf<Pair<Pair<Int, Int>, Pair<Int, Int>>?>(null) }
 
     fun scale(): Float = min(view.width / w.toFloat(), view.height / h.toFloat()) * zoom
     fun origin(): Offset {
@@ -333,6 +364,59 @@ private fun WorldView(
                     var painting = false
                     var transforming = false
                     var last = cell(start)
+
+                    /** Two fingers: zoom around the point between them and follow them. */
+                    fun transform(e: PointerEvent) {
+                        val centroid = e.calculateCentroid()
+                        val factor = e.calculateZoom()
+                        val panBy = e.calculatePan()
+                        val before = origin()
+                        val s0 = scale()
+                        zoom = (zoom * factor).coerceIn(1f, MAX_ZOOM)
+                        val s1 = scale()
+                        // keep the point under the fingers where it is, then follow the fingers
+                        val worldPoint = (centroid - before) / s0
+                        val newOrigin = centroid - worldPoint * s1 + panBy
+                        val centred = Offset((view.width - w * s1) / 2f, (view.height - h * s1) / 2f)
+                        pan = clampPan(newOrigin - centred)
+                        e.changes.forEach { it.consume() }
+                    }
+
+                    if (currentMode != BuildMode.BRUSH) {
+                        // a shape: drag from one corner (or end) to the other, see it, let go to build it
+                        val from = cell(start)
+                        preview = from to from
+                        var cancelled = false
+                        while (true) {
+                            val e = awaitPointerEvent()
+                            val pressed = e.changes.filter { it.pressed }
+                            if (pressed.isEmpty()) break
+                            if (pressed.size >= 2) {
+                                cancelled = true
+                                preview = null
+                                transform(e)
+                                continue
+                            }
+                            if (cancelled) continue
+                            preview = from to cell(pressed.first().position)
+                            pressed.first().consume()
+                        }
+                        val shape = preview
+                        preview = null
+                        if (!cancelled && shape != null) {
+                            val (a, b) = shape
+                            val t = currentTool
+                            val r = currentRadius
+                            val kind = when (currentMode) {
+                                BuildMode.LINE -> Session.ShapeKind.LINE
+                                BuildMode.RECT -> Session.ShapeKind.RECT
+                                else -> Session.ShapeKind.FRAME
+                            }
+                            runner.post { it.shape(kind, a.first, a.second, b.first, b.second, t, r) }
+                            strokeSound(sound, materials, t)
+                        }
+                        return@awaitEachGesture
+                    }
 
                     fun begin() {
                         painting = true
@@ -379,19 +463,7 @@ private fun WorldView(
                                 painting = false
                             }
                             transforming = true
-                            val centroid = e.calculateCentroid()
-                            val factor = e.calculateZoom()
-                            val panBy = e.calculatePan()
-                            val before = origin()
-                            val s0 = scale()
-                            zoom = (zoom * factor).coerceIn(1f, MAX_ZOOM)
-                            val s1 = scale()
-                            // keep the point under the fingers where it is, then follow the fingers
-                            val worldPoint = (centroid - before) / s0
-                            val newOrigin = centroid - worldPoint * s1 + panBy
-                            val centred = Offset((view.width - w * s1) / 2f, (view.height - h * s1) / 2f)
-                            pan = clampPan(newOrigin - centred)
-                            e.changes.forEach { it.consume() }
+                            transform(e)
                             continue
                         }
                         if (transforming) continue
@@ -418,6 +490,105 @@ private fun WorldView(
         drawImage(hazeImage, dstOffset = dstOffset, dstSize = dstSize, filterQuality = FilterQuality.Low)
         drawImage(flameImage, dstOffset = dstOffset, dstSize = dstSize, filterQuality = FilterQuality.Low)
         drawImage(lightImage, dstOffset = dstOffset, dstSize = dstSize, filterQuality = FilterQuality.Low)
+        preview?.let { (a, b) -> drawPreview(a, b, mode, radius, tool, materials, o, s) }
+    }
+}
+
+/** The shape about to be built, half transparent in the colour of its material (4.1.5). */
+private fun DrawScope.drawPreview(
+    a: Pair<Int, Int>,
+    b: Pair<Int, Int>,
+    mode: BuildMode,
+    radius: Int,
+    tool: Int,
+    materials: MaterialTable,
+    o: Offset,
+    s: Float,
+) {
+    val color = if (tool == Session.ERASER) Color.White.copy(alpha = 0.5f) else Color(materials.color[tool]).copy(alpha = 0.6f)
+    val left = minOf(a.first, b.first)
+    val top = minOf(a.second, b.second)
+    val width = (abs(a.first - b.first) + 1) * s
+    val height = (abs(a.second - b.second) + 1) * s
+    when (mode) {
+        BuildMode.LINE -> drawLine(
+            color,
+            Offset(o.x + (a.first + 0.5f) * s, o.y + (a.second + 0.5f) * s),
+            Offset(o.x + (b.first + 0.5f) * s, o.y + (b.second + 0.5f) * s),
+            strokeWidth = (2 * radius + 1) * s,
+            cap = StrokeCap.Square,
+        )
+        BuildMode.RECT -> drawRect(color, Offset(o.x + left * s, o.y + top * s), Size(width, height))
+        BuildMode.FRAME -> {
+            val t = minOf((radius + 1) * s, width / 2f, height / 2f)
+            drawRect(color, Offset(o.x + left * s + t / 2f, o.y + top * s + t / 2f), Size(width - t, height - t), style = Stroke(width = t))
+        }
+        BuildMode.BRUSH -> {}
+    }
+    // a thin outline makes small shapes visible on any background
+    drawRect(Color.White.copy(alpha = 0.35f), Offset(o.x + left * s, o.y + top * s), Size(width, height), style = Stroke(width = 1f))
+}
+
+/** Paint, line, filled rectangle, frame: one small icon each. */
+@Composable
+private fun ModeSelector(current: BuildMode, onSelect: (BuildMode) -> Unit) {
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .background(Palette.surfaceHigh)
+            .padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        for ((m, label) in listOf(BuildMode.BRUSH to "Pinsel", BuildMode.LINE to "Linie", BuildMode.RECT to "Rechteck", BuildMode.FRAME to "Rahmen")) {
+            val selected = m == current
+            val tint = if (selected) Palette.background else Palette.text
+            Box(
+                Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(if (selected) Palette.accent else Palette.surfaceHigh)
+                    .clickable { onSelect(m) }
+                    .semantics { contentDescription = label }
+                    .testTag("mode_$label"),
+                contentAlignment = Alignment.Center,
+            ) {
+                Canvas(Modifier.size(18.dp)) {
+                    val u = size.width
+                    when (m) {
+                        BuildMode.BRUSH -> {
+                            drawCircle(tint, u * 0.22f, Offset(u * 0.38f, u * 0.6f))
+                            drawCircle(tint, u * 0.12f, Offset(u * 0.72f, u * 0.3f))
+                        }
+                        BuildMode.LINE -> drawLine(tint, Offset(u * 0.1f, u * 0.9f), Offset(u * 0.9f, u * 0.1f), strokeWidth = u * 0.18f, cap = StrokeCap.Round)
+                        BuildMode.RECT -> drawRect(tint, Offset(u * 0.1f, u * 0.2f), Size(u * 0.8f, u * 0.6f))
+                        BuildMode.FRAME -> drawRect(tint, Offset(u * 0.14f, u * 0.24f), Size(u * 0.72f, u * 0.52f), style = Stroke(width = u * 0.14f))
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** The kinds of material in the bar. */
+@Composable
+private fun CategoryTabs(current: Int, modifier: Modifier, onSelect: (Int) -> Unit) {
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        for ((k, entry) in CATEGORIES.withIndex()) {
+            val selected = k == current
+            Text(
+                entry.first,
+                color = if (selected) Palette.background else Palette.text,
+                fontSize = 12.sp,
+                maxLines = 1,
+                softWrap = false,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(if (selected) Palette.accent else Palette.surfaceHigh)
+                    .clickable { onSelect(k) }
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                    .testTag("category_${entry.first}"),
+            )
+        }
     }
 }
 
@@ -513,7 +684,7 @@ private fun BrushSelector(current: Int, onSelect: (Int) -> Unit) {
             ) {
                 Box(
                     Modifier
-                        .size((6 + k * 5).dp)
+                        .size((4 + k * 4).dp)
                         .clip(CircleShape)
                         .background(if (selected) Palette.accent else Palette.textDim),
                 )
@@ -524,7 +695,7 @@ private fun BrushSelector(current: Int, onSelect: (Int) -> Unit) {
 
 /** The supply bar: every material with its colour, the amount left (unlimited here) and its cost. */
 @Composable
-private fun MaterialBar(materials: MaterialTable, tool: Int, onTool: (Int) -> Unit) {
+private fun MaterialBar(materials: MaterialTable, ids: List<String>, tool: Int, onTool: (Int) -> Unit) {
     // no stretching at the ends: the overscroll stretch squeezed the labels into each other
     CompositionLocalProvider(LocalOverscrollFactory provides null) {
         Row(
@@ -537,14 +708,14 @@ private fun MaterialBar(materials: MaterialTable, tool: Int, onTool: (Int) -> Un
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.Top,
         ) {
-            MaterialChips(materials, tool, onTool)
+            MaterialChips(materials, ids, tool, onTool)
         }
     }
 }
 
 @Composable
-private fun MaterialChips(materials: MaterialTable, tool: Int, onTool: (Int) -> Unit) {
-    for (id in BAR) {
+private fun MaterialChips(materials: MaterialTable, ids: List<String>, tool: Int, onTool: (Int) -> Unit) {
+    for (id in ids) {
         val m = materials.idOrNull(id) ?: continue
         MaterialChip(
             name = materials.spec(m).name,

@@ -56,6 +56,7 @@ class AppSmokeTest {
         shot("02_spielplatz")
 
         // fire on the log pile and on the bridge
+        compose.onNodeWithTag("category_Hitze").performClick()
         compose.onNodeWithTag("material_Feuer").performClick()
         paint(36, 112, holdMillis = 400)
         paint(100, 150, holdMillis = 400)
@@ -66,6 +67,7 @@ class AppSmokeTest {
         compose.onNodeWithTag("speed_Pause").performClick()
         compose.onNodeWithTag("material_Lava").performScrollTo().performClick()
         paint(115, 125, holdMillis = 200)
+        compose.onNodeWithTag("category_Flüssig").performClick()
         compose.onNodeWithTag("material_Wasser").performScrollTo().performClick()
         stroke(20, 70, 60, 70)
         run(300)
@@ -75,11 +77,29 @@ class AppSmokeTest {
         shot("05_lava_trifft_wasser")
 
         // a stroke taken back
+        compose.onNodeWithTag("category_Lose").performClick()
         compose.onNodeWithTag("material_Sand").performScrollTo().performClick()
         stroke(140, 40, 190, 40)
         run(500)
         compose.onNodeWithContentDescription("Rückgängig").performClick()
         run(500)
+
+        // building in the pause: a brick frame and a wooden plank across it, with the preview while dragging
+        compose.onNodeWithTag("speed_Pause").performClick()
+        compose.onNodeWithTag("category_Bauen").performClick()
+        compose.onNodeWithTag("material_Ziegel").performScrollTo().performClick()
+        compose.onNodeWithTag("mode_Rahmen").performClick()
+        drag(150, 60, 185, 95, finish = false)
+        shot("10_bauen_vorschau")
+        compose.onNodeWithTag("world").performTouchInput { up() }
+        run(200)
+        compose.onNodeWithTag("material_Holz").performScrollTo().performClick()
+        compose.onNodeWithTag("mode_Linie").performClick()
+        drag(140, 58, 195, 58)
+        compose.onNodeWithTag("mode_Pinsel").performClick()
+        compose.onNodeWithTag("speed_Normal").performClick()
+        run(1500)
+        shot("11_gebaut")
 
         // two fingers zoom in on the pond
         compose.onNodeWithTag("world").performTouchInput { pinch(cellToOffset(100, 170), 3f) }
@@ -147,6 +167,20 @@ class AppSmokeTest {
         run(holdMillis)
         compose.onNodeWithTag("world").performTouchInput { up() }
         run(100)
+    }
+
+    /** A shape dragged from cell (x0, y0) to (x1, y1); with [finish] false the finger stays down. */
+    private fun drag(x0: Int, y0: Int, x1: Int, y1: Int, finish: Boolean = true) {
+        compose.onNodeWithTag("world").performTouchInput { down(cellToOffset(x0, y0)) }
+        run(50)
+        for (k in 1..6) {
+            compose.onNodeWithTag("world").performTouchInput { moveTo(cellToOffset(x0 + (x1 - x0) * k / 6, y0 + (y1 - y0) * k / 6)) }
+            run(30)
+        }
+        if (finish) {
+            compose.onNodeWithTag("world").performTouchInput { up() }
+            run(200)
+        }
     }
 
     /** A finger drawn from cell (x0, y0) to (x1, y1). */

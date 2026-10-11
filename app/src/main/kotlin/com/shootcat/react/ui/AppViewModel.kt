@@ -10,6 +10,7 @@ import com.shootcat.react.sim.MaterialTable
 import com.shootcat.react.sim.Session
 import com.shootcat.react.sim.SimRunner
 import com.shootcat.react.sim.Terrain
+import com.shootcat.react.ui.sandbox.BuildMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,6 +25,8 @@ data class AppUiState(
     val settings: Settings = Settings(),
     /** Material number the brush paints with, or [Session.ERASER]. */
     val tool: Int = -2,
+    /** How the finger builds: paint, line, rectangle, frame. */
+    val mode: BuildMode = BuildMode.BRUSH,
     val loadError: String? = null,
 )
 
@@ -86,6 +89,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun selectTool(tool: Int) = _state.update { it.copy(tool = tool) }
+
+    fun selectMode(mode: BuildMode) = _state.update { it.copy(mode = mode) }
 
     fun updateSettings(settings: Settings) {
         _state.update { it.copy(settings = settings) }

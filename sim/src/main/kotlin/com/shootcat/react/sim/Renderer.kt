@@ -127,7 +127,7 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
             }
             if (glowingLiquid[m]) {
                 // orange-red melt with brighter veins; darker as it cools towards setting
-                c = mix(glowAt(minOf(t, 1150f) - 120f + ((v and 31) - 16) * 9f), c, if (m == lava) 0.3f else 0.45f)
+                c = mix(glowAt(minOf(t, 1150f) - 120f + ((v and 31) - 16) * 9f), c, if (m == lava) 0.3f else 0.7f)
                 if (((v + frame) and 63) == 0) c = scale(c, 1.25f)
             }
             when (m) {
@@ -155,7 +155,7 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
             if (f and Flag.BURNING != 0) {
                 // glowing embers under the flames: dark char with orange-red glow that flickers
                 val flick = ((v * 7 + frame * 3) and 31) / 31f
-                c = mix(glowAt(maxOf(t, 650f) + flick * 300f), scale(c, 0.35f), 0.2f + 0.45f * (1f - flick))
+                c = mix(glowAt(maxOf(t, 650f) + flick * 300f), scale(c, 0.35f), 0.08f + 0.4f * (1f - flick))
             } else if (t > GLOW_FROM && !glowingLiquid[m] && mt.kind[m] != Kind.GAS) {
                 val k = ((t - GLOW_FROM) / 650f).coerceIn(0f, 0.9f)
                 c = mix(glowAt(t), c, k)

@@ -27,3 +27,28 @@ class SandboxPicturesTest {
         assertTrue(s.world.count(materials.id("stone")) > 0)
     }
 }
+
+/** All materials side by side, as the renderer draws them (for the report). */
+class MaterialPicturesTest {
+    @Test
+    fun `every material at a glance`() {
+        val materials = MaterialTable.load()
+        val names = listOf(
+            "rock", "ore", "stone", "rubble", "ore_rubble", "gravel",
+            "sand", "earth", "clay", "salt", "snow", "ice",
+            "water", "saltwater", "lava", "molten_metal", "wood", "brick",
+            "glass", "metal", "charcoal", "ember", "ash", "fire",
+        )
+        val cols = 6
+        val cell = 14
+        val world = World(cols * cell, (names.size / cols) * cell, materials, 3L)
+        for ((k, name) in names.withIndex()) {
+            val m = materials.id(name)
+            val x0 = (k % cols) * cell
+            val y0 = (k / cols) * cell
+            for (y in y0 + 1 until y0 + cell - 1) for (x in x0 + 1 until x0 + cell - 1) world.set(x, y, m)
+        }
+        // no stepping: everything stays where it was put, only drawn
+        Pictures.write(world, IntArray(world.size) { 0xFF1A2230.toInt() }, "materials", scale = 6)
+    }
+}

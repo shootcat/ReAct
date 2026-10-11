@@ -65,6 +65,7 @@ object Terrain {
         val mt = world.materials
         val rock = mt.id("rock")
         val stone = mt.id("stone")
+        val ore = mt.idOrNull("ore") ?: -1
         val sand = mt.id("sand")
         val earth = mt.id("earth")
         val water = mt.id("water")
@@ -104,6 +105,8 @@ object Terrain {
                     d < soil -> earth
                     // a few boulders of stone in the rock near the surface
                     d < soil + 10 && n.fbm(u / 9f, v / 9f, 2) > 0.72f -> stone
+                    // thin, winding veins of ore deeper in the rock
+                    ore >= 0 && d > soil + 14 && kotlin.math.abs(n.fbm(u / 34f + 7f, v / 22f, 3) - 0.5f) < 0.018f -> ore
                     else -> rock
                 }
                 world.set(x, y, m)
