@@ -572,7 +572,8 @@ private fun ModeSelector(current: BuildMode, onSelect: (BuildMode) -> Unit) {
 /** The kinds of material in the bar. */
 @Composable
 private fun CategoryTabs(current: Int, modifier: Modifier, onSelect: (Int) -> Unit) {
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    // scrolls on narrow screens instead of squeezing the last tab to nothing
+    Row(modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         for ((k, entry) in CATEGORIES.withIndex()) {
             val selected = k == current
             Text(
@@ -585,7 +586,7 @@ private fun CategoryTabs(current: Int, modifier: Modifier, onSelect: (Int) -> Un
                     .clip(RoundedCornerShape(50))
                     .background(if (selected) Palette.accent else Palette.surfaceHigh)
                     .clickable { onSelect(k) }
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                    .padding(horizontal = 8.dp, vertical = 6.dp)
                     .testTag("category_${entry.first}"),
             )
         }
@@ -675,7 +676,7 @@ private fun BrushSelector(current: Int, onSelect: (Int) -> Unit) {
             val selected = r == current
             Box(
                 Modifier
-                    .size(36.dp)
+                    .size(32.dp)
                     .clip(CircleShape)
                     .background(if (selected) Palette.outline else Palette.surfaceHigh)
                     .clickable { onSelect(r) }

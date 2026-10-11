@@ -56,7 +56,7 @@ class AppSmokeTest {
         shot("02_spielplatz")
 
         // fire on the log pile and on the bridge
-        compose.onNodeWithTag("category_Hitze").performClick()
+        compose.onNodeWithTag("category_Hitze").performScrollTo().performClick()
         compose.onNodeWithTag("material_Feuer").performClick()
         paint(36, 112, holdMillis = 400)
         paint(100, 150, holdMillis = 400)
@@ -67,7 +67,7 @@ class AppSmokeTest {
         compose.onNodeWithTag("speed_Pause").performClick()
         compose.onNodeWithTag("material_Lava").performScrollTo().performClick()
         paint(115, 125, holdMillis = 200)
-        compose.onNodeWithTag("category_Flüssig").performClick()
+        compose.onNodeWithTag("category_Flüssig").performScrollTo().performClick()
         compose.onNodeWithTag("material_Wasser").performScrollTo().performClick()
         stroke(20, 70, 60, 70)
         run(300)
@@ -77,7 +77,7 @@ class AppSmokeTest {
         shot("05_lava_trifft_wasser")
 
         // a stroke taken back
-        compose.onNodeWithTag("category_Lose").performClick()
+        compose.onNodeWithTag("category_Lose").performScrollTo().performClick()
         compose.onNodeWithTag("material_Sand").performScrollTo().performClick()
         stroke(140, 40, 190, 40)
         run(500)
@@ -86,7 +86,7 @@ class AppSmokeTest {
 
         // building in the pause: a brick frame and a wooden plank across it, with the preview while dragging
         compose.onNodeWithTag("speed_Pause").performClick()
-        compose.onNodeWithTag("category_Bauen").performClick()
+        compose.onNodeWithTag("category_Bauen").performScrollTo().performClick()
         compose.onNodeWithTag("material_Ziegel").performScrollTo().performClick()
         compose.onNodeWithTag("mode_Rahmen").performClick()
         drag(150, 60, 185, 95, finish = false)
