@@ -374,5 +374,14 @@ Der Container wurde zwischendurch neu gestartet, der Rechner ist ein anderer. De
 - Die Abtastung fürs Buch läuft nur in der App, alle 30 Schritte über ein Viertel der Zeilen. Eimer und Hand rechnen nur, wenn der Finger sie benutzt.
 - Die Grenze von 8 ms (6.1) bleibt eingehalten; auf dem Handy bitte wieder „Leistung messen“.
 
+- CI-Rechner (Java 17, beta-66): voll aktive Welt 7,03 ms, mit Pflanzen, Tieren und Licht 9,22 ms (beta-64: 10,19 ms), Spielplatz 2,41 ms. Dieser Rechner ist etwa 3,7-mal langsamer als das Galaxy Z Fold2 (siehe 2b).
+
+**Build:** [`beta-66`](https://github.com/shootcat/ReAct/releases/tag/beta-66). CI grün. Screenshots geprüft:
+- `14_hand`: Stamm in der Hand, „Zu Brettern“ angeboten;
+- `15_lager_gebaut`: die Bretterlinie, das Lager danach leer;
+- `16_eimer`: Wasser aus dem Teich auf dem Hügel;
+- `17_buch`: 11 von 54 entdeckt;
+- `18_buch_szene`: Glühwürmchen im Dunkeln.
+
 **Hier stoppe ich und warte auf die Freigabe** (Leitfaden V3, 4.3 und 8).
 
