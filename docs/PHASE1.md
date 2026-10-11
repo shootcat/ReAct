@@ -1,6 +1,8 @@
 # Phase 1 „Spielplatz“: Bericht
 
-Leitfaden V3, Abschnitt 7: eine freie Sandbox mit Fels, Sand, Erde, Wasser, Holz, Feuer, Rauch, Dampf, Stein und Lava, dazu Wärme, Pause, Undo und Pinsel. Sie ist über die bestehende CI auf dem Handy installierbar. **Hier stoppt die Arbeit, bis der Testspieler freigibt.**
+**Freigegeben** vom Testspieler („Macht wirklich Spaß“); die Mängel aus dem Test behebt Phase 1b, siehe `docs/PHASE2.md`.
+
+Leitfaden V3, Abschnitt 7: eine freie Sandbox mit Fels, Sand, Erde, Wasser, Holz, Feuer, Rauch, Dampf, Stein und Lava, dazu Wärme, Pause, Undo und Pinsel. Sie ist über die bestehende CI auf dem Handy installierbar.
 
 ## Zusammenfassung
 
@@ -69,13 +71,13 @@ Alle Punkte sind in `sim/src/test/.../BehaviorTest.kt` als Test hinterlegt. Bild
 
 Die Welt hat 200 × 350 Zellen. Gemessen wird nach 60 Schritten Aufwärmen, in den Gradle-Tests über je 600 Schritte, in der App über je 300.
 
-| Welt | Desktop (Linux, Java 21, 4 Kerne) | CI-Rechner, Gradle-Test (Java 17, parallel zum App-Build) | CI-Rechner, Messung in der App unter Robolectric | Handy |
+| Welt | Desktop (Linux, Java 21, 4 Kerne) | CI-Rechner, Gradle-Test (Java 17, parallel zum App-Build) | CI-Rechner, Messung in der App unter Robolectric | **Handy: Galaxy Z Fold2 (SM-F976B), Android 17, 8 Kerne** |
 |---|---|---|---|---|
-| Leere Welt (alle Chunks schlafen) | über 2 Mio. Schritte/s | 1,6 Mio. Schritte/s | 0,3 Mio. Schritte/s | **steht aus** |
-| Leere Welt, alle Chunks wach | 1083 Schritte/s (0,92 ms) | 444 Schritte/s (2,25 ms) | 1471 Schritte/s (0,68 ms) | **steht aus** |
-| **Voll aktive Welt**, alle 77 Chunks wach, alles in Bewegung | **221 Schritte/s (4,5 ms)** | **136 Schritte/s (7,4 ms)** | **214 Schritte/s (4,7 ms)** | **steht aus** |
-| Spielplatz mit Feuer, Sand und Wasser (33 bis 35 von 77 Chunks wach) | 1129 Schritte/s (0,89 ms) | 609 Schritte/s (1,64 ms) | 1248 Schritte/s (0,80 ms) | **steht aus** |
-| Bild erzeugen (Pixel, ohne Dunst und Schein) | 0,38 ms | 0,72 ms | 0,27 ms | **steht aus** |
+| Leere Welt (alle Chunks schlafen) | über 2 Mio. Schritte/s | 1,6 Mio. Schritte/s | 0,3 Mio. Schritte/s | 2,6 Mio. Schritte/s |
+| Leere Welt, alle Chunks wach | 1083 Schritte/s (0,92 ms) | 444 Schritte/s (2,25 ms) | 1471 Schritte/s (0,68 ms) | 3095 Schritte/s (0,32 ms) |
+| **Voll aktive Welt**, alle 77 Chunks wach, alles in Bewegung | **221 Schritte/s (4,5 ms)** | **136 Schritte/s (7,4 ms)** | **214 Schritte/s (4,7 ms)** | **498 Schritte/s (2,01 ms)** |
+| Spielplatz mit Feuer, Sand und Wasser (33 bis 35 von 77 Chunks wach) | 1129 Schritte/s (0,89 ms) | 609 Schritte/s (1,64 ms) | 1248 Schritte/s (0,80 ms) | 3170 Schritte/s (0,32 ms) |
+| Bild erzeugen (Pixel, ohne Dunst und Schein) | 0,38 ms | 0,72 ms | 0,27 ms | 0,24 ms |
 
 Die CI-Werte stammen aus dem Lauf, der `beta-58` gebaut hat. Der Gradle-Test lief gleichzeitig mit dem Übersetzen der App und hatte deshalb weniger Rechenzeit. Das Ergebnisfenster der Messung in der App ist unten als Bild zu sehen. In allen Spalten liegt die voll aktive Welt beim Vier- bis Siebenfachen der geforderten 30 Schritte pro Sekunde.
 
@@ -83,29 +85,13 @@ Die „voll aktive Welt“ zwingt alle Chunks wach. Sie ist zufällig gemischt: 
 
 ### Auf dem Handy
 
-**Messwerte auf dem Gerät kann ich nicht selbst erheben.** Hier gibt es kein Handy und keinen Emulator. Deshalb misst die App selbst, mit demselben Code wie die Tests:
+Gemessen vom Testspieler mit „Leistung messen“ in der App (`beta-58`, je 300 Schritte). Das Handy ist schneller als Desktop und CI-Rechner: ART übersetzt die nicht debuggable APK vorab, und der große Kern des Snapdragon 865+ ist schnell. Die voll aktive Welt braucht **2,01 ms pro Schritt, also 498 Schritte pro Sekunde**. Das ist rund das Sechzehnfache der geforderten 30 Schritte pro Sekunde. Im Spiel laufen fest 60 Schritte pro Sekunde; der Testspieler sah dabei 2 bis 4 ms pro Schritt.
 
-1. APK aus dem neuesten Release installieren.
-2. **Spielplatz** öffnen, oben rechts das **Zahnrad**, dann **„Leistung messen“** (dauert einige Sekunden).
-3. **„Kopieren“** und den Text zurückschicken.
-
-Dazu zeigt **„Leistungsanzeige an“** im selben Menü während des Spielens laufend:
-- Schritte pro Sekunde,
-- ms pro Schritt,
-- ms pro Bild,
-- wache Chunks.
-
-Die Beta-APK ist dafür nicht mehr debuggable. ART übersetzt sie dann voll, und die Messung fällt nicht zu schlecht aus. Paket und Schlüssel bleiben gleich, die Installation als Update geht weiter.
-
-**Schätzung, nicht gemessen:** Ein Mittelklasse-Handy ist bei einem Kern etwa zwei- bis viermal langsamer als dieser Desktop. Die voll aktive Welt läge dann bei 55 bis 110 Schritten pro Sekunde, also über den geforderten 30. Ein langsames Einsteigergerät könnte nahe an 30 liegen.
+Die Messung bleibt im Menü. Sie lässt sich mit jedem neuen Build wiederholen, wie es der Leitfaden für jede neue Funktion verlangt.
 
 ### Entscheidung Kotlin oder NDK
 
-Vorerst bleibt es bei **Kotlin**. Nach dem Leitfaden heißt es „erst messen, dann entscheiden“, und die Desktop-Messung liegt um das Siebenfache über dem Ziel.
-
-Eine Beschleunigung ist schon eingebaut. Laut Profil kostete die Wärmeleitung rund 40 % eines Schritts. Jetzt rechnet sie nur noch in Chunks, in denen sich Temperaturen unterscheiden; fließendes Wasser bei Umgebungstemperatur kostet keine Wärme mehr. Die voll aktive Welt wird dadurch nicht schneller, denn dort ist überall alles heiß und in Bewegung.
-
-Bleibt das Handy trotzdem unter 30 Schritten pro Sekunde, wandert der Simulationskern **in C++ über das NDK**. Die Arrays sind schon flach und lassen sich ohne Umbau übergeben.
+**Kotlin bleibt, ein Kern über das NDK ist nicht nötig.** Die Wärmeleitung wird nur in Chunks gerechnet, in denen sich Temperaturen unterscheiden; sie kostete laut Profil rund 40 % eines Schritts.
 
 ## Abweichungen mit Begründung
 
