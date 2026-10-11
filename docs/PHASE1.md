@@ -99,10 +99,11 @@ Die Beta-APK ist dafür nicht mehr debuggable. ART übersetzt sie dann voll, und
 
 ### Entscheidung Kotlin oder NDK
 
-Vorerst bleibt es bei **Kotlin**. Nach dem Leitfaden heißt es „erst messen, dann entscheiden“, und die Desktop-Messung liegt um das Siebenfache über dem Ziel. Wenn das Handy unter 30 Schritten pro Sekunde bleibt, gibt es zwei Schritte in dieser Reihenfolge:
+Vorerst bleibt es bei **Kotlin**. Nach dem Leitfaden heißt es „erst messen, dann entscheiden“, und die Desktop-Messung liegt um das Siebenfache über dem Ziel.
 
-1. **Wärme nur in Chunks rechnen, in denen sich Temperaturen unterscheiden.** Laut Profil macht die Wärmeleitung 40 % eines Schritts aus. Fließendes Wasser bei Raumtemperatur bräuchte sie nicht.
-2. **Simulationskern in C++ über das NDK.** Die Arrays sind schon flach und lassen sich ohne Umbau übergeben.
+Eine Beschleunigung ist schon eingebaut. Laut Profil kostete die Wärmeleitung rund 40 % eines Schritts. Jetzt rechnet sie nur noch in Chunks, in denen sich Temperaturen unterscheiden; fließendes Wasser bei Umgebungstemperatur kostet keine Wärme mehr. Die voll aktive Welt wird dadurch nicht schneller, denn dort ist überall alles heiß und in Bewegung.
+
+Bleibt das Handy trotzdem unter 30 Schritten pro Sekunde, wandert der Simulationskern **in C++ über das NDK**. Die Arrays sind schon flach und lassen sich ohne Umbau übergeben.
 
 ## Abweichungen mit Begründung
 
