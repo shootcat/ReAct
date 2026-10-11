@@ -35,7 +35,7 @@ class ProgressStoreTest {
 
     @Test
     fun settingsSurviveARestart() {
-        val settings = Settings(speed = Speed.FAST, markers = false, levelTexts = true, haptics = false, sound = false, music = false)
+        val settings = Settings(haptics = false, sound = false, music = false, performance = true, brush = 10)
         SettingsStore(app).save(settings)
         assertEquals(settings, SettingsStore(app).load())
     }
