@@ -58,11 +58,35 @@ class SimRunner(val session: Session, backdrop: IntArray) {
         val step: Int = 0,
         val cost: Int = 0,
         val canUndo: Boolean = false,
+        /** What the player has (Leitfaden V3, 4.3). */
+        val supply: Session.Supply = Session.Supply.UNLIMITED,
+        val bucketMaterial: Int = MaterialTable.AIR,
+        val bucketAmount: Int = 0,
+        val bucketSize: Int = 0,
+        val bucketTemp: Float = 0f,
+        /** What the hand holds (never changed once made, safe to read from the UI). */
+        val held: Session.Held? = null,
+        val stock: List<Int> = emptyList(),
+        val notice: String = "",
+        val noticeCount: Int = 0,
     )
 
     @Volatile
     var stats = Stats()
         private set
+
+    /** Watches for discoveries (Leitfaden V3, 4.3), set by the app; new ones wait in [found] until [takeFound]. */
+    @Volatile
+    var watch: DiscoveryWatch? = null
+    private val found = ConcurrentLinkedQueue<Discoveries.Entry>()
+    private var stepsSinceWatch = 0
+
+    /** Discoveries made since the last call. */
+    fun takeFound(): List<Discoveries.Entry> {
+        val out = ArrayList<Discoveries.Entry>()
+        while (true) out += found.poll() ?: break
+        return out
+    }
 
     /** Sound cues of the last frames, summed up per [Event] until [takeEvents] reads them. */
     private val eventSums = IntArray(Event.COUNT)
@@ -164,6 +188,10 @@ class SimRunner(val session: Session, backdrop: IntArray) {
                     acc -= stepNs
                     k++
                     dirty = true
+                    if (++stepsSinceWatch >= WATCH_EVERY) {
+                        stepsSinceWatch = 0
+                        watch?.let { found.addAll(it.check(world)) }
+                    }
                 }
                 // too slow for real time: run slower instead of piling up steps
                 if (k == MAX_STEPS_PER_LOOP) acc = 0L
@@ -208,6 +236,15 @@ class SimRunner(val session: Session, backdrop: IntArray) {
                 step = world.step,
                 cost = session.cost(),
                 canUndo = session.canUndo,
+                supply = session.supply,
+                bucketMaterial = session.bucketMaterial,
+                bucketAmount = session.bucketAmount,
+                bucketSize = session.bucketSize,
+                bucketTemp = session.bucketTemp,
+                held = session.held,
+                stock = if (stats.stock.size == session.stock.size && stats.stock.indices.all { stats.stock[it] == session.stock[it] }) stats.stock else session.stock.toList(),
+                notice = session.notice,
+                noticeCount = session.noticeCount,
             )
 
             // sleep until the next step is due (or a frame, or, when paused, until input arrives)
@@ -222,6 +259,7 @@ class SimRunner(val session: Session, backdrop: IntArray) {
 
     private companion object {
         const val MAX_STEPS_PER_LOOP = 4
+        const val WATCH_EVERY = 30
         const val FRAME_NANOS = 16_000_000L
     }
 }

@@ -198,6 +198,15 @@ object Terrain {
             world.growNow(vineX - 30, vineY - 10, vineX + 30, vineY + 30, 10)
         }
 
+        // a fallen log on the dune and a loose stone: things the hand can carry (4.3)
+        val trunk = mt.id("trunk")
+        val logX = (150 * sx).toInt()
+        val logTop = (logX until logX + 14).minOf { surface[it] } - 2
+        for (x in logX until logX + 14) for (y in logTop until logTop + 2) if (world.material(x, y) == air) world.set(x, y, trunk)
+        val stoneX = (176 * sx).toInt()
+        val stoneTop = (stoneX until stoneX + 4).minOf { surface[it] } - 3
+        for (x in stoneX until stoneX + 4) for (y in stoneTop until stoneTop + 3) if (world.material(x, y) == air) world.set(x, y, mt.id("stone"))
+
         // birds on the tree tops and on the bridge
         val bird = mt.id("bird")
         for (x in listOf(treeA + 1, treeB - 2, (pondLeft + pondRight) / 2)) {

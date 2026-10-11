@@ -34,6 +34,9 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
     /** Without lighting everything is drawn at full brightness (overviews of the materials). */
     var lit = true
 
+    /** Brightness in total darkness; little scenes in the discovery book lift it so a dark cave still shows. */
+    var ambient = AMBIENT
+
     /** Brightness per block of the light field, and per cell, smoothly in between. */
     private val factor = FloatArray(light.width * light.height)
     private val shadeRows = FloatArray(light.height * world.width)
@@ -94,7 +97,7 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
         for (b in factor.indices) {
             // the eye sees shade brighter than the bare amount of light: 1 - (1 - l)²; darkness stays dark
             val l = 1f - minOf(1f, light.shown(b))
-            factor[b] = AMBIENT + (1f - AMBIENT) * (1f - l * l)
+            factor[b] = ambient + (1f - ambient) * (1f - l * l)
         }
         val w = world.width
         val lw = light.width

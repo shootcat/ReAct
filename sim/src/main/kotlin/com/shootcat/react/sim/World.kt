@@ -38,6 +38,50 @@ object Event {
 }
 
 /**
+ * What can be seen happening to a material, for the discovery book (Leitfaden V3, 4.3). Counted per kind and
+ * material in [World.seen]; whoever reads the counts resets them. Counting never changes the world.
+ */
+object Seen {
+    const val IGNITE = 0
+    const val BURN_OUT = 1
+    const val DOUSE = 2
+    const val SUFFOCATE = 3
+    const val CHAR = 4
+    const val MELT = 5
+    const val SALT_MELT = 6
+    const val BOIL = 7
+    const val RESIDUE = 8
+    const val SET = 9
+    const val CONDENSE = 10
+    const val DISSOLVE = 11
+    const val SOAK = 12
+    const val ERODE = 13
+    const val SEEP = 14
+    const val GROW = 15
+    const val DIE_HEAT = 16
+    const val DIE_SALT = 17
+    const val DIE_DRY = 18
+    const val FLEE = 19
+    const val DIG = 20
+    const val FALL = 21
+    const val HOLD_HEAT = 22
+    const val GLOW = 23
+    const val FLOAT = 24
+    const val CONDUCT = 25
+    const val SHINE = 26
+    const val WET_NO_FIRE = 27
+    const val COUNT = 28
+
+    val NAMES = listOf(
+        "ignite", "burn_out", "douse", "suffocate", "char", "melt", "salt_melt", "boil", "residue", "set", "condense",
+        "dissolve", "soak", "erode", "seep", "grow", "die_heat", "die_salt", "die_dry", "flee", "dig", "fall",
+        "hold_heat", "glow", "float", "conduct", "shine", "wet_no_fire",
+    )
+
+    fun parse(name: String): Int = NAMES.indexOf(name).also { require(it >= 0) { "unknown observation '$name'" } }
+}
+
+/**
  * The particle world (Leitfaden V3, 4.1 and 4.2): a cellular automaton with one particle per cell, kept in
  * flat primitive arrays, never in objects per particle.
  *
@@ -94,6 +138,13 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
 
     /** Counts per [Event]; whoever reads them resets them. */
     val events = IntArray(Event.COUNT)
+
+    /** Counts per [Seen] kind and material (kind × materials + material); whoever reads them resets them. */
+    val seen = IntArray(Seen.COUNT * materials.count)
+
+    internal fun note(kind: Int, m: Int) {
+        seen[kind * materials.count + m]++
+    }
 
     private val ambient = materials.ambient
     private val kindOf = materials.kind
@@ -155,13 +206,14 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
      * Fills the air inside a disc with [material]; with [fill] below 1 only that share of it, scattered, the
      * way poured sand or water looks. Only air is replaced: nothing goes into rock or anything else.
      */
-    fun paint(material: Int, cx: Int, cy: Int, radius: Int, fill: Float = 1f): Int {
+    fun paint(material: Int, cx: Int, cy: Int, radius: Int, fill: Float = 1f, limit: Int = Int.MAX_VALUE): Int {
         var n = 0
         val r2 = radius * radius + radius
         for (dy in -radius..radius) {
             val y = cy + dy
             if (y < 0 || y >= height) continue
             for (dx in -radius..radius) {
+                if (n >= limit) break
                 val x = cx + dx
                 if (x < 0 || x >= width || dx * dx + dy * dy > r2) continue
                 val i = y * width + x
@@ -176,17 +228,17 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     }
 
     /** A straight stroke from (x0, y0) to (x1, y1), [radius] thick: air along it becomes [material]. */
-    fun paintLine(material: Int, x0: Int, y0: Int, x1: Int, y1: Int, radius: Int): Int {
+    fun paintLine(material: Int, x0: Int, y0: Int, x1: Int, y1: Int, radius: Int, limit: Int = Int.MAX_VALUE): Int {
         var n = 0
-        Shapes.line(x0, y0, x1, y1) { x, y -> n += paint(material, x, y, radius) }
+        Shapes.line(x0, y0, x1, y1) { x, y -> n += paint(material, x, y, radius, limit = limit - n) }
         return n
     }
 
     /** A rectangle between two corners, filled or as a frame [thickness] cells wide: air in it becomes [material]. */
-    fun paintRect(material: Int, x0: Int, y0: Int, x1: Int, y1: Int, frame: Boolean, thickness: Int): Int {
+    fun paintRect(material: Int, x0: Int, y0: Int, x1: Int, y1: Int, frame: Boolean, thickness: Int, limit: Int = Int.MAX_VALUE): Int {
         var n = 0
         Shapes.rect(x0, y0, x1, y1, frame, thickness) { x, y ->
-            if (inside(x, y)) {
+            if (inside(x, y) && n < limit) {
                 val i = y * width + x
                 if (mat[i].toInt() == AIR) {
                     spawn(x, y, i, material, materials.spawnTemp[material])
@@ -272,6 +324,45 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         heatPending.fill(true)
         structuresDirty = true
     }
+
+    /**
+     * The object cell [i] belongs to, for the hand (Leitfaden V3, 4.3): for a solid cell its whole structure
+     * (4-connected solid cells), for a loose grain a lump of up to [lump] grains of the same material.
+     * [Piece.anchored] says whether it is built into anchored ground: touching it beside or above. Lying on
+     * it does not count, a log on the rock floor can be lifted. At most [max] cells are looked at.
+     */
+    fun pieceAt(i: Int, lump: Int, max: Int): Piece? {
+        val m = mat[i].toInt()
+        val solid = kindOf[m] == Kind.SOLID
+        if (!solid && kindOf[m] != Kind.POWDER) return null
+        val seen = HashSet<Int>()
+        val stack = ArrayDeque<Int>()
+        val cells = ArrayList<Int>()
+        var anchored = false
+        stack.addLast(i)
+        seen += i
+        val limit = if (solid) max else lump
+        while (stack.isNotEmpty() && cells.size < limit) {
+            val c = stack.removeFirst()
+            cells += c
+            val x = c % width
+            for (n in intArrayOf(if (x > 0) c - 1 else -1, if (x < width - 1) c + 1 else -1, c - width, c + width)) {
+                if (n < 0 || n >= size || n in seen) continue
+                val q = mat[n].toInt()
+                if (solid && kindOf[q] == Kind.SOLID || !solid && q == m) {
+                    seen += n
+                    stack.addLast(n)
+                } else if (n != c + width && (materials.anchored[q] || (flags[n].toInt() and Flag.ANCHORED) != 0)) {
+                    anchored = true
+                }
+            }
+        }
+        // a structure larger than [max] counts as too big to hold
+        return Piece(cells.toIntArray(), anchored, solid && stack.isNotEmpty())
+    }
+
+    /** Cells of an object under the finger; [tooBig] if it goes on beyond what was looked at. */
+    class Piece(val cells: IntArray, val anchored: Boolean, val tooBig: Boolean)
 
     /** A full-grown tree (or bush) on the ground below (x, y), for building worlds (2b). */
     fun plantTree(x: Int, y: Int, tree: Boolean) = living.plantTree(x, y, tree)
@@ -505,9 +596,11 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
                 flags[i] = (f or Flag.BURNING).toByte()
                 life[i] = burnLife(m).toShort()
                 events[Event.IGNITE]++
+                note(Seen.IGNITE, m)
                 wake(x, y)
             } else if (mt.quenchProduct[m] != m && temp[i] >= mt.igniteTemp[m] + CHAR_OVER && chance(CHAR_CHANCE)) {
                 // well above burning heat but no air to burn with: it slowly chars, as wood does in a charcoal kiln
+                note(Seen.CHAR, m)
                 change(x, y, i, mt.quenchProduct[m])
                 return
             }
@@ -518,7 +611,9 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
 
         // phase changes, all at temperature thresholds; salt next to ice or snow lowers its melting point
         val t = temp[i]
-        if (t >= mt.meltTemp[m] || (t >= mt.saltMeltTemp[m] && saltyNeighbour(x, y, i))) {
+        val byHeat = t >= mt.meltTemp[m]
+        if ((byHeat && melted(x, y, i, m)) || (!byHeat && t >= mt.saltMeltTemp[m] && saltyNeighbour(x, y, i))) {
+            note(if (byHeat) Seen.MELT else Seen.SALT_MELT, m)
             change(x, y, i, mt.meltProduct[m])
             events[Event.MELT]++
             return
@@ -567,6 +662,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         if (!chance(SEEP)) return
         flags[b] = (flags[b].toInt() or Flag.WET).toByte()
         flags[i] = (flags[i].toInt() and Flag.WET.inv()).toByte()
+        note(Seen.SEEP, mat[i].toInt())
         wake(x, y + 1)
     }
 
@@ -593,6 +689,16 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             (x > 0 && sa[mat[i - 1].toInt()]) || (x < width - 1 && sa[mat[i + 1].toInt()])
     }
 
+    /** A neighbour (4) that is a liquid that wets (water, salt water): its material, or -1. */
+    private fun wetNeighbour(x: Int, y: Int, i: Int): Int {
+        val wt = materials.wets
+        if (y > 0 && wt[mat[i - width].toInt()]) return mat[i - width].toInt()
+        if (y < height - 1 && wt[mat[i + width].toInt()]) return mat[i + width].toInt()
+        if (x > 0 && wt[mat[i - 1].toInt()]) return mat[i - 1].toInt()
+        if (x < width - 1 && wt[mat[i + 1].toInt()]) return mat[i + 1].toInt()
+        return -1
+    }
+
     /**
      * A grain that dissolves (salt) next to its solvent (water): both cells become the solution (salt
      * water). Returns whether it happened.
@@ -611,6 +717,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             return false
         }
         val product = materials.dissolvedProduct[m]
+        note(Seen.DISSOLVE, m)
         change(x, y, i, product)
         change(j % w, j / w, j, product)
         return true
@@ -651,11 +758,15 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         wakeHeat(x, y)
         val t = temp[i]
         if (t < mt.quenchTemp[m]) {
+            // cooled below burning: by water next to it, if there is any
+            val dousing = wetNeighbour(x, y, i)
+            if (dousing >= 0) note(Seen.DOUSE, dousing)
             quench(x, y, i, m)
             return false
         }
         if (oxygen(x, y, i) == 0) {
             if (chance(SUFFOCATE)) {
+                note(Seen.SUFFOCATE, m)
                 quench(x, y, i, m)
                 return false
             }
@@ -670,6 +781,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         val l = life[i] - 1
         if (l <= 0) {
             val r = mt.residue[m]
+            note(Seen.BURN_OUT, m)
             change(x, y, i, if (r >= 1f || (r > 0f && chance(r))) mt.burnProduct[m] else AIR)
             events[Event.BURNT_OUT]++
             return false
@@ -690,6 +802,27 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         events[Event.EXTINGUISH]++
     }
 
+    /**
+     * Melting takes the latent heat on top of the melting point, if the material has one (ice, snow); it is
+     * collected in [life]. Salt melts ice without it.
+     */
+    private fun melted(x: Int, y: Int, i: Int, m: Int): Boolean {
+        val lat = materials.latent[m]
+        if (lat <= 0 || materials.boilTemp[m] != Float.MAX_VALUE || materials.freezeTemp[m] != -Float.MAX_VALUE) return true
+        val mt = materials.meltTemp[m]
+        val excess = (temp[i] - mt).toInt()
+        if (excess > 0) {
+            temp[i] -= excess
+            life[i] = minOf(Short.MAX_VALUE.toInt(), life[i] + excess).toShort()
+            wakeHeat(x, y)
+        } else {
+            wake(x, y)
+        }
+        if (life[i] < lat) return false
+        temp[i] = mt
+        return true
+    }
+
     /** Boiling takes the latent heat on top of the boiling point; it is collected in [life]. */
     private fun boil(x: Int, y: Int, i: Int, m: Int): Boolean {
         val mt = materials
@@ -706,8 +839,10 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             temp[i] = bt + 2f
         }
         val residue = mt.boilResidue[m]
+        note(Seen.BOIL, m)
         if (residue >= 0 && chance(mt.boilResidueShare[m])) {
             // the water goes up as steam, what was dissolved in it stays behind
+            note(Seen.RESIDUE, m)
             change(x, y, i, residue)
             emit(x, y, i, mt.boilProduct[m])
         } else {
@@ -732,6 +867,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             if (life[i] < lat) return false
             temp[i] = ft - 2f
         }
+        note(if (mt.kind[m] == Kind.GAS) Seen.CONDENSE else Seen.SET, m)
         change(x, y, i, mt.freezeProduct[m])
         events[if (mt.kind[m] == Kind.GAS) Event.CONDENSE else Event.SOLIDIFY]++
         return true
@@ -981,6 +1117,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         val q = mat[c].toInt()
         if (q == AIR || materials.kind[q] == Kind.LIQUID) {
             flags[b] = (flags[b].toInt() or Flag.WET).toByte()
+            note(Seen.ERODE, g)
             swap(b, c, x, by, nx, by)
         }
     }
@@ -1006,6 +1143,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             return false
         }
         flags[j] = (f or Flag.WET).toByte()
+        note(Seen.SOAK, mat[j].toInt())
         wake(jx, jy)
         clear(x, y, i)
         events[Event.SOAK]++
@@ -1122,6 +1260,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
                 fell++
             }
             if (fell > 0) {
+                if (speed == 0) note(Seen.FALL, mat[cells[0]].toInt())
                 moved = true
                 val f = Flag.FALLING or (minOf(7, speed + 1) shl Flag.VEL_SHIFT)
                 for (c in cells) flags[c] = ((flags[c].toInt() and (Flag.FALLING or Flag.VEL_MASK).inv()) or f).toByte()

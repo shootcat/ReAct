@@ -107,7 +107,8 @@ data class MaterialSpec(
     @SerialName("boil_residue_share") val boilResidueShare: Float = 0f,
     /**
      * Heat (in degrees of the material itself) of its phase change: taken in on top of reaching [boilTemp]
-     * to boil, or given off on top of cooling to [freezeTemp] to set (if it does not boil).
+     * to boil, given off on top of cooling to [freezeTemp] to set (if it does not boil), or taken in on top
+     * of reaching [meltTemp] to melt (if it neither boils nor sets: ice, snow).
      */
     @SerialName("latent_heat") val latentHeat: Float = 0f,
     @SerialName("freeze_temp") val freezeTemp: Float? = null,
@@ -178,6 +179,10 @@ data class MaterialSpec(
     val roots: Boolean = false,
     /** Share of light one cell lets through, 0..1; 0 if it blocks light, 1 if not given otherwise. */
     @SerialName("light_pass") val lightPass: Float? = null,
+    /** What an object of it gives in the store (2c): a log gives planks. */
+    @SerialName("split_into") val splitInto: String? = null,
+    /** How many cells of [splitInto] one cell gives. */
+    @SerialName("split_yield") val splitYield: Int = 1,
 )
 
 @Serializable
@@ -280,6 +285,8 @@ class MaterialTable(val specs: List<MaterialSpec>, val ambient: Float) {
     val diesInSalt = BooleanArray(count) { specs[it].diesInSalt }
     val deathProduct = IntArray(count) { ref(specs[it].deathProduct, AIR) }
     val roots = BooleanArray(count) { specs[it].roots }
+    val splitInto = IntArray(count) { ref(specs[it].splitInto, it) }
+    val splitYield = IntArray(count) { specs[it].splitYield }
     val opacity = FloatArray(count) { specs[it].opacity }
     val cost = IntArray(count) { specs[it].cost }
     val color = IntArray(count) { parseColor(specs[it].color) }
@@ -335,7 +342,7 @@ class MaterialTable(val specs: List<MaterialSpec>, val ambient: Float) {
         for (s in specs) {
             listOfNotNull(
                 s.burnProduct, s.quenchProduct, s.meltProduct, s.boilProduct, s.boilResidue, s.freezeProduct, s.decayProduct,
-                s.dissolvedProduct, s.dissolvesIn, s.deathProduct, s.growsOn, s.livesIn,
+                s.dissolvedProduct, s.dissolvesIn, s.deathProduct, s.growsOn, s.livesIn, s.splitInto,
             )
                 .forEach { require(it in index) { "${s.id} refers to unknown material '$it'" } }
             if (s.flammable) require(s.igniteTemp != null && s.burnTime != null) { "${s.id} burns but has no ignite_temp or burn_time" }

@@ -5,7 +5,7 @@
       "density": "kg pro Kubikmeter, nur das Verhältnis zählt",
       "conductivity": "0 bis 1, Spielwert (Fels 0.35, Luft 0.03, Metall 1, Flammen 1: sie geben Hitze besonders gut ab)",
       "heat_capacity": "Wärme pro Zelle und Grad (Wasser 4.2, Luft bewusst groß gewählt: 0.05)",
-      "latent_heat": "Wärme des Phasenwechsels in Grad des Materials selbst: beim Sieden zusätzlich aufzunehmen, beim Erstarren zusätzlich abzugeben",
+      "latent_heat": "Wärme des Phasenwechsels in Grad des Materials selbst: beim Sieden zusätzlich aufzunehmen, beim Erstarren zusätzlich abzugeben, bei Eis und Schnee zum Schmelzen zusätzlich aufzunehmen",
       "hardness": "0 bis 1, 1 heißt unzerstörbar",
       "absorbs": "Wahrscheinlichkeit pro Schritt und berührender Wasserzelle, sie aufzusaugen",
       "chances": "flame, smoke, residue, boil_residue_share, friction, viscosity, speckle: Wahrscheinlichkeiten oder Anteile 0 bis 1",
@@ -14,6 +14,7 @@
       "salt_melt_temp": "Schmelzpunkt, solange Salziges (Salz, Salzwasser) daneben liegt: Salz lässt Eis und Schnee ohne Wärme schmelzen",
       "pattern": "Darstellung fester Stoffe: planks, brick, masonry, sheen; speckle_color und speckle für Einschlüsse (Erz)",
       "light": "emits_light und light_pass 0 bis 1: eigenes Licht; Anteil des Lichts, den eine Zelle durchlässt (ohne Angabe 0 bei blocks_light, sonst 1)",
+      "store": "split_into, split_yield: was ein gegriffenes Objekt im Lager ergibt (ein Stamm 3 Bretter je Zelle)",
       "life": "organism: Verhalten (grass, moss, vine, seed, tree, leaf, fish, firefly, worm, bird); light_need, light_max: Licht zum Wachsen; grow: Wahrscheinlichkeit pro Zufallstick (etwa einmal pro Sekunde und Zelle); move: Wahrscheinlichkeit pro Schritt, sich zu bewegen; dies_above: Temperatur, über der es stirbt"
   },
   "ambient": 20,
@@ -135,6 +136,7 @@
       "flammable": false,
       "wet_blocks_burning": false, "absorbs": 0,
       "melt_temp": 0, "melt_product": "water", "salt_melt_temp": -18,
+      "latent_heat": 160,
       "conductivity": 0.08, "heat_capacity": 1.0, "hardness": 0.0, "erodes_in_water": false,
       "dissolves_in": null, "dissolved_product": null,
       "friction": 0.85, "temp": -5,
@@ -168,6 +170,7 @@
       "flammable": false,
       "wet_blocks_burning": false, "absorbs": 0,
       "melt_temp": 0, "melt_product": "water", "salt_melt_temp": -18,
+      "latent_heat": 160,
       "conductivity": 0.4, "heat_capacity": 2.0, "hardness": 0.6, "erodes_in_water": false,
       "dissolves_in": null, "dissolved_product": null,
       "temp": -10,
@@ -349,7 +352,7 @@
       "dissolves_in": null, "dissolved_product": null,
       "organism": "tree", "light_need": 0.3, "grow": 0.6,
       "dies_above": 150, "dies_in_salt": true, "death_product": "deadwood", "roots": true,
-      "bucketable": false, "grabbable": true, "emits_light": 0, "blocks_light": true,
+      "bucketable": false, "grabbable": true, "split_into": "wood", "split_yield": 3, "emits_light": 0, "blocks_light": true,
       "color": "#5f4229", "color_variance": 0.14, "speckle_color": "#3b281a", "speckle": 0.22, "cost": 2
     },
     {
@@ -359,7 +362,7 @@
       "conductivity": 0.08, "heat_capacity": 1.2, "hardness": 0.5, "erodes_in_water": false,
       "dissolves_in": null, "dissolved_product": null,
       "roots": true,
-      "bucketable": false, "grabbable": true, "emits_light": 0, "blocks_light": true,
+      "bucketable": false, "grabbable": true, "split_into": "wood", "split_yield": 2, "emits_light": 0, "blocks_light": true,
       "color": "#7d7064", "color_variance": 0.14, "speckle_color": "#5b5047", "speckle": 0.2, "cost": 2
     },
     {

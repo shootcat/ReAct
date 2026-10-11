@@ -10,9 +10,10 @@ import javax.imageio.ImageIO
  */
 object Pictures {
     /** The whole world, or with [area] (x0, y0, x1, y1) only that part of it. */
-    fun write(world: World, backdrop: IntArray, name: String, scale: Int = 3, frame: Int = 0, area: IntArray? = null, lit: Boolean = true): File {
+    fun write(world: World, backdrop: IntArray, name: String, scale: Int = 3, frame: Int = 0, area: IntArray? = null, lit: Boolean = true, ambient: Float? = null): File {
         val renderer = Renderer(world, backdrop)
         renderer.lit = lit
+        if (ambient != null) renderer.ambient = ambient
         val pixels = IntArray(world.size)
         renderer.render(pixels, frame)
         val lw = renderer.layerWidth

@@ -67,6 +67,7 @@ internal class Life(private val world: World) {
         val f = flags[i].toInt()
         if (f and Flag.BURNING != 0) return
         if (temp[i] > mt.diesAbove[m] || (mt.diesInSalt[m] && world.saltyNeighbour(x, y, i))) {
+            world.note(if (temp[i] > mt.diesAbove[m]) Seen.DIE_HEAT else Seen.DIE_SALT, m)
             convert(x, y, i, mt.deathProduct[m])
             return
         }
@@ -97,6 +98,7 @@ internal class Life(private val world: World) {
             // only at the surface, where light falls on it
             if (mt.lightPass[mat[j - w].toInt()] <= 0f) continue
             convert(nx, ny, j, m)
+            world.note(Seen.GROW, m)
             return
         }
     }
@@ -128,6 +130,7 @@ internal class Life(private val world: World) {
             if (mat[j].toInt() != AIR || !onGround(nx, ny, j, m)) continue
             world.spawn(nx, ny, j, m, temp[j])
             life[j] = (d + 1).toShort()
+            world.note(Seen.GROW, m)
             return
         }
     }
@@ -204,6 +207,7 @@ internal class Life(private val world: World) {
         world.growSolid(i, nx, ny, j, m)
         flags[j] = Flag.MARK.toByte()
         life[j] = (budget - 1).toShort()
+        world.note(Seen.GROW, m)
         return true
     }
 
@@ -242,6 +246,7 @@ internal class Life(private val world: World) {
         if (!damp(x, y + 1, b) && !damp(x, y, i)) return
         if (light.at(x, y) < mt.lightNeed[m] || !world.chance(mt.grow[m])) return
         val tree = world.chance(TREE_SHARE)
+        world.note(Seen.GROW, m)
         world.change(x, y, i, trunk)
         sprout(i, tree)
     }
@@ -279,6 +284,7 @@ internal class Life(private val world: World) {
             world.growSolid(i, x, y - 1, j, m)
             flags[j] = Flag.MARK.toByte()
             life[j] = tip(type, budget - 1)
+            world.note(Seen.GROW, m)
             if (type == TRUNK && budget in 2..BRANCH_FROM && world.chance(BRANCH)) {
                 val d = if (world.coin()) 1 else -1
                 val k = j + d
@@ -364,6 +370,7 @@ internal class Life(private val world: World) {
     /** One step of an animal: dying of heat or salt, otherwise its own way of moving. */
     fun animal(x: Int, y: Int, i: Int, m: Int) {
         if (temp[i] > mt.diesAbove[m] || (mt.diesInSalt[m] && world.saltyNeighbour(x, y, i))) {
+            world.note(if (temp[i] > mt.diesAbove[m]) Seen.DIE_HEAT else Seen.DIE_SALT, m)
             world.change(x, y, i, mt.deathProduct[m])
             return
         }
@@ -385,6 +392,7 @@ internal class Life(private val world: World) {
         if (!near(x, y, i, home, m)) {
             val l = life[i] + 1
             if (l > SUFFOCATE) {
+                world.note(Seen.DIE_DRY, m)
                 world.change(x, y, i, mt.deathProduct[m])
                 return
             }
@@ -438,6 +446,7 @@ internal class Life(private val world: World) {
         if (!near(x, y, i, home, m)) {
             val l = life[i] + 1
             if (l > DRY_OUT) {
+                world.note(Seen.DIE_DRY, m)
                 world.change(x, y, i, mt.deathProduct[m])
                 return
             }
@@ -450,7 +459,10 @@ internal class Life(private val world: World) {
         val r = world.below(10)
         val dx = if (r < 4) -1 else if (r < 8) 1 else 0
         val dy = if (r == 8) 1 else if (r == 9) -1 else 0
-        if (go(x, y, i, dx, dy, home)) flags[i] = (flags[i].toInt() or Flag.MARK).toByte()
+        if (go(x, y, i, dx, dy, home)) {
+            flags[i] = (flags[i].toInt() or Flag.MARK).toByte()
+            world.note(Seen.DIG, m)
+        }
     }
 
     /**
@@ -461,6 +473,7 @@ internal class Life(private val world: World) {
         val f = flags[i].toInt()
         if (f and Flag.MARK == 0) {
             if (world.chance(LOOK) && danger(x, y)) {
+                world.note(Seen.FLEE, m)
                 flags[i] = (f or Flag.MARK).toByte()
                 life[i] = (if (world.coin()) 1 else 0).toShort()
                 return
