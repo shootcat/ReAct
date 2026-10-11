@@ -15,13 +15,16 @@ class BenchmarkTest {
         val materials = MaterialTable.load()
         val results = Benchmark.runAll(materials, steps = 600)
         val render = Benchmark.renderMillis(Benchmark.sandboxWorld(materials, Terrain.WIDTH, Terrain.HEIGHT))
+        val paused = Benchmark.renderMillis(Benchmark.sandboxWorld(materials, Terrain.WIDTH, Terrain.HEIGHT), paused = true)
         val device = "${System.getProperty("os.name")} ${System.getProperty("os.arch")}, Java ${System.getProperty("java.version")}, ${Runtime.getRuntime().availableProcessors()} Kerne"
-        val report = Benchmark.report(results, render, device)
+        val report = Benchmark.report(results, render, device, paused)
         println(report)
         File("build").mkdirs()
         File("build/benchmark.md").writeText(report)
         val full = results.first { it.chunks == it.awakeChunks && it.name.startsWith("Voll") }
         // far above the 30 steps the phone needs, so a slowdown shows up here first
         assertTrue(full.stepsPerSecond > 60, "fully active world only reaches ${full.stepsPerSecond} steps per second")
+        val living = results.first { it.name.contains("Pflanzen") }
+        assertTrue(living.stepsPerSecond > 60, "fully active world with plants and animals only reaches ${living.stepsPerSecond} steps per second")
     }
 }

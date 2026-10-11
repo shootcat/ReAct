@@ -69,14 +69,13 @@ class MaterialBehaviorTest {
         val pan = Lab()
         pan.rect("saltwater", 20, 55, 43, 59)
         pan.rect("lava", 18, 60, 45, 61, 1300f)
-        var steam = 0
         var salt = 0
         repeat(10) {
             pan.seconds(1f)
-            steam = maxOf(steam, pan.count("steam"))
             salt = maxOf(salt, pan.count("salt"))
         }
-        assertTrue(steam > 10, "it boiled: $steam steam")
+        val boiled = pan.world.events[Event.BOIL]
+        assertTrue(boiled > 10, "it boiled: $boiled cells")
         // the steam rains down fresh and dissolves part of the salt again, so the most salt at any time counts
         assertTrue(salt > 10, "salt is left behind: at most $salt")
 
@@ -84,17 +83,23 @@ class MaterialBehaviorTest {
 
     @Test
     fun `salt melts ice and snow without heat`() {
+        // salt on the left block of ice and the left pile of snow, nothing on the right ones
         val lab = Lab()
-        lab.rect("ice", 20, 50, 43, 61, -5f)
-        lab.rect("snow", 2, 55, 15, 61, -5f)
-        lab.seconds(1f)
-        val ice = lab.count("ice")
-        val snow = lab.count("snow")
-        lab.world.paint(lab.id("salt"), 31, 46, 3)
-        lab.world.paint(lab.id("salt"), 8, 52, 3)
-        lab.seconds(6f)
-        assertTrue(lab.count("ice") < ice, "ice melted: ${lab.count("ice")} of $ice")
-        assertTrue(lab.count("snow") < snow, "snow melted: ${lab.count("snow")} of $snow")
+        lab.rect("ice", 4, 50, 27, 61, -10f)
+        lab.rect("ice", 36, 50, 59, 61, -10f)
+        val snowLab = Lab()
+        snowLab.rect("snow", 4, 52, 25, 61, -10f)
+        snowLab.rect("snow", 38, 52, 59, 61, -10f)
+        lab.world.paint(lab.id("salt"), 15, 46, 3)
+        snowLab.world.paint(snowLab.id("salt"), 14, 48, 3)
+        lab.seconds(3f)
+        snowLab.seconds(3f)
+        val salted = lab.countIn("ice", 0, 0, 31, 63)
+        val plain = lab.countIn("ice", 32, 0, 63, 63)
+        assertTrue(salted < plain - 10, "salted ice melted: $salted cells left, $plain without salt")
+        val saltedSnow = snowLab.countIn("snow", 0, 0, 31, 63)
+        val plainSnow = snowLab.countIn("snow", 32, 0, 63, 63)
+        assertTrue(saltedSnow < plainSnow - 10, "salted snow melted: $saltedSnow cells left, $plainSnow without salt")
         assertTrue(lab.count("water") + lab.count("saltwater") > 0)
     }
 

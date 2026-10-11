@@ -29,6 +29,38 @@ object Kind {
     }
 }
 
+/** What a living thing does (Leitfaden V3, 4.2): plants grow on random ticks, animals move every step. */
+object Organism {
+    const val NONE = 0
+    const val GRASS = 1
+    const val MOSS = 2
+    const val VINE = 3
+    const val SEED = 4
+    const val TREE = 5
+    const val LEAF = 6
+    const val FISH = 7
+    const val FIREFLY = 8
+    const val WORM = 9
+    const val BIRD = 10
+
+    fun parse(name: String?): Int = when (name) {
+        null -> NONE
+        "grass" -> GRASS
+        "moss" -> MOSS
+        "vine" -> VINE
+        "seed" -> SEED
+        "tree" -> TREE
+        "leaf" -> LEAF
+        "fish" -> FISH
+        "firefly" -> FIREFLY
+        "worm" -> WORM
+        "bird" -> BIRD
+        else -> error("unknown organism '$name'")
+    }
+
+    fun isAnimal(o: Int) = o >= FISH
+}
+
 /** How built material is drawn (the pattern of its surface). */
 object Pattern {
     const val NONE = 0
@@ -120,6 +152,32 @@ data class MaterialSpec(
     val reach: Int = 16,
     /** Liquids: chance per step of not flowing sideways at all. */
     val viscosity: Float = 0f,
+    /** A living thing (2b): grass, moss, vine, seed, tree, leaf, fish, firefly, worm, bird. */
+    val organism: String? = null,
+    /** Plants: the light they need to grow (0 dark, 1 daylight). */
+    @SerialName("light_need") val lightNeed: Float = 0f,
+    /** Plants: the most light they grow in (moss keeps to the dark). */
+    @SerialName("light_max") val lightMax: Float = 1f,
+    /** Plants: chance per random tick to grow. */
+    val grow: Float = 0f,
+    /** Vines: how many cells one grows. */
+    @SerialName("grow_size") val growSize: Int = 0,
+    /** Plants: the ground they take root in and spread over. */
+    @SerialName("grows_on") val growsOn: String? = null,
+    /** Animals: the material they live in (fish: water, worms: earth). */
+    @SerialName("lives_in") val livesIn: String? = null,
+    /** Animals: chance per step of moving. */
+    val move: Float = 0f,
+    /** Living things die above this temperature. */
+    @SerialName("dies_above") val diesAbove: Float? = null,
+    /** Living things die next to salt or salt water. */
+    @SerialName("dies_in_salt") val diesInSalt: Boolean = false,
+    /** What a dead plant or animal becomes. */
+    @SerialName("death_product") val deathProduct: String? = null,
+    /** Its roots hold the loose ground below together. */
+    val roots: Boolean = false,
+    /** Share of light one cell lets through, 0..1; 0 if it blocks light, 1 if not given otherwise. */
+    @SerialName("light_pass") val lightPass: Float? = null,
 )
 
 @Serializable
@@ -205,6 +263,23 @@ class MaterialTable(val specs: List<MaterialSpec>, val ambient: Float) {
     val reach = IntArray(count) { maxOf(specs[it].reach, specs[it].spread, 1) }
     val viscosity = FloatArray(count) { specs[it].viscosity }
     val emitsLight = FloatArray(count) { specs[it].emitsLight }
+
+    /** Light a cell gives off by itself; flammable solids and powders (charcoal) only while they burn. */
+    val glow = FloatArray(count) { if (flammable[it] && kind[it] != Kind.GAS) 0f else specs[it].emitsLight }
+    val lightPass = FloatArray(count) { specs[it].lightPass ?: if (specs[it].blocksLight) 0f else 1f }
+    val organism = IntArray(count) { Organism.parse(specs[it].organism) }
+    val animal = BooleanArray(count) { Organism.isAnimal(organism[it]) }
+    val lightNeed = FloatArray(count) { specs[it].lightNeed }
+    val lightMax = FloatArray(count) { specs[it].lightMax }
+    val grow = FloatArray(count) { specs[it].grow }
+    val growSize = IntArray(count) { specs[it].growSize }
+    val growsOn = IntArray(count) { ref(specs[it].growsOn, -1) }
+    val livesIn = IntArray(count) { ref(specs[it].livesIn, -1) }
+    val move = FloatArray(count) { specs[it].move }
+    val diesAbove = FloatArray(count) { specs[it].diesAbove ?: Float.MAX_VALUE }
+    val diesInSalt = BooleanArray(count) { specs[it].diesInSalt }
+    val deathProduct = IntArray(count) { ref(specs[it].deathProduct, AIR) }
+    val roots = BooleanArray(count) { specs[it].roots }
     val opacity = FloatArray(count) { specs[it].opacity }
     val cost = IntArray(count) { specs[it].cost }
     val color = IntArray(count) { parseColor(specs[it].color) }
@@ -220,7 +295,7 @@ class MaterialTable(val specs: List<MaterialSpec>, val ambient: Float) {
 
     /** Nothing ever happens to it on its own: no movement, no fire, no phase change. */
     val inert = BooleanArray(count) {
-        (kind[it] == Kind.STATIC || kind[it] == Kind.SOLID) && !flammable[it] &&
+        (kind[it] == Kind.STATIC || kind[it] == Kind.SOLID) && !flammable[it] && organism[it] == Organism.NONE &&
             meltTemp[it] == Float.MAX_VALUE && boilTemp[it] == Float.MAX_VALUE && freezeTemp[it] == -Float.MAX_VALUE &&
             lifetimeSteps[it] == 0 && dissolvesIn[it] < 0
     }
@@ -258,7 +333,10 @@ class MaterialTable(val specs: List<MaterialSpec>, val ambient: Float) {
             riseB[a * count + b] = up * ca / (ca + cb)
         }
         for (s in specs) {
-            listOfNotNull(s.burnProduct, s.quenchProduct, s.meltProduct, s.boilProduct, s.boilResidue, s.freezeProduct, s.decayProduct, s.dissolvedProduct, s.dissolvesIn)
+            listOfNotNull(
+                s.burnProduct, s.quenchProduct, s.meltProduct, s.boilProduct, s.boilResidue, s.freezeProduct, s.decayProduct,
+                s.dissolvedProduct, s.dissolvesIn, s.deathProduct, s.growsOn, s.livesIn,
+            )
                 .forEach { require(it in index) { "${s.id} refers to unknown material '$it'" } }
             if (s.flammable) require(s.igniteTemp != null && s.burnTime != null) { "${s.id} burns but has no ignite_temp or burn_time" }
             require(!(s.lifetime != null && (s.flammable || s.boilTemp != null))) { "${s.id}: lifetime cannot be combined with burning or boiling" }

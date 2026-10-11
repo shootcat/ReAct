@@ -9,8 +9,10 @@ import javax.imageio.ImageIO
  * pixels scaled up without smoothing, the haze and glow layers smoothly on top.
  */
 object Pictures {
-    fun write(world: World, backdrop: IntArray, name: String, scale: Int = 3, frame: Int = 0): File {
+    /** The whole world, or with [area] (x0, y0, x1, y1) only that part of it. */
+    fun write(world: World, backdrop: IntArray, name: String, scale: Int = 3, frame: Int = 0, area: IntArray? = null, lit: Boolean = true): File {
         val renderer = Renderer(world, backdrop)
+        renderer.lit = lit
         val pixels = IntArray(world.size)
         renderer.render(pixels, frame)
         val lw = renderer.layerWidth
@@ -23,9 +25,15 @@ object Pictures {
         val flames = IntArray(fw * fh)
         renderer.renderFlames(flames)
         val flameBlock = (Renderer.FLAME_BLOCK * scale).toFloat()
-        val img = BufferedImage(world.width * scale, world.height * scale, BufferedImage.TYPE_INT_RGB)
+        val ax = area?.get(0) ?: 0
+        val ay = area?.get(1) ?: 0
+        val aw = if (area != null) area[2] - area[0] + 1 else world.width
+        val ah = if (area != null) area[3] - area[1] + 1 else world.height
+        val img = BufferedImage(aw * scale, ah * scale, BufferedImage.TYPE_INT_RGB)
         val block = (Renderer.BLOCK * scale).toFloat()
-        for (py in 0 until img.height) for (px in 0 until img.width) {
+        for (qy in 0 until img.height) for (qx in 0 until img.width) {
+            val px = qx + ax * scale
+            val py = qy + ay * scale
             var c = pixels[(py / scale) * world.width + px / scale]
             val h = sample(haze, lw, lh, px / block - 0.5f, py / block - 0.5f)
             val a = h[0] / 255f
@@ -34,7 +42,7 @@ object Pictures {
             c = Renderer.mix(c, (fl[1].toInt() shl 16) or (fl[2].toInt() shl 8) or fl[3].toInt(), fl[0] / 255f)
             val l = sample(light, lw, lh, px / block - 0.5f, py / block - 0.5f)
             c = Renderer.mix(c, (l[1].toInt() shl 16) or (l[2].toInt() shl 8) or l[3].toInt(), l[0] / 255f)
-            img.setRGB(px, py, c and 0xFFFFFF)
+            img.setRGB(qx, qy, c and 0xFFFFFF)
         }
         val file = File("build/pictures/$name.png")
         file.parentFile.mkdirs()

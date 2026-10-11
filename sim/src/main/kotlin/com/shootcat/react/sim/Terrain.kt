@@ -54,7 +54,10 @@ class Noise(seed: Long) {
     }
 }
 
-/** The start of the free sandbox (Phase 1): a hillside with a pond, a wooden bridge, sand, and a lava cave. */
+/**
+ * The start of the free sandbox: a grassy hillside with trees and a pond with fish, a wooden bridge, sand,
+ * a lava cave deep in the rock and a dark, damp grotto under the hill with moss and fireflies.
+ */
 object Terrain {
 
     const val WIDTH = 200
@@ -158,7 +161,90 @@ object Terrain {
                 if (world.inside(x, y) && world.material(x, y) == MaterialTable.AIR) world.set(x, y, wood)
             }
         }
+
+        if (mt.idOrNull("grass") != null) life(world, n, surface, pondLeft, pondRight, waterLine, deckY, sx, sy)
         world.wakeAll()
+    }
+
+    /** Plants and animals (2b): grass, trees, a bush, a vine, fish, worms, birds, and the grotto. */
+    private fun life(world: World, n: Noise, surface: IntArray, pondLeft: Int, pondRight: Int, waterLine: Int, deckY: Int, sx: Float, sy: Float) {
+        val mt = world.materials
+        val w = world.width
+        val h = world.height
+        val earth = mt.id("earth")
+        val grass = mt.id("grass")
+        val water = mt.id("water")
+        val air = MaterialTable.AIR
+
+        // grass on the earth of the hill; near the pond the ground is damp
+        for (x in 0 until w) {
+            val top = surface[x]
+            if (world.material(x, top) != earth || world.material(x, top - 1) != air) continue
+            world.set(x, top, grass)
+            if (x in pondLeft - (18 * sx).toInt() until pondLeft) for (y in top until top + 3) world.setWet(x, y, true)
+        }
+
+        // two trees and a bush on the hill, a vine at the foot of the lower tree that grows towards the pond
+        val treeA = (14 * sx).toInt()
+        val treeB = (58 * sx).toInt()
+        val bush = (67 * sx).toInt()
+        world.plantTree(treeA, surface[treeA] - 1, tree = true)
+        world.plantTree(treeB, surface[treeB] - 1, tree = true)
+        world.plantTree(bush, surface[bush] - 1, tree = false)
+        val vineX = treeB + 1
+        val vineY = surface[treeB] - 3
+        if (world.material(vineX, vineY) == air) {
+            world.set(vineX, vineY, mt.id("vine"))
+            world.growNow(vineX - 30, vineY - 10, vineX + 30, vineY + 30, 10)
+        }
+
+        // birds on the tree tops and on the bridge
+        val bird = mt.id("bird")
+        for (x in listOf(treeA + 1, treeB - 2, (pondLeft + pondRight) / 2)) {
+            var y = 0
+            while (y < h - 1 && world.material(x, y + 1) == air) y++
+            if (y > 0 && y < deckY + 1) world.set(x, y, bird)
+        }
+
+        // fish in the pond
+        val fish = mt.id("fish")
+        val mid = (pondLeft + pondRight) / 2
+        for (k in 0 until 6) {
+            val x = mid + (k - 3) * 6 + 2
+            val y = waterLine + 5 + (k % 3) * 5
+            if (world.material(x, y) == water) world.set(x, y, fish)
+        }
+
+        // worms in the earth of the hill
+        val worm = mt.id("worm")
+        for (k in 0 until 6) {
+            val x = ((8 + k * 13) * sx).toInt()
+            val y = surface[x] + 4 + k % 3
+            if (world.material(x, y) == earth) world.set(x, y, worm)
+        }
+
+        // a grotto under the hill: no daylight reaches it; a pool, moss on its damp walls, fireflies
+        val gx = 44f * sx
+        val gy = 212f * sy
+        val pool = gy + 3f * sy
+        for (y in 0 until h) for (x in 0 until w) {
+            val dx = (x - gx) / (24f * sx)
+            val dy = (y - gy) / (10f * sy)
+            val r = dx * dx + dy * dy + (n.fbm(x / (8f * sx), y / (8f * sy) + 40f, 3) - 0.5f) * 0.6f
+            if (r < 1f) world.set(x, y, if (y > pool) water else air)
+        }
+        val moss = mt.id("moss")
+        for (y in (gy - 12f * sy).toInt() until (pool + 1).toInt()) for (x in (gx - 28f * sx).toInt()..(gx + 28f * sx).toInt()) {
+            if (!world.inside(x, y) || world.material(x, y) != air) continue
+            val nearWall = world.material(x - 1, y) == mt.id("rock") || world.material(x + 1, y) == mt.id("rock")
+            if (nearWall && y > pool - 6f * sy && n.hash(x, y) < 0.7f) world.set(x, y, moss)
+        }
+        val firefly = mt.id("firefly")
+        for (k in 0 until 8) {
+            val x = (gx + (k - 4) * 4f * sx).toInt()
+            val y = (gy - 3f * sy + (k % 3) * 2f).toInt()
+            if (world.material(x, y) == air) world.set(x, y, firefly)
+        }
     }
 
     /** Height of the ground (y grows downwards) at u = 0..200, between hand-set points. */

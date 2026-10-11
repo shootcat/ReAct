@@ -16,6 +16,12 @@ object Flag {
     /** Falling speed, 0..7, in bits 4 to 6 (of a whole structure for solid cells). */
     const val VEL_SHIFT = 4
     const val VEL_MASK = 0x70
+
+    /**
+     * A mark whose meaning depends on the material (2b): the growing tip of a tree or vine, earth loosened
+     * by a worm, a fish heading right, a bird that has taken off.
+     */
+    const val MARK = 0x80
 }
 
 /** What happened in the world, counted per step for sounds and tests. */
@@ -55,11 +61,11 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     val flags = ByteArray(size)
 
     /** The step mark at which the particle in this cell last moved. */
-    private val stamp = IntArray(size)
+    internal val stamp = IntArray(size)
 
     var step = 0
         private set
-    private var mark = 0
+    internal var mark = 0
     private var rng = seedState(seed)
 
     val chunksX = (width + CHUNK - 1) / CHUNK
@@ -96,11 +102,17 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     private val smokeId = materials.idOrNull("smoke") ?: AIR
     private val steamId = materials.idOrNull("steam") ?: AIR
 
+    /** Light for plants and animals (2b), worked out every [LIGHT_EVERY] steps. */
+    internal val light = Light(this)
+    private val living = Life(this)
+
     // structures (3.1): which structure a solid cell belongs to (number + 1), and the loose ones
     private val owner = IntArray(size)
     private var structuresDirty = true
     private val loose = ArrayList<IntArray>()
     private val looseDensity = ArrayList<Float>()
+    /** For each structure number: its place in [loose], or -1 if it stands. */
+    private val looseOf = IntArray(size + 2)
     private val fillStack = IntArray(size)
     private var fillCells = IntArray(256)
     private var fillTop = 0
@@ -118,9 +130,12 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     fun material(x: Int, y: Int): Int = mat[y * width + x].toInt()
     fun isAwake(cx: Int, cy: Int) = pending[cy * chunksX + cx]
 
+    /** The light at (x, y), 0 dark to 1 daylight, as the plants see it (2b). */
+    fun lightAt(x: Int, y: Int): Float = light.at(x, y)
+
     // ------------------------------------------------------------------ random numbers
 
-    private fun next(): Int {
+    internal fun next(): Int {
         var x = rng
         x = x xor (x shl 13)
         x = x xor (x ushr 17)
@@ -130,9 +145,9 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     }
 
     /** True with probability [p] (0..1). */
-    private fun chance(p: Float): Boolean = (next() ushr 8) < (p * 16777216f).toInt()
-    private fun coin(): Boolean = next() < 0
-    private fun below(n: Int): Int = (((next().toLong() and 0xffffffffL) * n) ushr 32).toInt()
+    internal fun chance(p: Float): Boolean = (next() ushr 8) < (p * 16777216f).toInt()
+    internal fun coin(): Boolean = next() < 0
+    internal fun below(n: Int): Int = (((next().toLong() and 0xffffffffL) * n) ushr 32).toInt()
 
     // ------------------------------------------------------------------ placing material
 
@@ -258,6 +273,12 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         structuresDirty = true
     }
 
+    /** A full-grown tree (or bush) on the ground below (x, y), for building worlds (2b). */
+    fun plantTree(x: Int, y: Int, tree: Boolean) = living.plantTree(x, y, tree)
+
+    /** Lets the trees and vines with growing tips inside the box grow at once, for building worlds. */
+    fun growNow(x0: Int, y0: Int, x1: Int, y1: Int, rounds: Int) = living.growNow(x0, y0, x1, y1, rounds)
+
     /** Wakes the whole world, e.g. after building it cell by cell. */
     fun wakeAll() {
         pending.fill(true)
@@ -283,8 +304,10 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         var n = 0
         for (b in awake) if (b) n++
         awakeChunks = n
+        if (step % LIGHT_EVERY == 0) light.compute()
         heat()
         if (n > 0) update()
+        living.randomTicks()
         if (structuresDirty) findStructures()
         dropLoose()
         step++
@@ -399,7 +422,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         }
     }
 
-    private fun wakeChunk(cx: Int, cy: Int) {
+    internal fun wakeChunk(cx: Int, cy: Int) {
         if (cx in 0 until chunksX && cy in 0 until chunksY) {
             pending[cy * chunksX + cx] = true
             heatPending[cy * chunksX + cx] = true
@@ -407,7 +430,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     }
 
     /** The chunk of (x, y) and, at chunk borders, the neighbouring ones are updated in the next step. */
-    private fun wake(x: Int, y: Int) {
+    internal fun wake(x: Int, y: Int) {
         val cx = x shr SHIFT
         val cy = y shr SHIFT
         val lx = x and (CHUNK - 1)
@@ -420,7 +443,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     }
 
     /** Like [wake], and heat has to flow there too. */
-    private fun wakeHeat(x: Int, y: Int) {
+    internal fun wakeHeat(x: Int, y: Int) {
         val cx = x shr SHIFT
         val cy = y shr SHIFT
         val lx = x and (CHUNK - 1)
@@ -512,6 +535,9 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             wakeHeat(x, y)
         }
 
+        // wet soil loosened by worms lets the water seep on down
+        if (f and SEEPING == SEEPING && mt.kind[m] == Kind.POWDER && mt.absorbs[m] > 0f) seep(x, y, i)
+
         // smoke thins out
         if (mt.lifetimeSteps[m] > 0) {
             val l = life[i] - 1
@@ -527,11 +553,41 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             Kind.POWDER -> movePowder(x, y, i, m)
             Kind.LIQUID -> moveLiquid(x, y, i, m)
             Kind.GAS -> moveGas(x, y, i, m)
+            Kind.LIFE -> if (mt.animal[m]) living.animal(x, y, i, m)
         }
     }
 
+    /** Wet, loosened soil passes its water on to dry soil below it: worm burrows let water seep in (2b). */
+    private fun seep(x: Int, y: Int, i: Int) {
+        if (y >= height - 1) return
+        val b = i + width
+        val q = mat[b].toInt()
+        if (kindOf[q] != Kind.POWDER || materials.absorbs[q] <= 0f || flags[b].toInt() and Flag.WET != 0) return
+        wake(x, y)
+        if (!chance(SEEP)) return
+        flags[b] = (flags[b].toInt() or Flag.WET).toByte()
+        flags[i] = (flags[i].toInt() and Flag.WET.inv()).toByte()
+        wake(x, y + 1)
+    }
+
+    /** Roots of a plant beside it or up to three cells above (grass, moss, vine, trunk) hold loose ground in place (2b). */
+    private fun rooted(x: Int, y: Int, i: Int): Boolean {
+        val r = materials.roots
+        val w = width
+        if ((x > 0 && r[mat[i - 1].toInt()]) || (x < w - 1 && r[mat[i + 1].toInt()])) return true
+        if (y > 0 && ((x > 0 && r[mat[i - w - 1].toInt()]) || (x < w - 1 && r[mat[i - w + 1].toInt()]))) return true
+        var j = i - w
+        var k = 0
+        while (k < 3 && j >= 0) {
+            if (r[mat[j].toInt()]) return true
+            j -= w
+            k++
+        }
+        return false
+    }
+
     /** A neighbour (4) that is salty: salt or salt water. */
-    private fun saltyNeighbour(x: Int, y: Int, i: Int): Boolean {
+    internal fun saltyNeighbour(x: Int, y: Int, i: Int): Boolean {
         val sa = materials.salty
         return (y > 0 && sa[mat[i - width].toInt()]) || (y < height - 1 && sa[mat[i + width].toInt()]) ||
             (x > 0 && sa[mat[i - 1].toInt()]) || (x < width - 1 && sa[mat[i + 1].toInt()])
@@ -705,17 +761,23 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         }
     }
 
-    private fun spawn(x: Int, y: Int, i: Int, m: Int, t: Float) {
+    internal fun spawn(x: Int, y: Int, i: Int, m: Int, t: Float) {
         if (kindOf[m] == Kind.SOLID || kindOf[mat[i].toInt()] == Kind.SOLID) structuresDirty = true
         mat[i] = m.toByte()
         temp[i] = t
         life[i] = initLife(m).toShort()
         variant[i] = next().toByte()
         flags[i] = (if (materials.spawnBurning[m]) Flag.BURNING else 0).toByte()
+        // a vine is planted as a growing tip
+        val g = materials.growSize[m]
+        if (g > 0) {
+            flags[i] = (flags[i].toInt() or Flag.MARK).toByte()
+            life[i] = g.toShort()
+        }
         wakeHeat(x, y)
     }
 
-    private fun clear(x: Int, y: Int, i: Int) {
+    internal fun clear(x: Int, y: Int, i: Int) {
         if (kindOf[mat[i].toInt()] == Kind.SOLID) structuresDirty = true
         mat[i] = AIR.toByte()
         temp[i] = ambient
@@ -725,7 +787,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     }
 
     /** The cell turns into [product] and keeps its temperature. */
-    private fun change(x: Int, y: Int, i: Int, product: Int) {
+    internal fun change(x: Int, y: Int, i: Int, product: Int) {
         if (kindOf[product] == Kind.SOLID || kindOf[mat[i].toInt()] == Kind.SOLID) structuresDirty = true
         mat[i] = product.toByte()
         life[i] = initLife(product).toShort()
@@ -735,7 +797,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         wakeHeat(x, y)
     }
 
-    private fun swap(i: Int, j: Int, x: Int, y: Int, x2: Int, y2: Int) {
+    internal fun swap(i: Int, j: Int, x: Int, y: Int, x2: Int, y2: Int) {
         val m = mat[i]; mat[i] = mat[j]; mat[j] = m
         val t = temp[i]; temp[i] = temp[j]; temp[j] = t
         val l = life[i]; life[i] = life[j]; life[j] = l
@@ -758,15 +820,18 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         flags[i] = ((flags[i].toInt() and Flag.VEL_MASK.inv()) or (v shl Flag.VEL_SHIFT)).toByte()
     }
 
-    /** Can a falling or flowing particle of [m] take the place of [q]? Only gases and lighter liquids give way. */
+    /**
+     * Can a falling or flowing particle of [m] take the place of [q]? Only gases, lighter liquids and lighter
+     * animals give way.
+     */
     private fun yields(m: Int, q: Int): Boolean {
         if (q == AIR) return true
         val k = kindOf[q]
-        return (k == Kind.GAS || k == Kind.LIQUID) && densityOf[q] < densityOf[m]
+        return (k == Kind.GAS || k == Kind.LIQUID || materials.animal[q]) && densityOf[q] < densityOf[m]
     }
 
     /** Falls up to 1 + speed / 2 cells through air and gases; a liquid below slows it down. Returns whether it moved. */
-    private fun fall(x: Int, y: Int, i: Int, m: Int): Boolean {
+    internal fun fall(x: Int, y: Int, i: Int, m: Int): Boolean {
         if (y >= height - 1) return false
         val w = width
         val below = i + w
@@ -804,6 +869,8 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         if (y >= height - 1) return
         val fr = if (flags[i].toInt() and Flag.WET != 0) materials.wetFriction[m] else materials.friction[m]
         if (chance(fr)) return
+        // roots hold the soil, wet or dry; turf holds itself
+        if (materials.roots[m] || (materials.erodes[m] && rooted(x, y, i))) return
         val d = if (coin()) 1 else -1
         if (slide(x, y, i, m, d)) return
         slide(x, y, i, m, -d)
@@ -907,6 +974,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         val g = mat[b].toInt()
         if (!materials.erodes[g]) return
         if (!chance(ERODE * (1f - materials.hardness[g]))) return
+        if (rooted(x, by, b)) return
         val nx = x + d
         if (nx < 0 || nx >= width) return
         val c = b + d
@@ -991,6 +1059,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         for (i in 0 until size) {
             if (owner[i] != 0 || kindOf[mat[i].toInt()] != Kind.SOLID) continue
             id++
+            looseOf[id] = -1
             var count = 0
             var falling = false
             var mass = 0f
@@ -1017,6 +1086,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
                 // bottom cells first, so each falls into the place the one below has just left
                 cells.sort()
                 cells.reverse()
+                looseOf[id] = loose.size
                 loose += cells
                 looseDensity += mass / count
             }
@@ -1075,10 +1145,55 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             if (q == AIR) continue
             val k = kindOf[q]
             if (k == Kind.GAS) continue
-            if (k == Kind.LIQUID && densityOf[q] < density) continue
+            if ((k == Kind.LIQUID || materials.animal[q]) && densityOf[q] < density) continue
             return false
         }
         return true
+    }
+
+    /**
+     * A plant grows a new solid cell [j] (at x, y) out of cell [p] (2b). It belongs to the same structure at
+     * once: a growing tree needs no new search for structures, unless it grows into anchored ground or into
+     * another structure.
+     */
+    internal fun growSolid(p: Int, x: Int, y: Int, j: Int, m: Int) {
+        mat[j] = m.toByte()
+        life[j] = 0
+        variant[j] = next().toByte()
+        flags[j] = 0
+        stamp[j] = mark
+        wakeHeat(x, y)
+        if (structuresDirty) return
+        val id = owner[p]
+        if (id == 0 || kindOf[mat[p].toInt()] != Kind.SOLID) {
+            structuresDirty = true
+            return
+        }
+        owner[j] = id
+        val w = width
+        if ((x > 0 && joins(j - 1, id)) || (x < w - 1 && joins(j + 1, id)) || (y > 0 && joins(j - w, id)) || (y < height - 1 && joins(j + w, id))) {
+            structuresDirty = true
+            return
+        }
+        val li = looseOf[id]
+        if (li < 0) return
+        // the cells of a loose structure stay ordered bottom first, the way it falls
+        val cells = loose[li]
+        val n = cells.size
+        var k = 0
+        while (k < n && cells[k] > j) k++
+        val grown = IntArray(n + 1)
+        cells.copyInto(grown, 0, 0, k)
+        grown[k] = j
+        cells.copyInto(grown, k + 1, k, n)
+        loose[li] = grown
+        looseDensity[li] = (looseDensity[li] * n + densityOf[m]) / (n + 1)
+    }
+
+    /** Cell [n] is anchored ground or part of another structure than [id]. */
+    private fun joins(n: Int, id: Int): Boolean {
+        val q = mat[n].toInt()
+        return (kindOf[q] == Kind.SOLID && owner[n] != id) || materials.anchored[q] || (flags[n].toInt() and Flag.ANCHORED) != 0
     }
 
     /** Moves the structure down by one cell; whatever was below it rises to the top of each column. */
@@ -1114,11 +1229,15 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         internal val pending: BooleanArray,
         internal val heatPending: BooleanArray,
         internal val placed: IntArray,
+        internal val light: FloatArray,
     ) {
-        val bytes: Int get() = mat.size * 9
+        val bytes: Int get() = mat.size * 9 + light.size * 4
     }
 
-    fun snapshot() = Snapshot(step, mat.copyOf(), temp.copyOf(), life.copyOf(), variant.copyOf(), flags.copyOf(), rng, pending.copyOf(), heatPending.copyOf(), placed.copyOf())
+    fun snapshot() = Snapshot(
+        step, mat.copyOf(), temp.copyOf(), life.copyOf(), variant.copyOf(), flags.copyOf(), rng, pending.copyOf(),
+        heatPending.copyOf(), placed.copyOf(), light.level.copyOf(),
+    )
 
     fun restore(s: Snapshot) {
         s.mat.copyInto(mat)
@@ -1129,6 +1248,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         s.pending.copyInto(pending)
         s.heatPending.copyInto(heatPending)
         s.placed.copyInto(placed)
+        s.light.copyInto(light.level)
         stamp.fill(0)
         rng = s.rng
         step = s.step
@@ -1186,6 +1306,11 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         private const val DRY_TEMP = 100f
         private const val DRY_CHANCE = 0.04f
         private const val DRY_COOLING = 15f
+
+        /** Light is worked out anew every this many steps. */
+        const val LIGHT_EVERY = 8
+        private const val SEEP = 0.08f
+        private const val SEEPING = Flag.WET or Flag.MARK
 
         private fun seedState(seed: Long): Int {
             val s = (seed xor (seed ushr 32)).toInt() xor 0x5DEECE66.toInt()

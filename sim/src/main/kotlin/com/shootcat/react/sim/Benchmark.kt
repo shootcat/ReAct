@@ -51,6 +51,28 @@ object Benchmark {
         return world
     }
 
+    /**
+     * Like [fullWorld], every chunk awake, with plants and animals mixed in (2b): grass, seeds, moss,
+     * leaves and vines grow and burn, fish, fireflies, worms and birds move, and the light is worked out.
+     */
+    fun livingWorld(materials: MaterialTable, width: Int, height: Int): World {
+        val world = World(width, height, materials, 4L)
+        val n = Noise(5L)
+        val table = listOf(
+            0.18f to "sand", 0.36f to "water", 0.42f to "earth", 0.44f to "lava", 0.47f to "wood", 0.50f to "fire",
+            0.52f to "steam", 0.56f to "grass", 0.58f to "seed", 0.60f to "moss", 0.62f to "leaves", 0.63f to "vine",
+            0.645f to "fish", 0.66f to "firefly", 0.67f to "worm", 0.68f to "bird",
+        ).map { (p, id) -> p to materials.id(id) }
+        for (y in 0 until height) for (x in 0 until width) {
+            val r = n.hash(x, y)
+            val m = table.firstOrNull { r < it.first }?.second ?: continue
+            world.set(x, y, m)
+            if (r < 0.42f && r >= 0.36f) world.setWet(x, y, true)
+        }
+        world.keepAllAwake = true
+        return world
+    }
+
     fun sandboxWorld(materials: MaterialTable, width: Int, height: Int): World {
         val world = World(width, height, materials, Terrain.SEED)
         Terrain.sandbox(world)
@@ -64,7 +86,8 @@ object Benchmark {
         return world
     }
 
-    fun measure(name: String, world: World, steps: Int, warmup: Int = 60): Result {
+    /** Measures [steps] steps after [warmup] steps, so the just-in-time compiler has settled (on the phone as well). */
+    fun measure(name: String, world: World, steps: Int, warmup: Int = 300): Result {
         world.run(warmup)
         var awake = 0
         val t0 = System.nanoTime()
@@ -77,13 +100,17 @@ object Benchmark {
         return Result(name, steps, steps / secs, ns / 1e6 / steps, awake / steps, world.chunksX * world.chunksY)
     }
 
-    /** Milliseconds to turn the world into a picture once. */
-    fun renderMillis(world: World, frames: Int = 60): Double {
+    /**
+     * Milliseconds to turn the world into a picture once, while it runs (with the light the simulation has
+     * worked out) or, with [paused], working out the light for the picture itself.
+     */
+    fun renderMillis(world: World, frames: Int = 60, paused: Boolean = false): Double {
         val renderer = Renderer(world, IntArray(world.size))
         val out = IntArray(world.size)
-        repeat(10) { renderer.render(out, it) }
+        if (world.step == 0) world.step()
+        repeat(60) { renderer.render(out, it, running = !paused) }
         val t0 = System.nanoTime()
-        repeat(frames) { renderer.render(out, it) }
+        repeat(frames) { renderer.render(out, it, running = !paused) }
         return (System.nanoTime() - t0) / 1e6 / frames
     }
 
@@ -91,10 +118,11 @@ object Benchmark {
         measure("Leere Welt", emptyWorld(materials, width, height), steps),
         measure("Leere Welt, alle Chunks wach", emptyWorld(materials, width, height).also { it.keepAllAwake = true }, steps),
         measure("Voll aktive Welt (alle Chunks wach)", fullWorld(materials, width, height), steps),
+        measure("Voll aktive Welt mit Pflanzen, Tieren und Licht", livingWorld(materials, width, height), steps),
         measure("Spielplatz mit Feuer, Sand und Wasser", sandboxWorld(materials, width, height), steps),
     )
 
-    fun report(results: List<Result>, renderMs: Double?, device: String): String = buildString {
+    fun report(results: List<Result>, renderMs: Double?, device: String, pausedRenderMs: Double? = null): String = buildString {
         appendLine("Gerät: $device")
         for (r in results) {
             appendLine(
@@ -103,5 +131,6 @@ object Benchmark {
             )
         }
         if (renderMs != null) appendLine("Bild erzeugen: %.2f ms".format(renderMs))
+        if (pausedRenderMs != null) appendLine("Bild erzeugen in der Pause (eigenes Licht): %.2f ms".format(pausedRenderMs))
     }
 }

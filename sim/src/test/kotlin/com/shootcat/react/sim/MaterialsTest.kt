@@ -10,11 +10,13 @@ class MaterialsTest {
     private val materials = MaterialTable.load()
 
     @Test
-    fun `phase 1 and 2a materials are all there`() {
+    fun `the materials of phase 1, 2a and 2b are all there`() {
         for (id in listOf(
             "rock", "sand", "earth", "water", "wood", "fire", "smoke", "steam", "stone", "lava",
             "gravel", "clay", "ore", "ore_rubble", "salt", "saltwater", "ice", "snow", "glass", "metal", "molten_metal",
             "charcoal", "ember", "ash", "brick", "rubble",
+            "grass", "moss", "vine", "seed", "trunk", "deadwood", "leaves", "dead_plant",
+            "fish", "dead_fish", "firefly", "worm", "bird",
         )) {
             assertTrue(materials.idOrNull(id) != null, "$id is missing")
         }

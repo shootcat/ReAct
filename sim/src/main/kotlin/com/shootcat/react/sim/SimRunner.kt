@@ -173,7 +173,7 @@ class SimRunner(val session: Session, backdrop: IntArray) {
 
             val after = System.nanoTime()
             if (dirty && after - lastRender >= FRAME_NANOS) {
-                renderer.render(back.pixels, frameNumber++)
+                renderer.render(back.pixels, frameNumber++, running = speed != Speed.PAUSE)
                 renderer.renderLayers(back.haze, back.light)
                 renderer.renderFlames(back.flames)
                 synchronized(lock) {

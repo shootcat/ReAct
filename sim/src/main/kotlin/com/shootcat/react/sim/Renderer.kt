@@ -18,6 +18,32 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
     private val smoke = mt.idOrNull("smoke") ?: -1
     private val glass = mt.idOrNull("glass") ?: -1
     private val steam = mt.idOrNull("steam") ?: -1
+    private val grass = mt.idOrNull("grass") ?: -1
+    private val fish = mt.idOrNull("fish") ?: -1
+    private val bird = mt.idOrNull("bird") ?: -1
+    private val firefly = mt.idOrNull("firefly") ?: -1
+
+    /**
+     * Light for drawing (2b). While the world runs, the field the simulation works out every few steps is
+     * used; while it is paused (and before the first step) the picture works out its own, so whatever is
+     * placed lights up at once.
+     */
+    private val ownLight = Light(world)
+    private var light = ownLight
+
+    /** Without lighting everything is drawn at full brightness (overviews of the materials). */
+    var lit = true
+
+    /** Brightness per block of the light field, and per cell, smoothly in between. */
+    private val factor = FloatArray(light.width * light.height)
+    private val shadeRows = FloatArray(light.height * world.width)
+    private val shade = FloatArray(world.size)
+    private val blockX = IntArray(world.width) { x -> lattice(x, light.width).first }
+    private val blockTx = FloatArray(world.width) { x -> lattice(x, light.width).second }
+
+    /** Fish and birds seen while drawing: tails and wings are added afterwards. */
+    private var critters = IntArray(64)
+    private var critterCount = 0
 
     /** Glowing melts drawn by their temperature: lava, molten metal. */
     private val glowingLiquid = BooleanArray(mt.count) { mt.kind[it] == Kind.LIQUID && mt.emitsLight[it] > 0f }
@@ -57,7 +83,45 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
         }
     }
 
-    fun render(out: IntArray, frame: Int) {
+    /** Works out how bright each cell is from the light field: dark caves, lit surroundings of fire. */
+    private fun computeShade(running: Boolean) {
+        if (!lit) {
+            factor.fill(1f)
+            shade.fill(1f)
+            return
+        }
+        light = if (running && world.step > 0) world.light else ownLight.also { it.compute() }
+        for (b in factor.indices) {
+            // the eye sees shade brighter than the bare amount of light: 1 - (1 - l)²; darkness stays dark
+            val l = 1f - minOf(1f, light.shown(b))
+            factor[b] = AMBIENT + (1f - AMBIENT) * (1f - l * l)
+        }
+        val w = world.width
+        val lw = light.width
+        val lh = light.height
+        for (by in 0 until lh) {
+            val r = by * lw
+            val o = by * w
+            for (x in 0 until w) {
+                val a = factor[r + blockX[x]]
+                val b = factor[r + minOf(blockX[x] + 1, lw - 1)]
+                shadeRows[o + x] = a + (b - a) * blockTx[x]
+            }
+        }
+        for (y in 0 until world.height) {
+            val (y0, t) = lattice(y, lh)
+            val ra = y0 * w
+            val rb = minOf(y0 + 1, lh - 1) * w
+            val o = y * w
+            for (x in 0 until w) {
+                val a = shadeRows[ra + x]
+                shade[o + x] = a + (shadeRows[rb + x] - a) * t
+            }
+        }
+    }
+
+    /** Draws the world into [out]; [running] says the simulation is stepping, so its own light field is fresh. */
+    fun render(out: IntArray, frame: Int, running: Boolean = false) {
         val w = world.width
         val size = world.size
         val mat = world.mat
@@ -65,6 +129,8 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
         val flags = world.flags
         val variant = world.variant
         val life = world.life
+        computeShade(running)
+        critterCount = 0
         depth.fill(0)
         var x = -1
         for (i in 0 until size) {
@@ -72,18 +138,26 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
             if (x == w) x = 0
             val m = mat[i].toInt()
             if (clearLiquid[m]) depth[x]++ else depth[x] = 0
+            val s = shade[i]
             if (m == AIR) {
+                val bg = if (s < 0.995f) darken(backdrop[i], s) else backdrop[i]
                 // gaps inside falling water or a flame are drawn filled, so streams and flames hold together
                 val up = if (i >= w) mat[i - w].toInt() else AIR
-                out[i] = if ((clearLiquid[up] || up == fire) && i < size - w && mat[i + w].toInt() == up) {
-                    if (up == fire) mix(flameRamp[FLAME_STEPS / 3], backdrop[i], 0.5f) else mix(palette[up * SHADES + 8], backdrop[i], 0.35f)
+                val down = if (i < size - w) mat[i + w].toInt() else AIR
+                out[i] = if ((clearLiquid[up] || up == fire) && down == up) {
+                    if (up == fire) mix(flameRamp[FLAME_STEPS / 3], bg, 0.5f) else mix(scale(palette[up * SHADES + 8], s), bg, 0.35f)
+                } else if (down == grass && (variant[i + w].toInt() and 3) != 0) {
+                    // blades of grass stick up into the air
+                    mix(scale(palette[grass * SHADES + (variant[i + w].toInt() and (SHADES - 1))], 1.15f * s), bg, 0.35f)
                 } else {
-                    backdrop[i]
+                    bg
                 }
                 continue
             }
             val v = variant[i].toInt() and 0xFF
             var c = palette[m * SHADES + (v and (SHADES - 1))]
+            val see = mt.opacity[m] < 1f || m == firefly
+            val bg = if (!see) 0 else if (s < 0.995f) darken(backdrop[i], s) else backdrop[i]
             val f = flags[i].toInt()
             val t = temp[i]
             if (clearLiquid[m]) {
@@ -92,7 +166,7 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
                 c = when {
                     d == 1 -> scale(c, 1.32f + 0.12f * wave((x * 3 + (frame shr 1)) and 63))
                     d == 2 -> scale(c, 1.12f)
-                    else -> scale(c, 1f - minOf(d, 48) * 0.009f)
+                    else -> scale(c, 1f - minOf(d, 48) * 0.005f)
                 }
             } else when (mt.pattern[m]) {
                 Pattern.PLANKS -> {
@@ -142,13 +216,22 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
                     val flick = ((v * 13 + frame * 5) and 15) / 15f
                     val heat = (n * 0.17f + age * 0.35f + flick * 0.22f).coerceIn(0f, 1f)
                     c = flameRamp[(heat * (FLAME_STEPS - 1)).toInt()]
-                    out[i] = mix(c, backdrop[i], if (n <= 1) 0.3f else 0.05f)
+                    out[i] = mix(c, bg, if (n <= 1) 0.3f else 0.05f)
                     continue
                 }
                 smoke -> {
                     val fade = (life[i] / 90f).coerceIn(0f, 1f)
-                    out[i] = mix(c, backdrop[i], 1f - mt.opacity[m] * fade)
+                    out[i] = mix(scale(c, s), bg, 1f - mt.opacity[m] * fade)
                     continue
+                }
+                firefly -> {
+                    // a soft blinking glow
+                    out[i] = if (((v * 7 + frame) and 63) < 44) c else mix(c, bg, 0.55f)
+                    continue
+                }
+                fish, bird -> {
+                    if (critterCount == critters.size) critters = critters.copyOf(critterCount * 2)
+                    critters[critterCount++] = i
                 }
             }
             if (f and Flag.WET != 0) c = scale(c, 0.68f)
@@ -160,8 +243,44 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
                 val k = ((t - GLOW_FROM) / 650f).coerceIn(0f, 0.9f)
                 c = mix(glowAt(t), c, k)
             }
+            // light of its own (fire, embers, lava, glowing heat) is not darkened; the cut face of solid ground
+            // is always shown, darker away from the light, while air, water and glass show the real light
+            if (s < 0.995f && mt.glow[m] == 0f && f and Flag.BURNING == 0 && t < GLOW_FROM) {
+                c = darken(c, if (mt.lightPass[m] == 0f && s < CUT_FACE) CUT_FACE else s)
+            }
             val a = mt.opacity[m]
-            out[i] = if (a >= 1f) c else if (m == glass && ((v and 15) == 0)) scale(mix(c, backdrop[i], 1f - a), 1.3f) else mix(c, backdrop[i], 1f - a)
+            out[i] = if (a >= 1f) c else if (m == glass && ((v and 15) == 0)) scale(mix(c, bg, 1f - a), 1.3f) else mix(c, bg, 1f - a)
+        }
+        drawCritters(out, frame)
+    }
+
+    /** A tail behind each fish, wings on each bird (flapping while it flies), drawn into the air or water around them. */
+    private fun drawCritters(out: IntArray, frame: Int) {
+        val w = world.width
+        val mat = world.mat
+        val flags = world.flags
+        for (k in 0 until critterCount) {
+            val i = critters[k]
+            val x = i % w
+            val m = mat[i].toInt()
+            val f = flags[i].toInt()
+            val c = out[i]
+            if (m == fish) {
+                val j = if (f and Flag.MARK != 0) i - 1 else i + 1
+                val tx = if (f and Flag.MARK != 0) x - 1 else x + 1
+                if (tx in 0 until w && clearLiquid[mat[j].toInt()]) out[j] = mix(scale(c, 0.8f), out[j], 0.35f)
+            } else if (f and Flag.MARK != 0) {
+                // flying: wings up and down in turn
+                val up = ((frame shr 2) + i) and 1 == 0
+                val row = if (up) i - w else i
+                if (row >= 0) {
+                    if (x > 0 && mat[row - 1].toInt() == AIR) out[row - 1] = c
+                    if (x < w - 1 && mat[row + 1].toInt() == AIR) out[row + 1] = c
+                }
+            } else if (i >= w && mat[i - w].toInt() == AIR) {
+                // sitting: a head above the body
+                out[i - w] = scale(c, 1.25f)
+            }
         }
     }
 
@@ -187,6 +306,7 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
         smokeSum.fill(0f)
         steamSum.fill(0f)
         lightSum.fill(0f)
+        val animal = mt.animal
         for (y in 0 until world.height) {
             val row = (y / BLOCK) * layerWidth
             var i = y * w
@@ -197,7 +317,8 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
                     if (m == smoke) smokeSum[b] += (life[i] / 90f).coerceAtMost(1f)
                     else if (m == steam) steamSum[b] += 1f
                     val e = mt.emitsLight[m]
-                    if (e > 0f && (!mt.flammable[m] || mt.kind[m] == Kind.GAS || flags[i].toInt() and Flag.BURNING != 0)) lightSum[b] += e
+                    // the warm glow of fire and heat; fireflies light up their surroundings through the light field only
+                    if (e > 0f && !animal[m] && (!mt.flammable[m] || mt.kind[m] == Kind.GAS || flags[i].toInt() and Flag.BURNING != 0)) lightSum[b] += e
                     else if (flags[i].toInt() and Flag.BURNING != 0) lightSum[b] += 0.5f
                 }
                 i++
@@ -213,7 +334,10 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
             val st = steamSum[b]
             val total = sm + st
             haze[b] = if (total <= 0.2f) 0 else {
-                val c = mix(smokeColor or OPAQUE, steamColor or OPAQUE, st / total)
+                // smoke in a dark cave is dark too
+                val lx = minOf((b % layerWidth) * 2 + 1, this.light.width - 1)
+                val ly = minOf((b / layerWidth) * 2 + 1, this.light.height - 1)
+                val c = scale(mix(smokeColor or OPAQUE, steamColor or OPAQUE, st / total), factor[ly * this.light.width + lx])
                 val a = (minOf(0.8f, total * 0.03f) * 255f).toInt()
                 (a shl 24) or (c and 0xFFFFFF)
             }
@@ -284,6 +408,20 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
     }
 
     companion object {
+        /** Brightness in total darkness. */
+        private const val AMBIENT = 0.05f
+
+        /** The least brightness of solid ground in the dark, so the ground stays readable as a cut. */
+        private const val CUT_FACE = 0.58f
+
+        /** Where cell [p] lies between the centres of blocks of 2 cells: the block left of it and how far on. */
+        private fun lattice(p: Int, blocks: Int): Pair<Int, Float> {
+            val f = (p - 0.5f) / 2f
+            if (f <= 0f) return 0 to 0f
+            val b = f.toInt()
+            return if (b >= blocks - 1) (blocks - 1) to 0f else b to (f - b)
+        }
+
         const val SHADES = 16
         private const val FLAME_STEPS = 32
         const val BLOCK = 4
@@ -292,6 +430,15 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
         private const val GLOW_FROM = 450f
         private const val GLOW_TO = 1400f
         const val OPAQUE = 0xFF000000.toInt()
+
+        /** [c] darkened to [f] (0..1) of its brightness. */
+        fun darken(c: Int, f: Float): Int {
+            val k = (f * 256f).toInt()
+            val r = (((c shr 16) and 0xFF) * k) shr 8
+            val g = (((c shr 8) and 0xFF) * k) shr 8
+            val b = ((c and 0xFF) * k) shr 8
+            return OPAQUE or (r shl 16) or (g shl 8) or b
+        }
 
         fun scale(c: Int, f: Float): Int {
             val r = (((c shr 16) and 0xFF) * f).toInt().coerceIn(0, 255)

@@ -38,6 +38,8 @@ class MaterialPicturesTest {
             "sand", "earth", "clay", "salt", "snow", "ice",
             "water", "saltwater", "lava", "molten_metal", "wood", "brick",
             "glass", "metal", "charcoal", "ember", "ash", "fire",
+            "grass", "moss", "vine", "seed", "trunk", "leaves",
+            "deadwood", "dead_plant", "fish", "firefly", "worm", "bird",
         )
         val cols = 6
         val cell = 14
@@ -49,6 +51,31 @@ class MaterialPicturesTest {
             for (y in y0 + 1 until y0 + cell - 1) for (x in x0 + 1 until x0 + cell - 1) world.set(x, y, m)
         }
         // no stepping: everything stays where it was put, only drawn
-        Pictures.write(world, IntArray(world.size) { 0xFF1A2230.toInt() }, "materials", scale = 6)
+        Pictures.write(world, IntArray(world.size) { 0xFF1A2230.toInt() }, "materials", scale = 6, lit = false)
+    }
+}
+
+/** Plants, animals and light in the sandbox (2b), for the report. */
+class LifePicturesTest {
+    @Test
+    fun `life in the sandbox`() {
+        val materials = MaterialTable.load()
+        val s = Session(materials, Terrain.WIDTH, Terrain.HEIGHT, Terrain.SEED) { Terrain.sandbox(it) }
+        val backdrop = Backdrop.of(s.world)
+        repeat(60) { s.tick() }
+        Pictures.write(s.world, backdrop, "life_grotto", scale = 6, area = intArrayOf(10, 192, 80, 232))
+        Pictures.write(s.world, backdrop, "life_hill", scale = 5, area = intArrayOf(0, 90, 110, 170))
+        // a minute later: grass on the damp ground, the vine at the pond, seeds sprouting
+        s.press(40, 100, materials.id("seed"), 3); repeat(30) { s.tick() }; s.release()
+        repeat(3600) { s.tick() }
+        Pictures.write(s.world, backdrop, "life_minute", scale = 5, area = intArrayOf(0, 90, 110, 170))
+        val birds = s.world.count(materials.id("bird"))
+        // fire in the tree on the slope: the birds fly off, the trunk burns through, the top falls
+        s.press(58, 130, materials.id("fire"), 3); repeat(20) { s.tick() }; s.release()
+        repeat(150) { s.tick() }
+        Pictures.write(s.world, backdrop, "life_fire", scale = 5, area = intArrayOf(0, 90, 110, 170), frame = 1)
+        repeat(900) { s.tick() }
+        Pictures.write(s.world, backdrop, "life_after_fire", scale = 5, area = intArrayOf(0, 90, 110, 170), frame = 2)
+        assertTrue(s.world.count(materials.id("bird")) < birds, "birds flew off")
     }
 }

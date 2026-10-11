@@ -12,7 +12,9 @@
       "burn_heat": "Wärme, die eine brennende Zelle pro Schritt abgibt (Grad bei Wärmekapazität 1)",
       "lifetime": "Rauch verfliegt nach oben aus der Welt; im geschlossenen Raum hält er sich lange, so erstickt dort das Feuer",
       "salt_melt_temp": "Schmelzpunkt, solange Salziges (Salz, Salzwasser) daneben liegt: Salz lässt Eis und Schnee ohne Wärme schmelzen",
-      "pattern": "Darstellung fester Stoffe: planks, brick, masonry, sheen; speckle_color und speckle für Einschlüsse (Erz)"
+      "pattern": "Darstellung fester Stoffe: planks, brick, masonry, sheen; speckle_color und speckle für Einschlüsse (Erz)",
+      "light": "emits_light und light_pass 0 bis 1: eigenes Licht; Anteil des Lichts, den eine Zelle durchlässt (ohne Angabe 0 bei blocks_light, sonst 1)",
+      "life": "organism: Verhalten (grass, moss, vine, seed, tree, leaf, fish, firefly, worm, bird); light_need, light_max: Licht zum Wachsen; grow: Wahrscheinlichkeit pro Zufallstick (etwa einmal pro Sekunde und Zelle); move: Wahrscheinlichkeit pro Schritt, sich zu bewegen; dies_above: Temperatur, über der es stirbt"
   },
   "ambient": 20,
   "materials": [
@@ -147,7 +149,7 @@
       "conductivity": 0.3, "heat_capacity": 4.2, "hardness": 0, "erodes_in_water": false,
       "dissolves_in": null, "dissolved_product": null, "wets": true,
       "spread": 8, "reach": 40,
-      "bucketable": true, "grabbable": false, "emits_light": 0, "blocks_light": false,
+      "bucketable": true, "grabbable": false, "emits_light": 0, "blocks_light": false, "light_pass": 0.985,
       "color": "#2f6fc4", "color_variance": 0.025, "opacity": 0.85, "cost": 1
     },
     {
@@ -158,7 +160,7 @@
       "conductivity": 0.3, "heat_capacity": 4.0, "hardness": 0, "erodes_in_water": false,
       "dissolves_in": null, "dissolved_product": null, "salty": true, "wets": true,
       "spread": 8, "reach": 40,
-      "bucketable": true, "grabbable": false, "emits_light": 0, "blocks_light": false,
+      "bucketable": true, "grabbable": false, "emits_light": 0, "blocks_light": false, "light_pass": 0.98,
       "color": "#2a7a92", "color_variance": 0.025, "opacity": 0.85, "cost": 1
     },
     {
@@ -169,7 +171,7 @@
       "conductivity": 0.4, "heat_capacity": 2.0, "hardness": 0.6, "erodes_in_water": false,
       "dissolves_in": null, "dissolved_product": null,
       "temp": -10,
-      "bucketable": false, "grabbable": true, "emits_light": 0, "blocks_light": false,
+      "bucketable": false, "grabbable": true, "emits_light": 0, "blocks_light": false, "light_pass": 0.95,
       "color": "#bde3f2", "color_variance": 0.05, "opacity": 0.8, "cost": 1
     },
     {
@@ -197,7 +199,7 @@
       "wet_blocks_burning": false, "absorbs": 0,
       "conductivity": 0.2, "heat_capacity": 1.9, "hardness": 0.7, "erodes_in_water": false,
       "dissolves_in": null, "dissolved_product": null,
-      "bucketable": false, "grabbable": true, "emits_light": 0, "blocks_light": false,
+      "bucketable": false, "grabbable": true, "emits_light": 0, "blocks_light": false, "light_pass": 0.99,
       "color": "#bfe3ea", "color_variance": 0.04, "opacity": 0.4, "cost": 3
     },
     {
@@ -268,7 +270,7 @@
       "conductivity": 0.03, "heat_capacity": 0.05, "hardness": 0, "erodes_in_water": false,
       "dissolves_in": null, "dissolved_product": null,
       "lifetime": 60, "decay_product": "air",
-      "bucketable": false, "grabbable": false, "emits_light": 0, "blocks_light": false,
+      "bucketable": false, "grabbable": false, "emits_light": 0, "blocks_light": false, "light_pass": 0.85,
       "color": "#4d4a48", "color_variance": 0.1, "opacity": 0.7, "cost": 0
     },
     {
@@ -279,7 +281,7 @@
       "conductivity": 0.05, "heat_capacity": 0.4, "hardness": 0, "erodes_in_water": false,
       "dissolves_in": null, "dissolved_product": null,
       "temp": 130,
-      "bucketable": false, "grabbable": false, "emits_light": 0, "blocks_light": false,
+      "bucketable": false, "grabbable": false, "emits_light": 0, "blocks_light": false, "light_pass": 0.93,
       "color": "#dde6ee", "color_variance": 0.05, "opacity": 0.55, "cost": 1
     },
     {
@@ -292,6 +294,148 @@
       "spread": 1, "reach": 6, "viscosity": 0.8, "temp": 1250,
       "bucketable": false, "grabbable": false, "emits_light": 0.8, "blocks_light": true,
       "color": "#ff6a12", "color_variance": 0.16, "cost": 5
+    },
+    {
+      "id": "grass", "name": "Gras", "kind": "powder", "density": 1300, "anchored": false,
+      "flammable": true, "ignite_temp": 230, "burn_time": 0.7, "burn_temp": 650, "burn_heat": 30, "flame": 0.7, "smoke": 0.02,
+      "burn_product": "earth", "residue": 1.0, "wet_blocks_burning": true, "absorbs": 0.02,
+      "conductivity": 0.12, "heat_capacity": 1.5, "hardness": 0.4, "erodes_in_water": false,
+      "dissolves_in": null, "dissolved_product": null,
+      "friction": 0.97, "wet_friction": 0.9,
+      "organism": "grass", "grows_on": "earth", "light_need": 0.45, "grow": 0.5,
+      "dies_above": 70, "dies_in_salt": true, "death_product": "earth", "roots": true,
+      "bucketable": true, "grabbable": false, "emits_light": 0, "blocks_light": true,
+      "color": "#4f9a34", "color_variance": 0.2, "cost": 1
+    },
+    {
+      "id": "moss", "name": "Moos", "kind": "life", "density": 400, "anchored": false,
+      "flammable": true, "ignite_temp": 260, "burn_time": 1.0, "burn_temp": 600, "burn_heat": 25, "flame": 0.5, "smoke": 0.03,
+      "burn_product": "ash", "residue": 0.3, "wet_blocks_burning": true, "absorbs": 0.03,
+      "conductivity": 0.08, "heat_capacity": 1.2, "hardness": 0.1, "erodes_in_water": false,
+      "dissolves_in": null, "dissolved_product": null,
+      "organism": "moss", "light_max": 0.2, "grow": 0.3,
+      "dies_above": 60, "dies_in_salt": true, "death_product": "dead_plant", "roots": true,
+      "bucketable": false, "grabbable": false, "emits_light": 0, "blocks_light": false, "light_pass": 0.6,
+      "color": "#3e6e2a", "color_variance": 0.22, "cost": 1
+    },
+    {
+      "id": "vine", "name": "Ranke", "kind": "solid", "density": 600, "anchored": false,
+      "flammable": true, "ignite_temp": 270, "burn_time": 2.0, "burn_temp": 650, "burn_heat": 30, "flame": 0.6, "smoke": 0.02,
+      "burn_product": "ash", "residue": 0.2, "wet_blocks_burning": true, "absorbs": 0.01,
+      "conductivity": 0.08, "heat_capacity": 1.3, "hardness": 0.3, "erodes_in_water": false,
+      "dissolves_in": null, "dissolved_product": null,
+      "organism": "vine", "light_need": 0.25, "grow": 0.8, "grow_size": 64,
+      "dies_above": 70, "dies_in_salt": true, "death_product": "dead_plant", "roots": true,
+      "bucketable": false, "grabbable": false, "emits_light": 0, "blocks_light": false, "light_pass": 0.6,
+      "color": "#3c7a2b", "color_variance": 0.16, "speckle_color": "#74b04e", "speckle": 0.25, "cost": 2
+    },
+    {
+      "id": "seed", "name": "Samen", "kind": "powder", "density": 700, "anchored": false,
+      "flammable": true, "ignite_temp": 250, "burn_time": 0.5, "burn_temp": 600, "burn_heat": 20,
+      "burn_product": "ash", "residue": 0.5, "wet_blocks_burning": false, "absorbs": 0,
+      "conductivity": 0.08, "heat_capacity": 1.2, "hardness": 0.2, "erodes_in_water": false,
+      "dissolves_in": null, "dissolved_product": null,
+      "friction": 0.3,
+      "organism": "seed", "grows_on": "earth", "light_need": 0.35, "grow": 0.15,
+      "dies_above": 70, "dies_in_salt": true, "death_product": "dead_plant",
+      "bucketable": true, "grabbable": false, "emits_light": 0, "blocks_light": true,
+      "color": "#a07a3a", "color_variance": 0.16, "cost": 1
+    },
+    {
+      "id": "trunk", "name": "Stamm", "kind": "solid", "density": 700, "anchored": false,
+      "flammable": true, "ignite_temp": 300, "burn_time": 6, "burn_temp": 750, "burn_heat": 45, "flame": 0.9, "smoke": 0.01,
+      "burn_product": "ash", "residue": 0.2, "quench_product": "charcoal", "wet_blocks_burning": true, "absorbs": 0.002,
+      "conductivity": 0.08, "heat_capacity": 1.3, "hardness": 0.6, "erodes_in_water": false,
+      "dissolves_in": null, "dissolved_product": null,
+      "organism": "tree", "light_need": 0.3, "grow": 0.6,
+      "dies_above": 150, "dies_in_salt": true, "death_product": "deadwood", "roots": true,
+      "bucketable": false, "grabbable": true, "emits_light": 0, "blocks_light": true,
+      "color": "#5f4229", "color_variance": 0.14, "speckle_color": "#3b281a", "speckle": 0.22, "cost": 2
+    },
+    {
+      "id": "deadwood", "name": "Totholz", "kind": "solid", "density": 600, "anchored": false,
+      "flammable": true, "ignite_temp": 270, "burn_time": 5, "burn_temp": 750, "burn_heat": 45, "flame": 0.9, "smoke": 0.01,
+      "burn_product": "ash", "residue": 0.2, "quench_product": "charcoal", "wet_blocks_burning": true, "absorbs": 0.004,
+      "conductivity": 0.08, "heat_capacity": 1.2, "hardness": 0.5, "erodes_in_water": false,
+      "dissolves_in": null, "dissolved_product": null,
+      "roots": true,
+      "bucketable": false, "grabbable": true, "emits_light": 0, "blocks_light": true,
+      "color": "#7d7064", "color_variance": 0.14, "speckle_color": "#5b5047", "speckle": 0.2, "cost": 2
+    },
+    {
+      "id": "leaves", "name": "Laub", "kind": "solid", "density": 300, "anchored": false,
+      "flammable": true, "ignite_temp": 240, "burn_time": 0.9, "burn_temp": 700, "burn_heat": 35, "flame": 0.8, "smoke": 0.04,
+      "burn_product": "ash", "residue": 0.1, "wet_blocks_burning": false, "absorbs": 0,
+      "conductivity": 0.06, "heat_capacity": 1.0, "hardness": 0.1, "erodes_in_water": false,
+      "dissolves_in": null, "dissolved_product": null,
+      "organism": "leaf",
+      "dies_above": 70, "dies_in_salt": true, "death_product": "dead_plant",
+      "bucketable": false, "grabbable": false, "emits_light": 0, "blocks_light": false, "light_pass": 0.75,
+      "color": "#3a7c2e", "color_variance": 0.24, "speckle_color": "#62a646", "speckle": 0.3, "cost": 1
+    },
+    {
+      "id": "dead_plant", "name": "Welkes", "kind": "powder", "density": 250, "anchored": false,
+      "flammable": true, "ignite_temp": 200, "burn_time": 0.6, "burn_temp": 650, "burn_heat": 30, "flame": 0.7, "smoke": 0.03,
+      "burn_product": "ash", "residue": 0.3, "wet_blocks_burning": false, "absorbs": 0.01,
+      "conductivity": 0.05, "heat_capacity": 1.0, "hardness": 0.0, "erodes_in_water": true,
+      "dissolves_in": null, "dissolved_product": null,
+      "friction": 0.7,
+      "bucketable": true, "grabbable": false, "emits_light": 0, "blocks_light": true,
+      "color": "#9b7b45", "color_variance": 0.2, "cost": 0
+    },
+    {
+      "id": "fish", "name": "Fisch", "kind": "life", "density": 1000, "anchored": false,
+      "flammable": false,
+      "wet_blocks_burning": false, "absorbs": 0,
+      "conductivity": 0.3, "heat_capacity": 3.5, "hardness": 0.1, "erodes_in_water": false,
+      "dissolves_in": null, "dissolved_product": null,
+      "organism": "fish", "lives_in": "water", "move": 0.3,
+      "dies_above": 38, "dies_in_salt": true, "death_product": "dead_fish",
+      "bucketable": false, "grabbable": false, "emits_light": 0, "blocks_light": false, "light_pass": 0.985,
+      "color": "#e0893a", "color_variance": 0.12, "cost": 2
+    },
+    {
+      "id": "dead_fish", "name": "Toter Fisch", "kind": "powder", "density": 980, "anchored": false,
+      "flammable": false,
+      "wet_blocks_burning": false, "absorbs": 0,
+      "conductivity": 0.3, "heat_capacity": 3.5, "hardness": 0.1, "erodes_in_water": false,
+      "dissolves_in": null, "dissolved_product": null,
+      "friction": 0.6, "lifetime": 40, "decay_product": "air",
+      "bucketable": true, "grabbable": false, "emits_light": 0, "blocks_light": true,
+      "color": "#cfc8b6", "color_variance": 0.08, "cost": 0
+    },
+    {
+      "id": "firefly", "name": "Glühwürmchen", "kind": "life", "density": 1.0, "anchored": false,
+      "flammable": false,
+      "wet_blocks_burning": false, "absorbs": 0,
+      "conductivity": 0.03, "heat_capacity": 0.5, "hardness": 0.0, "erodes_in_water": false,
+      "dissolves_in": null, "dissolved_product": null,
+      "organism": "firefly", "move": 0.35,
+      "dies_above": 50, "death_product": "air",
+      "bucketable": false, "grabbable": false, "emits_light": 0.35, "blocks_light": false,
+      "color": "#e6f77c", "color_variance": 0.08, "cost": 2
+    },
+    {
+      "id": "worm", "name": "Wurm", "kind": "life", "density": 1400, "anchored": false,
+      "flammable": false,
+      "wet_blocks_burning": false, "absorbs": 0,
+      "conductivity": 0.12, "heat_capacity": 1.5, "hardness": 0.1, "erodes_in_water": false,
+      "dissolves_in": null, "dissolved_product": null,
+      "organism": "worm", "lives_in": "earth", "move": 0.05,
+      "dies_above": 45, "dies_in_salt": true, "death_product": "earth",
+      "bucketable": false, "grabbable": false, "emits_light": 0, "blocks_light": true,
+      "color": "#c47c7a", "color_variance": 0.1, "cost": 2
+    },
+    {
+      "id": "bird", "name": "Vogel", "kind": "life", "density": 1.0, "anchored": false,
+      "flammable": false,
+      "wet_blocks_burning": false, "absorbs": 0,
+      "conductivity": 0.03, "heat_capacity": 0.5, "hardness": 0.0, "erodes_in_water": false,
+      "dissolves_in": null, "dissolved_product": null,
+      "organism": "bird", "move": 0.8,
+      "dies_above": 60, "death_product": "air",
+      "bucketable": false, "grabbable": false, "emits_light": 0, "blocks_light": false,
+      "color": "#2f2a2a", "color_variance": 0.12, "cost": 2
     }
   ]
 }
