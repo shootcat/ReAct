@@ -10,8 +10,12 @@ class MaterialsTest {
     private val materials = MaterialTable.load()
 
     @Test
-    fun `phase 1 materials are all there`() {
-        for (id in listOf("rock", "sand", "earth", "water", "wood", "fire", "smoke", "steam", "stone", "lava")) {
+    fun `phase 1 and 2a materials are all there`() {
+        for (id in listOf(
+            "rock", "sand", "earth", "water", "wood", "fire", "smoke", "steam", "stone", "lava",
+            "gravel", "clay", "ore", "ore_rubble", "salt", "saltwater", "ice", "snow", "glass", "metal", "molten_metal",
+            "charcoal", "ember", "ash", "brick", "rubble",
+        )) {
             assertTrue(materials.idOrNull(id) != null, "$id is missing")
         }
         assertEquals("air", materials.spec(0).id)
@@ -21,11 +25,18 @@ class MaterialsTest {
     fun `the file names the fields of the guide`() {
         val text = MaterialTable::class.java.getResourceAsStream("/materials.json")!!.bufferedReader().readText()
         for (field in listOf(
-            "kind", "density", "flammable", "ignite_temp", "burn_time", "burn_product", "quench_product", "melt_temp",
-            "melt_product", "boil_temp", "boil_product", "freeze_temp", "freeze_product", "conductivity", "heat_capacity",
-            "hardness", "erodes_in_water", "absorbs", "emits_light", "color", "color_variance", "cost",
+            "kind", "density", "anchored", "flammable", "ignite_temp", "burn_time", "burn_product", "quench_product",
+            "wet_blocks_burning", "absorbs", "melt_temp", "melt_product", "boil_temp", "boil_product", "freeze_temp",
+            "freeze_product", "conductivity", "heat_capacity", "hardness", "erodes_in_water", "dissolves_in",
+            "dissolved_product", "bucketable", "grabbable", "emits_light", "blocks_light", "color", "color_variance",
         )) assertTrue("\"$field\"" in text, "no material uses $field")
-        // dissolves_in / dissolved_product are read as well; salt (phase 2) is the first to need them
+        // every material states the fields that apply to all of them (Leitfaden V3, 6.3)
+        val blocks = text.substringAfter("\"materials\"").split("\"id\":").drop(1)
+        for (b in blocks) for (field in listOf(
+            "kind", "density", "anchored", "flammable", "wet_blocks_burning", "absorbs", "conductivity", "heat_capacity",
+            "hardness", "erodes_in_water", "dissolves_in", "dissolved_product", "bucketable", "grabbable", "emits_light",
+            "blocks_light", "color", "color_variance",
+        )) assertTrue("\"$field\"" in b, "${b.substringBefore(",")} has no $field")
     }
 
     @Test

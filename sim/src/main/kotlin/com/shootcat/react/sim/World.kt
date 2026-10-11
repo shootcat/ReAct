@@ -160,6 +160,41 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         return n
     }
 
+    /** A straight stroke from (x0, y0) to (x1, y1), [radius] thick: air along it becomes [material]. */
+    fun paintLine(material: Int, x0: Int, y0: Int, x1: Int, y1: Int, radius: Int): Int {
+        var n = 0
+        Shapes.line(x0, y0, x1, y1) { x, y -> n += paint(material, x, y, radius) }
+        return n
+    }
+
+    /** A rectangle between two corners, filled or as a frame [thickness] cells wide: air in it becomes [material]. */
+    fun paintRect(material: Int, x0: Int, y0: Int, x1: Int, y1: Int, frame: Boolean, thickness: Int): Int {
+        var n = 0
+        Shapes.rect(x0, y0, x1, y1, frame, thickness) { x, y ->
+            if (inside(x, y)) {
+                val i = y * width + x
+                if (mat[i].toInt() == AIR) {
+                    spawn(x, y, i, material, materials.spawnTemp[material])
+                    n++
+                }
+            }
+        }
+        placed[material] += n
+        return n
+    }
+
+    fun eraseLine(x0: Int, y0: Int, x1: Int, y1: Int, radius: Int): Int {
+        var n = 0
+        Shapes.line(x0, y0, x1, y1) { x, y -> n += erase(x, y, radius) }
+        return n
+    }
+
+    fun eraseRect(x0: Int, y0: Int, x1: Int, y1: Int, frame: Boolean, thickness: Int): Int {
+        var n = 0
+        Shapes.rect(x0, y0, x1, y1, frame, thickness) { x, y -> if (inside(x, y)) n += erase(x, y, 0) }
+        return n
+    }
+
     /** Turns everything inside the disc back into air (only the sandbox offers this). */
     fun erase(cx: Int, cy: Int, radius: Int): Int {
         var n = 0
@@ -442,7 +477,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         // fire (4.2: ignition is a temperature threshold, and burning needs air)
         if (f and Flag.BURNING != 0) {
             if (!burn(x, y, i, m)) return
-        } else if (mt.flammable[m] && temp[i] >= mt.igniteTemp[m] && (f and Flag.WET) == 0) {
+        } else if (mt.flammable[m] && temp[i] >= mt.igniteTemp[m] && ((f and Flag.WET) == 0 || !mt.wetBlocksBurning[m])) {
             if (oxygen(x, y, i) > 0) {
                 flags[i] = (f or Flag.BURNING).toByte()
                 life[i] = burnLife(m).toShort()
@@ -455,9 +490,12 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             }
         }
 
-        // phase changes, all at temperature thresholds
+        // salt dissolves in water and turns it salty
+        if (mt.dissolvesIn[m] >= 0 && dissolve(x, y, i, m)) return
+
+        // phase changes, all at temperature thresholds; salt next to ice or snow lowers its melting point
         val t = temp[i]
-        if (t >= mt.meltTemp[m]) {
+        if (t >= mt.meltTemp[m] || (t >= mt.saltMeltTemp[m] && saltyNeighbour(x, y, i))) {
             change(x, y, i, mt.meltProduct[m])
             events[Event.MELT]++
             return
@@ -490,6 +528,36 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             Kind.LIQUID -> moveLiquid(x, y, i, m)
             Kind.GAS -> moveGas(x, y, i, m)
         }
+    }
+
+    /** A neighbour (4) that is salty: salt or salt water. */
+    private fun saltyNeighbour(x: Int, y: Int, i: Int): Boolean {
+        val sa = materials.salty
+        return (y > 0 && sa[mat[i - width].toInt()]) || (y < height - 1 && sa[mat[i + width].toInt()]) ||
+            (x > 0 && sa[mat[i - 1].toInt()]) || (x < width - 1 && sa[mat[i + 1].toInt()])
+    }
+
+    /**
+     * A grain that dissolves (salt) next to its solvent (water): both cells become the solution (salt
+     * water). Returns whether it happened.
+     */
+    private fun dissolve(x: Int, y: Int, i: Int, m: Int): Boolean {
+        val solvent = materials.dissolvesIn[m]
+        val w = width
+        var j = -1
+        if (y < height - 1 && mat[i + w].toInt() == solvent) j = i + w
+        else if (x > 0 && mat[i - 1].toInt() == solvent) j = i - 1
+        else if (x < w - 1 && mat[i + 1].toInt() == solvent) j = i + 1
+        else if (y > 0 && mat[i - w].toInt() == solvent) j = i - w
+        if (j < 0) return false
+        if (!chance(DISSOLVE)) {
+            wake(x, y)
+            return false
+        }
+        val product = materials.dissolvedProduct[m]
+        change(x, y, i, product)
+        change(j % w, j / w, j, product)
+        return true
     }
 
     /** Neighbours (4) that give a fire air: air itself, and flames. */
@@ -581,7 +649,14 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             if (life[i] < lat) return false
             temp[i] = bt + 2f
         }
-        change(x, y, i, mt.boilProduct[m])
+        val residue = mt.boilResidue[m]
+        if (residue >= 0 && chance(mt.boilResidueShare[m])) {
+            // the water goes up as steam, what was dissolved in it stays behind
+            change(x, y, i, residue)
+            emit(x, y, i, mt.boilProduct[m])
+        } else {
+            change(x, y, i, mt.boilProduct[m])
+        }
         events[Event.BOIL]++
         return true
     }
@@ -622,7 +697,8 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             if (nx < 0 || nx >= w || ny < 0 || ny >= height) continue
             val j = ny * w + nx
             if (mat[j].toInt() != AIR) continue
-            val t = if (materials.spawnBurning[product]) materials.spawnTemp[product] else maxOf(temp[i] * 0.6f, temp[j])
+            // flames and steam come out at their own temperature, smoke carries some of the heat away
+            val t = if (materials.hasSpawnTemp[product]) maxOf(materials.spawnTemp[product], temp[j]) else maxOf(temp[i] * 0.6f, temp[j])
             spawn(nx, ny, j, product, t)
             stamp[j] = mark
             return
@@ -1105,6 +1181,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         private const val CHAR_OVER = 80f
         private const val CHAR_CHANCE = 0.006f
         private const val SINK_CHANCE = 0.55f
+        private const val DISSOLVE = 0.03f
         private const val ERODE = 0.05f
         private const val DRY_TEMP = 100f
         private const val DRY_CHANCE = 0.04f

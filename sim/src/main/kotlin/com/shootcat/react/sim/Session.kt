@@ -44,6 +44,20 @@ class Session(
     data class Press(override val step: Int, val x: Int, val y: Int, val tool: Int, val radius: Int) : Input
     data class Drag(override val step: Int, val x: Int, val y: Int) : Input
     data class Release(override val step: Int) : Input
+
+    /** A built shape: a line, a filled rectangle or a frame (Leitfaden V3, 4.1), as one action. */
+    data class Shape(
+        override val step: Int,
+        val kind: ShapeKind,
+        val x0: Int,
+        val y0: Int,
+        val x1: Int,
+        val y1: Int,
+        val tool: Int,
+        val size: Int,
+    ) : Input
+
+    enum class ShapeKind { LINE, RECT, FRAME }
     data class Clear(override val step: Int) : Input
 
     /** A finger touches the world: one action begins (and can be undone as a whole). */
@@ -81,6 +95,28 @@ class Session(
         if (!down) return
         log += Release(world.step)
         down = false
+    }
+
+    /**
+     * Builds a shape with [tool] at once, as one action that can be undone: a line [size] cells thick
+     * (radius), a filled rectangle, or a frame [size] + 1 cells wide.
+     */
+    fun shape(kind: ShapeKind, x0: Int, y0: Int, x1: Int, y1: Int, tool: Int, size: Int) {
+        if (down) release()
+        pushUndo()
+        log += Shape(world.step, kind, x0, y0, x1, y1, tool, size)
+        this.tool = tool
+        this.radius = size
+        applyShape(kind, x0, y0, x1, y1, tool, size)
+    }
+
+    private fun applyShape(kind: ShapeKind, x0: Int, y0: Int, x1: Int, y1: Int, tool: Int, size: Int) {
+        val w = world
+        when (kind) {
+            ShapeKind.LINE -> if (tool == ERASER) w.eraseLine(x0, y0, x1, y1, size) else w.paintLine(tool, x0, y0, x1, y1, size)
+            ShapeKind.RECT -> if (tool == ERASER) w.eraseRect(x0, y0, x1, y1, false, 1) else w.paintRect(tool, x0, y0, x1, y1, false, 1)
+            ShapeKind.FRAME -> if (tool == ERASER) w.eraseRect(x0, y0, x1, y1, true, size + 1) else w.paintRect(tool, x0, y0, x1, y1, true, size + 1)
+        }
     }
 
     /** One simulation step; a finger that stays down keeps pouring. */
@@ -132,8 +168,8 @@ class Session(
         }
     }
 
-    /** Loose material is poured scattered, solid material is drawn as a closed shape. */
-    private fun fillFor(m: Int): Float = when (materials.kind[m]) {
+    /** Loose material is poured scattered, solid material is drawn as a closed shape; a one-cell brush is exact. */
+    private fun fillFor(m: Int): Float = if (radius == 0) 1f else when (materials.kind[m]) {
         Kind.POWDER -> 0.3f
         Kind.LIQUID -> 0.4f
         Kind.GAS -> if (materials.spawnBurning[m]) 0.8f else 0.35f
@@ -172,6 +208,7 @@ class Session(
                         is Press -> s.press(input.x, input.y, input.tool, input.radius)
                         is Drag -> s.drag(input.x, input.y)
                         is Release -> s.release()
+                        is Shape -> s.shape(input.kind, input.x0, input.y0, input.x1, input.y1, input.tool, input.size)
                         is Clear -> s.clear()
                     }
                     k++

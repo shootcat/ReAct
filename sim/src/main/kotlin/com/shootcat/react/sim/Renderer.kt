@@ -13,14 +13,17 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
     private val palette = IntArray(mt.count * SHADES)
     private val glow = IntArray(GLOW_STEPS)
 
-    private val water = mt.idOrNull("water") ?: -1
     private val lava = mt.idOrNull("lava") ?: -1
     private val fire = mt.idOrNull("fire") ?: -1
-    private val wood = mt.idOrNull("wood") ?: -1
     private val smoke = mt.idOrNull("smoke") ?: -1
     private val glass = mt.idOrNull("glass") ?: -1
     private val steam = mt.idOrNull("steam") ?: -1
-    private val charcoal = mt.idOrNull("charcoal") ?: -1
+
+    /** Glowing melts drawn by their temperature: lava, molten metal. */
+    private val glowingLiquid = BooleanArray(mt.count) { mt.kind[it] == Kind.LIQUID && mt.emitsLight[it] > 0f }
+
+    /** Clear liquids drawn with depth and a moving surface edge: water and salt water. */
+    private val clearLiquid = BooleanArray(mt.count) { mt.kind[it] == Kind.LIQUID && mt.emitsLight[it] == 0f && mt.opacity[it] < 1f }
 
     init {
         require(backdrop.size == world.size)
@@ -68,12 +71,12 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
             x++
             if (x == w) x = 0
             val m = mat[i].toInt()
-            if (m == water) depth[x]++ else depth[x] = 0
+            if (clearLiquid[m]) depth[x]++ else depth[x] = 0
             if (m == AIR) {
                 // gaps inside falling water or a flame are drawn filled, so streams and flames hold together
                 val up = if (i >= w) mat[i - w].toInt() else AIR
-                out[i] = if ((up == water || up == fire) && i < size - w && mat[i + w].toInt() == up) {
-                    if (up == water) mix(palette[water * SHADES + 8], backdrop[i], 0.35f) else mix(flameRamp[FLAME_STEPS / 3], backdrop[i], 0.5f)
+                out[i] = if ((clearLiquid[up] || up == fire) && i < size - w && mat[i + w].toInt() == up) {
+                    if (up == fire) mix(flameRamp[FLAME_STEPS / 3], backdrop[i], 0.5f) else mix(palette[up * SHADES + 8], backdrop[i], 0.35f)
                 } else {
                     backdrop[i]
                 }
@@ -83,6 +86,50 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
             var c = palette[m * SHADES + (v and (SHADES - 1))]
             val f = flags[i].toInt()
             val t = temp[i]
+            if (clearLiquid[m]) {
+                // a light, gently moving edge at the surface; darker with depth
+                val d = depth[x]
+                c = when {
+                    d == 1 -> scale(c, 1.32f + 0.12f * wave((x * 3 + (frame shr 1)) and 63))
+                    d == 2 -> scale(c, 1.12f)
+                    else -> scale(c, 1f - minOf(d, 48) * 0.009f)
+                }
+            } else when (mt.pattern[m]) {
+                Pattern.PLANKS -> {
+                    // grain along the planks
+                    val y = i / w
+                    if (((y + (x shr 3)) and 3) == 0) c = scale(c, 0.82f)
+                }
+                Pattern.BRICK -> {
+                    // bricks of 6 × 3 cells in staggered rows, light mortar between them
+                    val y = i / w
+                    val row = y / 3
+                    val bx = (x + (if (row and 1 == 0) 0 else 3)) % 6
+                    if (y % 3 == 2 || bx == 5) c = mix(c, 0xFFB9AFA4.toInt(), 0.55f)
+                }
+                Pattern.MASONRY -> {
+                    // larger blocks with dark joints
+                    val y = i / w
+                    val row = y / 5
+                    val bx = (x + (if (row and 1 == 0) 0 else 4)) % 9
+                    if (y % 5 == 4 || bx == 8) c = scale(c, 0.72f)
+                }
+                Pattern.SHEEN -> {
+                    // brushed metal: a soft diagonal shine
+                    val y = i / w
+                    c = scale(c, 0.9f + 0.25f * wave((x + y * 2) and 63))
+                }
+            }
+            if (mt.speckle[m] > 0f && (v ushr 4) < (mt.speckle[m] * 16f).toInt()) {
+                // inclusions that catch the light (ore), some of them glinting
+                c = mt.speckleColor[m]
+                if (((v * 31 + frame) and 127) == 0) c = scale(c, 1.35f)
+            }
+            if (glowingLiquid[m]) {
+                // orange-red melt with brighter veins; darker as it cools towards setting
+                c = mix(glowAt(minOf(t, 1150f) - 120f + ((v and 31) - 16) * 9f), c, if (m == lava) 0.3f else 0.45f)
+                if (((v + frame) and 63) == 0) c = scale(c, 1.25f)
+            }
             when (m) {
                 fire -> {
                     // a flame body: hot and yellow inside, orange, red at the rim, flickering, cooler as it dies
@@ -98,26 +145,6 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
                     out[i] = mix(c, backdrop[i], if (n <= 1) 0.3f else 0.05f)
                     continue
                 }
-                lava -> {
-                    // orange-red melt with brighter veins; darker as it cools towards setting
-                    c = mix(glowAt(minOf(t, 1150f) - 120f + ((v and 31) - 16) * 9f), c, 0.3f)
-                    if (((v + frame) and 63) == 0) c = scale(c, 1.25f)
-                }
-                water -> {
-                    // a light, gently moving edge at the surface; darker with depth
-                    val d = depth[x]
-                    c = when {
-                        d == 1 -> scale(c, 1.32f + 0.12f * wave((x * 3 + (frame shr 1)) and 63))
-                        d == 2 -> scale(c, 1.12f)
-                        else -> scale(c, 1f - minOf(d, 48) * 0.009f)
-                    }
-                }
-                wood -> {
-                    // grain along the planks
-                    val y = i / w
-                    val x = i - y * w
-                    if (((y + (x shr 3)) and 3) == 0) c = scale(c, 0.82f)
-                }
                 smoke -> {
                     val fade = (life[i] / 90f).coerceIn(0f, 1f)
                     out[i] = mix(c, backdrop[i], 1f - mt.opacity[m] * fade)
@@ -129,7 +156,7 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
                 // glowing embers under the flames: dark char with orange-red glow that flickers
                 val flick = ((v * 7 + frame * 3) and 31) / 31f
                 c = mix(glowAt(maxOf(t, 650f) + flick * 300f), scale(c, 0.35f), 0.2f + 0.45f * (1f - flick))
-            } else if (t > GLOW_FROM && m != lava && mt.kind[m] != Kind.GAS) {
+            } else if (t > GLOW_FROM && !glowingLiquid[m] && mt.kind[m] != Kind.GAS) {
                 val k = ((t - GLOW_FROM) / 650f).coerceIn(0f, 0.9f)
                 c = mix(glowAt(t), c, k)
             }
@@ -170,7 +197,7 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
                     if (m == smoke) smokeSum[b] += (life[i] / 90f).coerceAtMost(1f)
                     else if (m == steam) steamSum[b] += 1f
                     val e = mt.emitsLight[m]
-                    if (e > 0f && (m != charcoal || flags[i].toInt() and Flag.BURNING != 0)) lightSum[b] += e
+                    if (e > 0f && (!mt.flammable[m] || mt.kind[m] == Kind.GAS || flags[i].toInt() and Flag.BURNING != 0)) lightSum[b] += e
                     else if (flags[i].toInt() and Flag.BURNING != 0) lightSum[b] += 0.5f
                 }
                 i++

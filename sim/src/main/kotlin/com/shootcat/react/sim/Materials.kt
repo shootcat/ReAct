@@ -29,6 +29,15 @@ object Kind {
     }
 }
 
+/** How built material is drawn (the pattern of its surface). */
+object Pattern {
+    const val NONE = 0
+    const val PLANKS = 1
+    const val BRICK = 2
+    const val MASONRY = 3
+    const val SHEEN = 4
+}
+
 /** One entry of `materials.json`, exactly as written there. */
 @Serializable
 data class MaterialSpec(
@@ -53,10 +62,17 @@ data class MaterialSpec(
     val smoke: Float = 0f,
     @SerialName("spawn_burning") val spawnBurning: Boolean = false,
     @SerialName("quench_product") val quenchProduct: String? = null,
+    /** Wet, it does not catch fire until it has dried (wood). */
+    @SerialName("wet_blocks_burning") val wetBlocksBurning: Boolean = false,
     @SerialName("melt_temp") val meltTemp: Float? = null,
     @SerialName("melt_product") val meltProduct: String? = null,
+    /** Melting point while something salty touches it: salt melts ice and snow without heat. */
+    @SerialName("salt_melt_temp") val saltMeltTemp: Float? = null,
     @SerialName("boil_temp") val boilTemp: Float? = null,
     @SerialName("boil_product") val boilProduct: String? = null,
+    /** What a boiling cell leaves behind instead, with [boilResidueShare]: salt water leaves salt. */
+    @SerialName("boil_residue") val boilResidue: String? = null,
+    @SerialName("boil_residue_share") val boilResidueShare: Float = 0f,
     /**
      * Heat (in degrees of the material itself) of its phase change: taken in on top of reaching [boilTemp]
      * to boil, or given off on top of cooling to [freezeTemp] to set (if it does not boil).
@@ -73,10 +89,23 @@ data class MaterialSpec(
     val wets: Boolean = false,
     @SerialName("dissolves_in") val dissolvesIn: String? = null,
     @SerialName("dissolved_product") val dissolvedProduct: String? = null,
+    /** Salt and salt water: they lower the melting point of ice and snow next to them. */
+    val salty: Boolean = false,
+    /** The bucket can take it up (2c). */
+    val bucketable: Boolean = false,
+    /** The hand can pick it up (2c). */
+    val grabbable: Boolean = false,
+    /** Light does not pass it (2b). */
+    @SerialName("blocks_light") val blocksLight: Boolean = true,
     @SerialName("emits_light") val emitsLight: Float = 0f,
     val color: String,
     @SerialName("color_variance") val colorVariance: Float = 0f,
     val opacity: Float = 1f,
+    /** Inclusions (ore): this share of the particles shows [speckleColor]. */
+    @SerialName("speckle_color") val speckleColor: String? = null,
+    val speckle: Float = 0f,
+    /** How built material is drawn: planks, brick, masonry, sheen. */
+    val pattern: String? = null,
     val cost: Int = 0,
     /** Temperature of newly placed material; the surroundings' temperature if not given. */
     val temp: Float? = null,
@@ -126,6 +155,28 @@ class MaterialTable(val specs: List<MaterialSpec>, val ambient: Float) {
     val burnTemp = FloatArray(count) { specs[it].burnTemp ?: 0f }
     val burnProduct = IntArray(count) { ref(specs[it].burnProduct, AIR) }
     val burnHeat = FloatArray(count) { specs[it].burnHeat }
+    val wetBlocksBurning = BooleanArray(count) { specs[it].wetBlocksBurning }
+    val saltMeltTemp = FloatArray(count) { specs[it].saltMeltTemp ?: Float.MAX_VALUE }
+    val boilResidue = IntArray(count) { ref(specs[it].boilResidue, -1) }
+    val boilResidueShare = FloatArray(count) { specs[it].boilResidueShare }
+    val dissolvesIn = IntArray(count) { ref(specs[it].dissolvesIn, -1) }
+    val dissolvedProduct = IntArray(count) { ref(specs[it].dissolvedProduct, -1) }
+    val salty = BooleanArray(count) { specs[it].salty }
+    val bucketable = BooleanArray(count) { specs[it].bucketable }
+    val grabbable = BooleanArray(count) { specs[it].grabbable }
+    val blocksLight = BooleanArray(count) { specs[it].blocksLight }
+    val speckleColor = IntArray(count) { specs[it].speckleColor?.let { c -> parseColor(c) } ?: 0 }
+    val speckle = FloatArray(count) { specs[it].speckle }
+    val pattern = IntArray(count) {
+        when (specs[it].pattern) {
+            null -> Pattern.NONE
+            "planks" -> Pattern.PLANKS
+            "brick" -> Pattern.BRICK
+            "masonry" -> Pattern.MASONRY
+            "sheen" -> Pattern.SHEEN
+            else -> error("${specs[it].id}: unknown pattern ${specs[it].pattern}")
+        }
+    }
     val residue = FloatArray(count) { specs[it].residue }
     val flame = FloatArray(count) { specs[it].flame }
     val smoke = FloatArray(count) { specs[it].smoke }
@@ -145,6 +196,7 @@ class MaterialTable(val specs: List<MaterialSpec>, val ambient: Float) {
     val absorbs = FloatArray(count) { specs[it].absorbs }
     val wets = BooleanArray(count) { specs[it].wets }
     val spawnTemp = FloatArray(count) { specs[it].temp ?: ambient }
+    val hasSpawnTemp = BooleanArray(count) { specs[it].temp != null }
     val lifetimeSteps = IntArray(count) { ((specs[it].lifetime ?: 0f) * STEPS_PER_SECOND).toInt() }
     val decayProduct = IntArray(count) { ref(specs[it].decayProduct, AIR) }
     val friction = FloatArray(count) { specs[it].friction }
@@ -170,14 +222,14 @@ class MaterialTable(val specs: List<MaterialSpec>, val ambient: Float) {
     val inert = BooleanArray(count) {
         (kind[it] == Kind.STATIC || kind[it] == Kind.SOLID) && !flammable[it] &&
             meltTemp[it] == Float.MAX_VALUE && boilTemp[it] == Float.MAX_VALUE && freezeTemp[it] == -Float.MAX_VALUE &&
-            lifetimeSteps[it] == 0
+            lifetimeSteps[it] == 0 && dissolvesIn[it] < 0
     }
 
     /**
      * Heat exchange between neighbours of material a and b, per step: the cell of a moves `pairA` of the
      * temperature difference towards b, the cell of b `pairB` towards a. Both together conserve heat; the
-     * rate is the geometric mean of both conductivities and never more than 0.45 of the way to the common
-     * temperature, so the exchange is always stable.
+     * rate is the geometric mean of both conductivities and never more than [MAX_EXCHANGE] of the way to the
+     * common temperature. Each exchange leaves both cells between their old temperatures, so it is stable.
      */
     val pairA = FloatArray(count * count)
     val pairB = FloatArray(count * count)
@@ -196,17 +248,17 @@ class MaterialTable(val specs: List<MaterialSpec>, val ambient: Float) {
             val ka = conductivity[a]
             val kb = conductivity[b]
             val k = kotlin.math.sqrt(ka * kb)
-            val alpha = minOf(0.45f, k)
+            val alpha = minOf(MAX_EXCHANGE, k)
             val ca = heatCapacity[a]
             val cb = heatCapacity[b]
             pairA[a * count + b] = alpha * cb / (ca + cb)
             pairB[a * count + b] = alpha * ca / (ca + cb)
-            val up = minOf(0.45f, k * CONVECTION)
+            val up = minOf(MAX_EXCHANGE, k * CONVECTION)
             riseA[a * count + b] = up * cb / (ca + cb)
             riseB[a * count + b] = up * ca / (ca + cb)
         }
         for (s in specs) {
-            listOfNotNull(s.burnProduct, s.quenchProduct, s.meltProduct, s.boilProduct, s.freezeProduct, s.decayProduct, s.dissolvedProduct, s.dissolvesIn)
+            listOfNotNull(s.burnProduct, s.quenchProduct, s.meltProduct, s.boilProduct, s.boilResidue, s.freezeProduct, s.decayProduct, s.dissolvedProduct, s.dissolvesIn)
                 .forEach { require(it in index) { "${s.id} refers to unknown material '$it'" } }
             if (s.flammable) require(s.igniteTemp != null && s.burnTime != null) { "${s.id} burns but has no ignite_temp or burn_time" }
             require(!(s.lifetime != null && (s.flammable || s.boilTemp != null))) { "${s.id}: lifetime cannot be combined with burning or boiling" }
@@ -218,6 +270,9 @@ class MaterialTable(val specs: List<MaterialSpec>, val ambient: Float) {
     companion object {
         const val AIR = 0
         const val STEPS_PER_SECOND = 60
+
+        /** At most this share of the way to the common temperature per step and pair (1 would be all the way). */
+        const val MAX_EXCHANGE = 0.9f
 
         /** How much better heat passes upwards out of a hotter gas than by plain conduction. */
         const val CONVECTION = 3f
