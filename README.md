@@ -2,115 +2,133 @@
 
 > „Du lernst nicht die Lösungen. Du lernst die Welt.“
 
-REACT ist ein deterministisches 2D-Logik-Puzzle für Android über die Kräfte der Natur. Jedes Level ist ein Schnitt durch eine Landschaft: Feuer, Wasser, Dampf, Wolken, Erde und Stein folgen festen Regeln. Jede Bewegung des Spielers setzt die Welt sofort in Gang – man sieht live, wie Eis schmilzt, Wasser in Mulden läuft, Dampf aufsteigt und als Regen wiederkommt.
+REACT wird ein Physik-Puzzle mit fein simulierter Materie, im Stil von Noita oder The Powder Toy (Leitfaden V3). Die Welt besteht aus vielen kleinen Partikeln:
+- Sand rieselt, Wasser fließt, Holz brennt, Lava erstarrt, Dampf steigt auf.
+- Was passiert, ergibt sich aus den **Eigenschaften** der Materialien (Dichte, Zündpunkt, Wärmeleitung …), nicht aus Rezepten.
 
-**Stand:** Live-Simulation mit Rückgängig/Wiederholen, Ziehen-und-Verschmelzen, Aufgaben mit Sternen, Wasserkreislauf, Geräusche und Musik, Ablagefelder, vollständige Suche für die Schwierigkeit und Zoom. Nach Leitfaden V2 wird REACT eine **Rätsel-Sandbox aus echten Materialien**: Das Ergebnis einer Reaktion ist das Werkzeug für die nächste (brennendes Holz rechtzeitig gelöscht wird Holzkohle, Holzkohle wird Glut, Glut schmilzt Sand zu Glas). Die Welt **„Test“** prüft das Prinzip mit drei Leveln; die früheren Level (Welten Wald bis Frost, Prüfung p_01 … p_10) sind entfernt, ebenso der Frostkristall.
+**Stand: Phase 1 „Spielplatz“.** Es ist eine freie Sandbox ohne Level und ohne Ziele. Sie wartet auf die Freigabe durch den Testspieler. Der Bericht dazu steht in [`docs/PHASE1.md`](docs/PHASE1.md).
 
-## Welt „Test“
-
-Drei Messpunkte, jeder aus einem anderen Gebiet. Der Spieler kennt alle Elemente und Reaktionen darin schon; die Schwierigkeit kommt nur aus dem Kombinieren. Deshalb führt das Entdeckungsbuch in dieser Welt alle Reaktionen von Anfang an (`"reactions_known": true` in `world_01.json`).
-
-| Level | Gebiet | Ziel | Einsicht | Stand |
-|---|---|---|---|---|
-| t_01 „Kochstelle“ | Wald, leicht | Wasser im Becken kocht, der Wald brennt nicht | Glut erhitzt, ohne zu zünden | fertig, 4 Züge |
-| t_02 „Süßwasser“ | Küste, Mitte | Becken auf der Klippe voll Süßwasser, die Hütte brennt nicht | Verdunsten entsalzt | fertig, 5 Züge |
-| t_03 „Tiefe Schmelze“ | Mine, Obergrenze | Glas herstellen, der Wald brennt nicht | Metall leitet Hitze durch die Wand; es gibt nur eine Flamme | fertig, 9 Züge |
+Die Raster-Version mit Leveln (Leitfaden V1 und V2) ist nicht mehr Teil dieses Branches. Sie liegt hier:
+- Commit `a7fc414` (Tag `grid-legacy`),
+- Branch `claude/charming-goodall-6m55iu`,
+- Release `beta-51`.
 
 ## APK herunterladen
 
 Jeder Push baut automatisch eine APK und veröffentlicht sie als Release:
 
-**[Neueste APK herunterladen](https://github.com/shootcat/ReAct/releases/latest/download/REACT-beta.apk)** · [alle Builds](https://github.com/shootcat/ReAct/releases)
+**[Alle Builds](https://github.com/shootcat/ReAct/releases)**: die APK des neuesten Builds von `claude/react-v3` installieren.
 
-Alle Builds sind mit demselben Schlüssel signiert und installieren sich als Update übereinander. Jedes Release enthält auch Screenshots aller Bildschirme.
+Alle Builds sind mit demselben Schlüssel signiert und installieren sich als Update übereinander. Jedes Release enthält außerdem:
+- Screenshots,
+- die Messwerte des CI-Rechners.
 
-## Spielen
+## Spielplatz
 
-1. Startbildschirm → **Spielen** → Welt „Test“ → ein Level wählen.
-2. Bewegliche Dinge liegen auf einem weichen Schatten in einem hellen Rahmen. Man zieht sie – oder tippt sie an und dann das Zielfeld. Man muss nicht genau treffen.
-3. **Ziehen und Verschmelzen:** eine Flamme auf Holzkohle wird Glut, Erz auf Holzkohle wird Schmelzgut, Erde und Wasser werden Schlamm, Wasser auf Wasser wird tiefes Wasser. Ein Stein auf einem Baum ist ein Werkzeug: der Baum wird zu Holz, der Stein bleibt liegen. Was nicht zusammenpasst, prallt ab – oder reagiert, wenn es eine Regel dafür gibt (eine Flamme neben Eis landet daneben und schmilzt es). Beim Ziehen zeigt das Zielfeld, was passieren wird.
-4. Die Welt reagiert **sofort** und läuft Schritt für Schritt, bis alles ruht.
-5. Oben stehen die **Aufgaben** (Mulde füllen, Feuer löschen, Regen auslösen, Samen keimen lassen …) mit Häkchen und Sternen. Sobald alle Hauptaufgaben erfüllt sind, erscheint **„Aufgabe erfüllt“**.
-6. **↶ Rückgängig** und **↷ Wiederholen** gehen durch die eigenen Züge (jeder Zug speichert den Zustand davor), **↺** startet das Level neu – auch das lässt sich rückgängig machen.
+1. Startbildschirm, dann **Spielplatz**. Die Startlandschaft ist 200 × 350 Zellen groß. Sie hat einen Hügel mit Erde und einem Holzstapel, einen Teich mit Holzbrücke, eine Sanddüne und tief im Fels eine Höhle mit Lava.
+2. **Material wählen** in der Leiste unten. Jede Karte zeigt die Körnung des Materials, den Vorrat (hier ∞) und die Kosten pro Einheit. Zur Auswahl stehen:
+   - Sand, Erde, Wasser, Holz, Feuer, Lava, Stein, Fels, Dampf, Rauch,
+   - dazu der Radierer, den es nur im Spielplatz gibt.
+3. **Malen und Schütten** mit einem Finger. Material landet nur dort, wo Luft ist, nie in Fels oder anderem Material. Ein liegen gelassener Finger schüttet weiter. Lose Stoffe fallen gestreut, feste Stoffe (Fels, Holz) werden als geschlossene Form gezeichnet. Rechts neben dem Tempo stehen vier Pinselgrößen.
+4. **Zwei Finger** zoomen (bis sechsfach) und verschieben. Kommt der zweite Finger in den ersten 70 ms, entsteht kein Klecks.
+5. **Pause, Normal, Schnell.** Normal sind 60 Schritte pro Sekunde, Schnell bis zu 180. In der Pause lassen sich mehrere Dinge setzen, die dann gemeinsam starten.
+6. **↶ Rückgängig** nimmt den letzten Strich zurück, bis zu 25 Striche. **↺ Neu beginnen** stellt die Startlandschaft wieder her und lässt sich ebenfalls rückgängig machen.
+7. Im **Menü** (Zahnrad) gibt es:
+   - **Leistung messen** (Ergebnis zum Kopieren),
+   - **Leistungsanzeige**: Schritte pro Sekunde, ms pro Schritt, ms pro Bild, wache Chunks,
+   - **Alles leeren**,
+   - **Einstellungen**: Geräusche, Musik, Vibration, Leistungsanzeige.
 
-**Ablagefelder:** In Leveln mit `"placement": "marked"` darf man nur auf die markierten Ablagefelder (`+` in der Karte) etwas ablegen; sie leuchten auf, sobald man ein Objekt aufnimmt. Genau gilt:
+Die Welt erzeugt Geräusche: Zischen beim Löschen, Brodeln beim Kochen, Knistern beim Brennen, Fauchen beim Entzünden.
 
-- **Ablegen** (auf ein freies Feld, eines nur mit Dampf, oder einen Stein in Wasser werfen) geht nur auf ein Ablagefeld.
-- **Verschmelzen** geht mit einem Objekt, das selbst auf einem Ablagefeld oder direkt (waagerecht oder senkrecht) neben einem liegt.
-- **Reagieren** (z. B. eine Flamme auf Eis ziehen) geht nur, wenn direkt neben dem Partner ein freies Ablagefeld liegt; dort landet das Objekt.
-- Aufnehmen darf man jedes bewegliche Objekt, wo immer es liegt. Abgelegtes unterliegt weiter der Physik: ein Stein auf einem hohen Ablagefeld fällt, wenn darunter nichts ist.
+## Simulation (`sim/`)
 
-Ohne `"placement"` gilt das alte Verhalten: jedes freie, bebaubare Feld.
+Das Modul ist reines Kotlin ohne Android. Es läuft identisch in den Tests auf dem Rechner und in der App.
 
-Das Spielfeld skaliert auf jede Bildschirmgröße und hält ringsum mindestens 20 dp Abstand (mehr, wo die Zurück-Geste des Systems weiter hereinreicht). Überschüssige Höhe wird zu mehr Himmel und mehr Erde.
+- **Zellulärer Automat**, ein Partikel pro Zelle, gespeichert in flachen Arrays. Es gibt keine Objekte pro Partikel. Die Arrays sind:
+  - `ByteArray` für Material, Farbvariante und Flags (brennt, nass, Fallgeschwindigkeit),
+  - `FloatArray` für die Temperatur,
+  - `ShortArray` für die Lebensdauer (Brenndauer, Rauch, gespeicherte Verdampfungswärme).
+- **Reihenfolge:** Die Zeilen werden von unten nach oben abgearbeitet, jede Zeile in der Gegenrichtung der vorigen. Ein Stempel verhindert, dass ein Partikel im selben Schritt zweimal bewegt wird.
+- **Chunks zu 32 × 32:** Nur Chunks, in denen im Schritt davor etwas passiert ist, werden gerechnet; ruhende Bereiche schlafen.
+- **Wärme:** Jede Zelle tauscht pro Schritt Wärme mit ihren Nachbarn. Die Rate ist das geometrische Mittel beider Leitfähigkeiten, verteilt nach Wärmekapazität. Dabei bleibt die Wärmemenge erhalten, und der Austausch ist immer stabil. Offene Luft kühlt langsam auf die Umgebungstemperatur ab.
+- **Phasenwechsel nur über Temperaturschwellen:**
+  - Entzünden (`ignite_temp`), Schmelzen (`melt_temp`), Sieden (`boil_temp`), Erstarren, Gefrieren und Kondensieren (`freeze_temp`).
+  - Sieden und Erstarren brauchen zusätzlich latente Wärme. Wasser kocht deshalb nicht in einem einzigen Schritt weg, und Lava bleibt eine Weile flüssig.
+- **Verbrennung braucht Luft:**
+  - Brennendes gibt pro Schritt Wärme ab, schickt Flammen und Rauch in die Luft daneben und zerfällt am Ende zu Asche, zum größten Teil aber zu Luft.
+  - Ohne Luft geht es aus. Heißes Brennbares ohne Luft verkohlt, wie im Kohlenmeiler. Rauch verdrängt die Luft, deshalb erstickt Feuer im geschlossenen Raum.
+  - Wasser löscht, weil es kühlt und die Luft abschneidet.
+- **Wasser:**
+  - Es wird von Erde und Sand teilweise aufgesogen; nasse Erde rutscht, nasser Sand hält.
+  - Fließendes Wasser trägt lose Körner mit.
+  - Dampf kondensiert beim Abkühlen zu Wasser.
+- **Gase** steigen nach ihrer Dichte auf und verlassen die Welt nach oben. Unter Überhängen sammeln sie sich.
+- **Deterministisch:**
+  - fester Seed pro Welt und ein einziger Zufallsgenerator in fester Reihenfolge;
+  - im Schritt nur Addition und Multiplikation;
+  - Eingaben wirken immer zwischen zwei Schritten.
 
-**Zoom:** Mit zwei Fingern lässt sich das Spielfeld bis auf das Dreifache vergrößern und verschieben, für breite Level. Dabei bleibt kein leerer Rand, und Zusammenziehen zeigt wieder das ganze Feld. Ein Finger zieht und tippt wie immer; kommt ein zweiter dazu, bricht das Ziehen ab.
+  Dieselben Aktionen ergeben auf jedem Gerät und bei jeder Bildrate dieselbe Welt. `Session` protokolliert jede Eingabe mit ihrem Schritt und kann das Protokoll wieder abspielen.
+- **Undo** über Schnappschüsse des ganzen Zustands, 9 Byte pro Zelle, also etwa 630 kB pro Schnappschuss.
+- **SimRunner** rechnet auf einem eigenen Thread mit fester Schrittweite. Er zeichnet das fertige Bild in einen Puffer, und die Oberfläche holt nur fertige Bilder ab. Wird die Simulation langsamer als Echtzeit, läuft sie langsamer, statt Schritte aufzustauen.
+- **Darstellung:**
+  - ein Pixel pro Zelle, ohne Glättung skaliert;
+  - jede Zelle mit eigener Farbschattierung;
+  - Heißes glüht, Brennendes flackert;
+  - darüber zwei weiche Schichten in Viertelauflösung: Rauch und Dampf als Schwaden, Feuer, Glut und Lava als warmer Schein;
+  - im Hintergrund Himmel mit Hügeln und eine dunkle Höhlenwand.
 
-Das **Entdeckungsbuch** sammelt jede beobachtete Reaktion; unbekannte erscheinen als Silhouette.
+### Materialien (`sim/src/main/resources/materials.json`)
 
-**Einstellungen:** Tempo, Vorschau beim Ziehen, Rahmen um Bewegliches, Level-Texte, Geräusche, Musik, Vibration, Fortschritt zurücksetzen.
+Jedes Material hat die Felder aus Leitfaden 4.3, dazu ein paar Spielwerte:
+- `burn_temp`, `burn_heat`, `flame`, `smoke`, `residue`,
+- `latent_heat`, `lifetime`,
+- `friction`, `spread`, `viscosity`, `opacity`.
 
-**Klang:** kurze Effekte für das, was in der Welt passiert (Zischen, Plätschern, Knistern, Gefrieren, Regen …) und für jede Welt eine ruhige, meditative Melodie (`SoundManager`).
+Die Einheiten stehen in der Datei.
+
+| Material | Art | Verhalten (aus den Werten) |
+|---|---|---|
+| Fels | fest | unzerstörbar, leitet Wärme |
+| Stein | Geröll | fällt nur senkrecht, schmilzt bei 1150 °C zu Lava |
+| Sand | Pulver | rieselt flach, sinkt in Wasser, saugt etwas Wasser auf, wird bei 1000 °C zu Glas |
+| Erde | Pulver | hält steile Hänge, nass rutscht sie, wird weggespült |
+| Wasser | flüssig | fließt, kocht bei 100 °C (mit Verdampfungswärme), löscht |
+| Holz | fest | zündet bei 280 °C an der Luft, brennt mit Flammen, gelöscht zu Holzkohle, abgebrannt zu etwas Asche |
+| Feuer | Gas | brennende Flamme, steigt, heizt stark, braucht Luft |
+| Rauch | Gas | steigt langsam, verdrängt Luft, verweht nach oben |
+| Dampf | Gas | steigt schnell, kondensiert unter 90 °C zu Wasser |
+| Lava | flüssig | zäh, 1250 °C, erstarrt unter 850 °C (mit Erstarrungswärme) zu Stein |
+| Asche, Holzkohle, Glas | entstehen | Asche und Holzkohle schwimmen; Holzkohle glüht lange ohne Flamme; Glas ist durchsichtig |
 
 ## Projektstruktur
 
 ```
-engine/                     Reine Kotlin-Engine (ohne Android, voll getestet)
-  model/                    GameObject, Rule, LevelData, GameState, Ziele …
-  RuleEngine.kt             Ein Schritt: Physik, dann Regeln (Hitze, Löschen, Gefrieren …), Kaskaden-Schutz
-  Physics.kt                Fallen, Auftrieb, Flüssigkeiten, Dampf, Wolken, Wind, Regen, Wärme, Verbrennen
-  Drops.kt                  Ziehen und Ablegen: platzieren, verschmelzen, reagieren oder abprallen
-  LiveSimulation.kt         Live-Modus: Zug → Welt reagiert bis zur Ruhe (unveränderliche Runs für Undo)
-  Simulator.kt              Ganze Zeitleiste am Stück (Tests, Determinismus)
-  LevelLoader.kt            JSON-Loader mit Validierung
-  Reactions.kt              Texte fürs Entdeckungsbuch
-app/                        Android-App (Kotlin, Jetpack Compose, MVVM/UDF)
-  ui/level/                 Spielfeld, Landschaft, Wasserdarstellung, Aufgaben, „Aufgabe erfüllt“
-  audio/SoundManager.kt     Effekte (SoundPool) und Musik je Welt (MediaPlayer)
-  data/                     Fortschritt, Einstellungen, Inhalte
-  src/main/assets/levels/   elements.json (Elemente, Regeln, Verschmelzungen), world_01.json (Welt „Test“), t_01 … t_03.json
-docs/LEVELDESIGN.md         Entwurf jedes Levels: Einsicht, Fallen, Köder, Kette, Kennzahlen, Ehrlichkeitsprüfung, Startbild
-docs/BERICHT_V2.md          Abschlussbericht zu Leitfaden V2: DifficultyReport, Beweise, Abweichungen
+sim/                        Partikelsimulation, reines Kotlin (ohne Android)
+  World.kt                  Zustand und Schritt: Wärme, Feuer, Phasen, Bewegung, Chunks, Schnappschüsse
+  Materials.kt              materials.json lesen, flache Tabellen für den Schritt
+  Session.kt                Pinsel, Undo, Reset, Aktionsprotokoll, Wiedergabe
+  SimRunner.kt              eigener Thread, feste Schrittweite, fertige Bilder, Leistungswerte
+  Renderer.kt               Pixelbild, Dunst- und Glühschicht, Hintergrund
+  Terrain.kt                Startlandschaft des Spielplatzes (Rauschen nur aus Ganzzahl-Hashes)
+  Benchmark.kt              Schritte pro Sekunde: leere, voll aktive und belebte Welt
+app/                        Android-App (Kotlin, Jetpack Compose)
+  ui/sandbox/               Spielplatz: Weltansicht, Gesten, Leiste, Tempo, Messung
+  ui/title/                 Startbildschirm mit kleiner echter Simulation
+  ui/settings/              Einstellungen
+  audio/SoundManager.kt     Effekte (SoundPool) und Musik (MediaPlayer)
+  data/                     Einstellungen, Fortschritt
+docs/PHASE1.md              Bericht zu Phase 1: Zusammenfassung, Abweichungen, Messwerte
+docs/v2/                    Unterlagen der Raster-Version (Leitfaden V2)
 ```
-
-## Engine-Regeln
-
-Jeder Simulationsschritt läuft in festen Phasen:
-
-1. **Physik** – Feststoffe fallen und sinken (schwere verdrängen Wasser), leichte steigen auf (Holz, Eis, Bimsstein, Schnee). Flüssigkeiten sind Volumen (bis 8 Einheiten pro Feld): sie fallen, füllen Mulden von unten und schichten sich nach Dichte (Lava unter Meer unter Süßwasser). Dampf steigt wie umgekehrtes Wasser; sammelt sich genug davon unter einem Hindernis, wird er zur **Wolke**, die nahen Dampf aufnimmt, mit dem **Wind** treibt und voll geworden **regnet**. Wärme reicht bei großem Feuer und Lava zwei Felder weit durch die Luft. Metall leitet Hitze weiter und gibt sie, in einem Wandschlitz steckend, durch eine Wand hindurch ab; ohne Hitzequelle kühlt es ab. Holz, Bäume und die Hütte brennen eine feste Zahl **Züge** (Holz 2, Baum und Hütte 3, der Zug des Entzündens zählt mit) und zerfallen dann zu Asche; bis dahin lassen sie sich löschen. Kleine Glutpunkte am brennenden Ding zeigen, wie viele Züge bleiben.
-2. **Regeln** aus `elements.json` – z. B. Flamme + Holz → brennt, Wasser + brennendes Holz → Holzkohle, Glut kocht Wasser und Salzwasser (der Dampf regnet als Süßwasser ab), Glut oder heißes Metall + Sand → Glas, Glut + Schmelzgut → Metall, Hitze + Schnee → Wasser, Salz + Schnee → Wasser, Salz + Wasser → Meerwasser. Nur eine offene Flamme entzündet; Glut und heißes Metall sind heiß, zünden aber nichts an.
-
-Pro Schritt sind höchstens **100 Regel-Transformationen** erlaubt; darüber bricht die Simulation kontrolliert ab. Gleiche Züge ergeben immer exakt denselben Ablauf.
-
-Es gibt keine Level-Sonderfälle im Code: alles kommt aus den JSON-Dateien. Elemente werden über Eigenschaften beschrieben (`gravity`, `liquid`, `gas`, `density`, `heat`, `heat_radius`, `conducts`, `heat_through_wall`, `burn_moves`, `granular`, `condense`, `cloud` …). Level sind ASCII-Landschaften mit Legende: `#` Erde, `%` Fels, `.` frei, `:` frei, aber nicht bebaubar, `+` Ablagefeld; Großbuchstaben sind bewegliche Dinge (`isMovable`), Kleinbuchstaben gehören zur Landschaft. Ziele: `fill` (mit `min` oder `"full": true`; eine fremde Flüssigkeit im Bereich verdirbt es), `produce` (mindestens `min` Dinge vom Typ `element`), `heat` (eine Flüssigkeit im Bereich kocht), `extinguish`, `rain`, `state`, `preserve` (ein Ding oder alle Dinge der `types` in einem Bereich), `clear` und `max_moves`, jeweils optional als Stern.
-
-Die Musterlösungen aller Level stehen in `engine/src/test/resources/walkthroughs.txt` (`t_01 min=4`, `t_01 [] fire_0_4@5,4 …` – in Klammern die erreichten optionalen Aufgaben). Der Test spielt jede Lösung durch, prüft die Sterne und beweist per Breitensuche, dass es keine kürzere Lösung gibt (vollständig bei Leveln mit Ablagefeldern, sonst bis zwei Züge tief).
-
-## Schwierigkeit
-
-`DifficultyReportTest` misst die Testlevel nach Leitfaden V2 (5.2) mit `LevelAnalysis`. Jeder Zug wird gefolgt vom Einschwingen der Welt; Züge mit gleichem Ergebnis zählen einmal.
-
-1. **Mindestzüge**, bewiesen durch Breitensuche. Level 1 und 2 werden vollständig durchsucht. Bei Level 3 wächst die Zahl der Welten pro Zug um den Faktor 25 bis 45; vollständig durchsucht wird bis 4 Züge (im Test, einige Minuten). Die Musterlösung mit 9 Zügen zeigt, dass es lösbar ist.
-2. **Lösungen**: Anzahl verschiedener Lösungen in Mindestlänge; Reihenfolge-Varianten zählen einzeln.
-3. **Sackgassen**: Anteil der möglichen ersten Züge, nach denen das Level nicht mehr lösbar ist (Suche bis Mindestzüge plus zwei).
-4. **Naheliegender Zug**: ein bewegliches Objekt auf das Ablagefeld, das dem Hauptziel am nächsten liegt. Er darf keine Mindestlösung beginnen.
-5. **Köder**: bewegliche Objekte, die in keiner Mindestlösung vorkommen.
-6. **Ablagefelder pro Zug**: Level 1 und 2 mindestens 2, Level 3 mindestens 1,5.
-7. **Zufallsspiele** (nur Level 3): 3000 Spiele aus zufälligen erlaubten Zügen, je Mindestzüge plus drei. Höchstens 5 % davon dürfen das Level lösen.
-
-Die Suche verwirft Welten, in denen ein Hauptziel nicht mehr erreichbar ist, etwa wenn der Wald brennt. Welten, die sich nur in den Nummern selbst entstandener Dinge unterscheiden (Holzkohle, Dampf, Schmelzwasser), zählt sie als eine. Die Tabelle schreibt der Test nach `engine/build/difficulty.md`.
-
-`WalkthroughTest` beweist die Mindestzugzahl vollständig, wenn sie höchstens 7 beträgt. `TrapsTest` spielt jede Falle aus dem Leitfaden nach und zeigt, dass das Level danach nicht mehr lösbar ist:
-- bei Level 1 und 2 durch vollständige Suche über 6 weitere Züge;
-- bei Level 3 durch die Materialbilanz (was verbraucht ist, kommt nicht zurück) und eine vollständige Suche über 3 weitere Züge.
 
 ## Bauen und testen
 
 ```bash
-./gradlew :engine:test                # Engine-Tests (Physik, Regeln, alle Level und Lösungen)
+./gradlew :sim:test                   # Verhalten, Determinismus, Materialdaten, Leistung; Bilder in sim/build/pictures
 ./gradlew :app:testDebugUnitTest      # App-Smoke-Test mit Robolectric, Screenshots in app/build/screenshots
-./gradlew assembleDebug               # Debug-APK -> app/build/outputs/apk/debug/
-./gradlew installDebug                # auf Gerät/Emulator installieren
+./gradlew assembleDebug               # APK -> app/build/outputs/apk/debug/
 ```
 
-Benötigt JDK 17+ und ein Android SDK (compileSdk 35). Die GitHub-Action `.github/workflows/build-apk.yml` führt Tests und Build bei jedem Push aus und veröffentlicht die APK.
+Benötigt werden JDK 17+ und ein Android SDK (compileSdk 35). Die GitHub-Action `.github/workflows/build-apk.yml` läuft bei jedem Push: Sie führt die Tests aus, baut die APK und veröffentlicht sie mit den Messwerten des CI-Rechners.

@@ -62,6 +62,13 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     /** Chunks woken since the current step began: they are updated in the next one. */
     private var pending = BooleanArray(chunksX * chunksY) { true }
 
+    /**
+     * Chunks in which temperatures differ, so heat has to flow: a chunk can be busy (water flowing) without
+     * any heat to exchange, and heat is the costliest part of a step.
+     */
+    private var heatAwake = BooleanArray(chunksX * chunksY)
+    private var heatPending = BooleanArray(chunksX * chunksY) { true }
+
     /** For measuring: update every chunk, asleep or not. */
     var keepAllAwake = false
 
@@ -166,7 +173,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
 
     fun setTemperature(x: Int, y: Int, t: Float) {
         temp[y * width + x] = t
-        wake(x, y)
+        wakeHeat(x, y)
     }
 
     /** Everything becomes air at the temperature of the surroundings; time and chance go on. */
@@ -176,10 +183,14 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         life.fill(0)
         flags.fill(0)
         pending.fill(true)
+        heatPending.fill(true)
     }
 
     /** Wakes the whole world, e.g. after building it cell by cell. */
-    fun wakeAll() = pending.fill(true)
+    fun wakeAll() {
+        pending.fill(true)
+        heatPending.fill(true)
+    }
 
     // ------------------------------------------------------------------ the step
 
@@ -188,15 +199,20 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         awake = pending
         pending = t
         pending.fill(false)
-        if (keepAllAwake) awake.fill(true)
+        val h = heatAwake
+        heatAwake = heatPending
+        heatPending = h
+        heatPending.fill(false)
+        if (keepAllAwake) {
+            awake.fill(true)
+            heatAwake.fill(true)
+        }
         mark = step + 1
         var n = 0
         for (b in awake) if (b) n++
         awakeChunks = n
-        if (n > 0) {
-            heat()
-            update()
-        }
+        heat()
+        if (n > 0) update()
         step++
     }
 
@@ -215,13 +231,13 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         for (cy in 0 until chunksY) {
             for (cx in 0 until chunksX) {
                 val c = cy * chunksX + cx
-                if (!awake[c]) continue
+                if (!heatAwake[c]) continue
                 val x0 = cx * CHUNK
                 val x1 = minOf(w, x0 + CHUNK) - 1
                 val y0 = cy * CHUNK
                 val y1 = minOf(h, y0 + CHUNK) - 1
-                val leftAsleep = cx > 0 && !awake[c - 1]
-                val upAsleep = cy > 0 && !awake[c - chunksX]
+                val leftAsleep = cx > 0 && !heatAwake[c - 1]
+                val upAsleep = cy > 0 && !heatAwake[c - chunksX]
                 var hot = false
                 for (y in y0..y1) {
                     var i = y * w + x0
@@ -295,13 +311,19 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
                         i++
                     }
                 }
-                if (hot) pending[c] = true
+                if (hot) {
+                    pending[c] = true
+                    heatPending[c] = true
+                }
             }
         }
     }
 
     private fun wakeChunk(cx: Int, cy: Int) {
-        if (cx in 0 until chunksX && cy in 0 until chunksY) pending[cy * chunksX + cx] = true
+        if (cx in 0 until chunksX && cy in 0 until chunksY) {
+            pending[cy * chunksX + cx] = true
+            heatPending[cy * chunksX + cx] = true
+        }
     }
 
     /** The chunk of (x, y) and, at chunk borders, the neighbouring ones are updated in the next step. */
@@ -315,6 +337,22 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         val ya = if (ly == 0 && cy > 0) cy - 1 else cy
         val yb = if (ly == CHUNK - 1 && cy < chunksY - 1) cy + 1 else cy
         for (yy in ya..yb) for (xx in xa..xb) pending[yy * chunksX + xx] = true
+    }
+
+    /** Like [wake], and heat has to flow there too. */
+    private fun wakeHeat(x: Int, y: Int) {
+        val cx = x shr SHIFT
+        val cy = y shr SHIFT
+        val lx = x and (CHUNK - 1)
+        val ly = y and (CHUNK - 1)
+        val xa = if (lx == 0 && cx > 0) cx - 1 else cx
+        val xb = if (lx == CHUNK - 1 && cx < chunksX - 1) cx + 1 else cx
+        val ya = if (ly == 0 && cy > 0) cy - 1 else cy
+        val yb = if (ly == CHUNK - 1 && cy < chunksY - 1) cy + 1 else cy
+        for (yy in ya..yb) for (xx in xa..xb) {
+            pending[yy * chunksX + xx] = true
+            heatPending[yy * chunksX + xx] = true
+        }
     }
 
     // ------------------------------------------------------------------ cells
@@ -388,7 +426,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             temp[i] = t - DRY_COOLING
             emit(x, y, i, steamId)
             events[Event.BOIL]++
-            wake(x, y)
+            wakeHeat(x, y)
         }
 
         // smoke thins out
@@ -441,7 +479,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
      */
     private fun burn(x: Int, y: Int, i: Int, m: Int): Boolean {
         val mt = materials
-        wake(x, y)
+        wakeHeat(x, y)
         val t = temp[i]
         if (t < mt.quenchTemp[m]) {
             quench(x, y, i, m)
@@ -493,7 +531,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             if (excess > 0) {
                 temp[i] -= excess
                 life[i] = minOf(Short.MAX_VALUE.toInt(), life[i] + excess).toShort()
-                wake(x, y)
+                wakeHeat(x, y)
             }
             if (life[i] < lat) return false
             temp[i] = bt + 2f
@@ -513,7 +551,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             if (deficit > 0) {
                 temp[i] += deficit
                 life[i] = minOf(Short.MAX_VALUE.toInt(), life[i] + deficit).toShort()
-                wake(x, y)
+                wakeHeat(x, y)
             }
             if (life[i] < lat) return false
             temp[i] = ft - 2f
@@ -552,7 +590,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         life[i] = initLife(m).toShort()
         variant[i] = next().toByte()
         flags[i] = (if (materials.spawnBurning[m]) Flag.BURNING else 0).toByte()
-        wake(x, y)
+        wakeHeat(x, y)
     }
 
     private fun clear(x: Int, y: Int, i: Int) {
@@ -560,7 +598,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         temp[i] = ambient
         life[i] = 0
         flags[i] = 0
-        wake(x, y)
+        wakeHeat(x, y)
     }
 
     /** The cell turns into [product] and keeps its temperature. */
@@ -570,7 +608,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         variant[i] = next().toByte()
         flags[i] = (if (materials.spawnBurning[product]) Flag.BURNING else 0).toByte()
         stamp[i] = mark
-        wake(x, y)
+        wakeHeat(x, y)
     }
 
     private fun swap(i: Int, j: Int, x: Int, y: Int, x2: Int, y2: Int) {
@@ -581,8 +619,15 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         val f = flags[i]; flags[i] = flags[j]; flags[j] = f
         stamp[i] = mark
         stamp[j] = mark
-        wake(x, y)
-        wake(x2, y2)
+        // a hot particle carries its heat into new surroundings
+        val dt = temp[i] - temp[j]
+        if (dt > SWAP_HEAT || dt < -SWAP_HEAT) {
+            wakeHeat(x, y)
+            wakeHeat(x2, y2)
+        } else {
+            wake(x, y)
+            wake(x2, y2)
+        }
     }
 
     private fun setVelocity(i: Int, v: Int) {
@@ -780,12 +825,13 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         internal val flags: ByteArray,
         internal val rng: Int,
         internal val pending: BooleanArray,
+        internal val heatPending: BooleanArray,
         internal val placed: IntArray,
     ) {
         val bytes: Int get() = mat.size * 9
     }
 
-    fun snapshot() = Snapshot(step, mat.copyOf(), temp.copyOf(), life.copyOf(), variant.copyOf(), flags.copyOf(), rng, pending.copyOf(), placed.copyOf())
+    fun snapshot() = Snapshot(step, mat.copyOf(), temp.copyOf(), life.copyOf(), variant.copyOf(), flags.copyOf(), rng, pending.copyOf(), heatPending.copyOf(), placed.copyOf())
 
     fun restore(s: Snapshot) {
         s.mat.copyInto(mat)
@@ -794,6 +840,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         s.variant.copyInto(variant)
         s.flags.copyInto(flags)
         s.pending.copyInto(pending)
+        s.heatPending.copyInto(heatPending)
         s.placed.copyInto(placed)
         stamp.fill(0)
         rng = s.rng
@@ -835,6 +882,9 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         /** A temperature change above this keeps a chunk awake. */
         private const val HEAT_WAKE = 0.02f
         private const val AIR_RELAX = 0.03f
+
+        /** Particles swapping places with more than this temperature difference stir up heat exchange. */
+        private const val SWAP_HEAT = 0.5f
         private const val AIR_SNAP = 0.5f
 
         private const val SUFFOCATE = 0.05f
