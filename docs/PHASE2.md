@@ -278,5 +278,8 @@ Desktop (Linux, Java 21, 4 Kerne), je 600 Schritte nach 300 zum Vorwärmen, je z
 
 - Das Licht kostet pro Berechnung 0,4 ms (leere Welt) bis 1,2 ms (mit Lava und Feuer). Alle 8 Schritte macht das 0,05 bis 0,15 ms pro Schritt.
 - Die voll aktive Welt mit Pflanzen, Tieren und Licht liegt bei rund 4 ms, also bei der Hälfte der Grenze von 8 ms (6.1) – auf diesem Rechner, der in Phase 1 etwa halb so schnell war wie das Galaxy Z Fold2 (voll aktive Welt 4,4 ms hier gegen 2,0 ms auf dem Handy).
-- **Bitte auf dem Handy erneut „Leistung messen“.** Die neue Zeile „Voll aktive Welt mit Pflanzen, Tieren und Licht“ ist der Wert für 6.1.
+- **CI-Rechner** (Java 17, beta-64): voll aktive Welt 6,43 ms, mit Pflanzen, Tieren und Licht 10,19 ms, Spielplatz 2,57 ms, Bild 2,49 ms (in der Pause 5,99 ms). Dieser Rechner schwankt stark und ist deutlich langsamer als das Handy: Für Build beta-60 maß er 7,46 ms für die voll aktive Welt, das Galaxy Z Fold2 2,01 ms. Umgerechnet ergibt das auf dem Handy etwa 2,8 ms für die Welt mit Pflanzen, Tieren und Licht.
+- **Bitte auf dem Handy erneut „Leistung messen“.** Die neue Zeile „Voll aktive Welt mit Pflanzen, Tieren und Licht“ ist der Wert für 6.1. Liegt er über 8 ms, ist der erste Hebel, das Licht seltener zu rechnen (alle 16 statt 8 Schritte), der zweite, Tiere nur jeden zweiten Schritt ziehen zu lassen.
+
+**Build:** [`beta-64`](https://github.com/shootcat/ReAct/releases/tag/beta-64). CI grün. Screenshots `12_leben` (lebende Startwelt) und `13_hoehle` (dunkle Grotte mit Glühwürmchen, herangezoomt, Kategorie „Leben“ in der Leiste) geprüft.
 
