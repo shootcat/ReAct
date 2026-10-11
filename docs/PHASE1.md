@@ -67,17 +67,19 @@ Alle Punkte sind in `sim/src/test/.../BehaviorTest.kt` als Test hinterlegt. Bild
 
 ### Gemessen
 
-Die Welt hat 200 × 350 Zellen. Gemessen wurden je 600 Schritte nach 60 Schritten Aufwärmen.
+Die Welt hat 200 × 350 Zellen. Gemessen wird nach 60 Schritten Aufwärmen, in den Gradle-Tests über je 600 Schritte, in der App über je 300.
 
-| Welt | Desktop (Linux, Java 21, 4 Kerne) | CI-Rechner (GitHub, JVM) | Handy |
-|---|---|---|---|
-| Leere Welt (alle Chunks schlafen) | über 3 Mio. Schritte/s | CI_EMPTY | **steht aus** |
-| Leere Welt, alle Chunks wach | 920 Schritte/s (1,09 ms) | CI_EMPTY_AWAKE | **steht aus** |
-| Voll aktive Welt, alle 77 Chunks wach, alles in Bewegung | **221 Schritte/s (4,5 ms)** | CI_FULL | **steht aus** |
-| Spielplatz mit Feuer, Sand und Wasser (33 von 77 Chunks wach) | 1150 Schritte/s (0,87 ms) | CI_SANDBOX | **steht aus** |
-| Bild erzeugen (Pixel, ohne Dunst und Schein) | 0,38 ms | CI_RENDER | **steht aus** |
+| Welt | Desktop (Linux, Java 21, 4 Kerne) | CI-Rechner, Gradle-Test (Java 17, parallel zum App-Build) | CI-Rechner, Messung in der App unter Robolectric | Handy |
+|---|---|---|---|---|
+| Leere Welt (alle Chunks schlafen) | über 2 Mio. Schritte/s | 1,6 Mio. Schritte/s | 0,3 Mio. Schritte/s | **steht aus** |
+| Leere Welt, alle Chunks wach | 1083 Schritte/s (0,92 ms) | 444 Schritte/s (2,25 ms) | 1471 Schritte/s (0,68 ms) | **steht aus** |
+| **Voll aktive Welt**, alle 77 Chunks wach, alles in Bewegung | **221 Schritte/s (4,5 ms)** | **136 Schritte/s (7,4 ms)** | **214 Schritte/s (4,7 ms)** | **steht aus** |
+| Spielplatz mit Feuer, Sand und Wasser (33 bis 35 von 77 Chunks wach) | 1129 Schritte/s (0,89 ms) | 609 Schritte/s (1,64 ms) | 1248 Schritte/s (0,80 ms) | **steht aus** |
+| Bild erzeugen (Pixel, ohne Dunst und Schein) | 0,38 ms | 0,72 ms | 0,27 ms | **steht aus** |
 
-Die „voll aktive Welt“ zwingt alle Chunks wach und ist zu einem Drittel aus Sand, einem Drittel aus Wasser und sonst aus Lava, Holz, Feuer und Dampf gemischt. Es ist der ungünstigste Fall: jede Zelle wird in jedem Schritt angefasst.
+Die CI-Werte stammen aus dem Lauf, der `beta-58` gebaut hat. Der Gradle-Test lief gleichzeitig mit dem Übersetzen der App und hatte deshalb weniger Rechenzeit. Das Ergebnisfenster der Messung in der App ist unten als Bild zu sehen. In allen Spalten liegt die voll aktive Welt beim Vier- bis Siebenfachen der geforderten 30 Schritte pro Sekunde.
+
+Die „voll aktive Welt“ zwingt alle Chunks wach. Sie ist zufällig gemischt: je gut ein Fünftel Sand und Wasser, dazu Erde, Lava, Holz, Feuer und Dampf, ein Drittel Luft. Es ist der ungünstigste Fall: jede Zelle wird in jedem Schritt angefasst, und überall fließt Wärme.
 
 ### Auf dem Handy
 
@@ -146,7 +148,21 @@ Diese Bilder zeigen, was der Renderer macht. Sie stammen aus den Simulationstest
 - `docs/phase1/sandbox_lava.png`: dazu Lava auf der Brücke und Wasser am Hügel;
 - `docs/phase1/sandbox_later.png`: 10 Sekunden später.
 
-Screenshots der echten App erzeugt jeder CI-Lauf; sie hängen an jedem Release:
-- Titel, Spielplatz, Feuer;
-- Pause mit Lava und Wasser, Lava trifft Wasser;
-- Zoom, Messung, Einstellungen.
+Screenshots der echten App aus dem CI-Lauf von `beta-58` (Robolectric, 411 × 891 dp), verkleinert in `docs/phase1/app/`:
+
+| Bild | Inhalt |
+|---|---|
+| `01_titel.png` | Startbildschirm mit kleiner echter Simulation: Lava läuft in den Teich, Sand rieselt |
+| `02_spielplatz.png` | Startlandschaft, Leiste, Tempo, Pinselgrößen |
+| `03_feuer.png` | Feuer am Holzstapel und an der Brücke, Rauchsäulen |
+| `04_pause_mit_lava_und_wasser.png` | in der Pause gesetzt: Wasser über dem Hügel, Lava an der Brücke |
+| `05_lava_trifft_wasser.png` | nach dem Start: Wasser fließt den Hang hinab, Dampf und Rauch |
+| `06_zoom.png` | zwei Finger: Teich vergrößert, Pixel ohne Glättung |
+| `07_messung.png` | „Leistung messen“ in der App |
+| `08_einstellungen.png` | Einstellungen |
+
+Jeder weitere CI-Lauf hängt die Screenshots in voller Größe an sein Release.
+
+## APK
+
+**Release `beta-58`:** https://github.com/shootcat/ReAct/releases/tag/beta-58 (Datei `REACT-beta.apk`). Es installiert sich als Update über frühere Builds.
