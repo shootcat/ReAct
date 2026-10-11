@@ -6,7 +6,7 @@ REACT wird ein Physik-Puzzle mit fein simulierter Materie, im Stil von Noita ode
 - Sand rieselt, Wasser fließt, Holz brennt, Lava erstarrt, Dampf steigt auf.
 - Was passiert, ergibt sich aus den **Eigenschaften** der Materialien (Dichte, Zündpunkt, Wärmeleitung …), nicht aus Rezepten.
 
-**Stand: Phase 1 „Spielplatz“ ist freigegeben; in Arbeit sind Phase 1b und 2** (Leitfaden V3, aktualisierte Fassung). Berichte: [`docs/PHASE1.md`](docs/PHASE1.md), [`docs/PHASE2.md`](docs/PHASE2.md).
+**Stand: Phase 1 „Spielplatz“ ist freigegeben; fertig sind Phase 1b, 2a (Bauen, Materialien) und 2b (Pflanzen, Tiere, Licht), in Arbeit ist 2c** (Leitfaden V3, aktualisierte Fassung). Berichte: [`docs/PHASE1.md`](docs/PHASE1.md), [`docs/PHASE2.md`](docs/PHASE2.md).
 
 Die Raster-Version mit Leveln (Leitfaden V1 und V2) ist nicht mehr Teil dieses Branches. Sie liegt hier:
 - Commit `a7fc414` (Tag `grid-legacy`),
@@ -25,11 +25,20 @@ Alle Builds sind mit demselben Schlüssel signiert und installieren sich als Upd
 
 ## Spielplatz
 
-1. Startbildschirm, dann **Spielplatz**. Die Startlandschaft ist 200 × 350 Zellen groß. Sie hat einen Hügel mit Erde und einem Holzstapel, einen Teich mit Holzbrücke, eine Sanddüne und tief im Fels eine Höhle mit Lava.
-2. **Material wählen** in der Leiste unten. Jede Karte zeigt die Körnung des Materials, den Vorrat (hier ∞) und die Kosten pro Einheit. Zur Auswahl stehen:
-   - Sand, Erde, Wasser, Holz, Feuer, Lava, Stein, Fels, Dampf, Rauch,
-   - dazu der Radierer, den es nur im Spielplatz gibt.
-3. **Malen und Schütten** mit einem Finger. Material landet nur dort, wo Luft ist, nie in Fels oder anderem Material. Ein liegen gelassener Finger schüttet weiter. Lose Stoffe fallen gestreut, feste Stoffe (Fels, Holz) werden als geschlossene Form gezeichnet. Rechts neben dem Tempo stehen vier Pinselgrößen.
+1. Startbildschirm, dann **Spielplatz**. Die Startlandschaft ist 200 × 350 Zellen groß:
+   - ein grasbewachsener Hügel mit zwei Bäumen, einem Busch, einem Holzstapel und Vögeln;
+   - ein Teich mit Fischen und einer Holzbrücke, eine Ranke wächst zu ihm hin;
+   - eine Sanddüne;
+   - unter dem Hügel eine dunkle Grotte mit Wasser, Moos und Glühwürmchen, tief im Fels eine Höhle mit Lava.
+2. **Material wählen** in der Leiste unten, in Kategorien. Jede Karte zeigt die Körnung des Materials, den Vorrat (hier ∞) und die Kosten pro Einheit.
+   - **Lose:** Sand, Erde, Kies, Lehm, Salz, Schnee, Geröll, Erzgeröll, Holzkohle, Asche.
+   - **Flüssig:** Wasser, Salzwasser, Lava, flüssiges Metall, Dampf, Rauch.
+   - **Bauen:** Holz, Ziegel, Stein, Glas, Metall, Eis.
+   - **Hitze:** Feuer, Glut, Lava.
+   - **Leben:** Samen, Gras, Moos, Ranke, Fisch, Glühwürmchen, Wurm, Vogel.
+   - Dazu der Radierer, den es nur im Spielplatz gibt. Fels ist Gelände und nicht in der Hand des Spielers.
+3. **Malen und Schütten** mit einem Finger. Material landet nur dort, wo Luft ist, nie in Fels oder anderem Material. Ein liegen gelassener Finger schüttet weiter. Lose Stoffe fallen gestreut, feste Stoffe werden als geschlossene Form gezeichnet. Fünf Pinselgrößen, die kleinste setzt genau ein Partikel.
+   - **Bauwerkzeuge:** Pinsel, Linie, Rechteck und Rahmen. Beim Ziehen zeigt eine halbtransparente Vorschau, was entsteht; Loslassen baut es. Das geht auch in der Pause.
 4. **Zwei Finger** zoomen (bis sechsfach) und verschieben. Kommt der zweite Finger in den ersten 70 ms, entsteht kein Klecks.
 5. **Pause, Normal, Schnell.** Normal sind 60 Schritte pro Sekunde, Schnell bis zu 180. In der Pause lassen sich mehrere Dinge setzen, die dann gemeinsam starten.
 6. **↶ Rückgängig** nimmt den letzten Strich zurück, bis zu 25 Striche. **↺ Neu beginnen** stellt die Startlandschaft wieder her und lässt sich ebenfalls rückgängig machen.
@@ -64,13 +73,22 @@ Das Modul ist reines Kotlin ohne Android. Es läuft identisch in den Tests auf d
   - Fließendes Wasser trägt lose Körner mit.
   - Dampf kondensiert beim Abkühlen zu Wasser.
 - **Gase** steigen nach ihrer Dichte auf und verlassen die Welt nach oben. Unter Überhängen sammeln sie sich.
+- **Strukturen:** Zusammenhängende feste Zellen bilden eine Struktur. Berührt sie verankertes Gelände (Fels), steht sie, sonst fällt sie als Ganzes.
+- **Licht** (`Light.kt`): ein Lichtfeld in Blöcken zu 2 × 2 Zellen, alle 8 Schritte neu.
+  - Tageslicht fällt von oben ein und streut, Feuer, Glut, Lava, Glühendes und Glühwürmchen leuchten selbst.
+  - Luft, Wasser, Glas und Laub lassen Licht durch, feste Stoffe nicht.
+  - Höhlen ohne Lichtquelle sind dunkel.
+- **Pflanzen und Tiere** (`Life.kt`) sind Zellen wie alles andere:
+  - Pflanzen wachsen über Zufallsticks (jede Zelle etwa einmal pro Sekunde), wenn sie Licht und Wasser haben, und sterben an Hitze und Salz.
+  - Bäume und Ranken sind Strukturen.
+  - Tiere bewegen sich in jedem Schritt nach einfachen Regeln.
 - **Deterministisch:**
   - fester Seed pro Welt und ein einziger Zufallsgenerator in fester Reihenfolge;
   - im Schritt nur Addition und Multiplikation;
   - Eingaben wirken immer zwischen zwei Schritten.
 
   Dieselben Aktionen ergeben auf jedem Gerät und bei jeder Bildrate dieselbe Welt. `Session` protokolliert jede Eingabe mit ihrem Schritt und kann das Protokoll wieder abspielen.
-- **Undo** über Schnappschüsse des ganzen Zustands, 9 Byte pro Zelle, also etwa 630 kB pro Schnappschuss.
+- **Undo** über Schnappschüsse des ganzen Zustands: 9 Byte pro Zelle und das Lichtfeld, also etwa 700 kB pro Schnappschuss.
 - **SimRunner** rechnet auf einem eigenen Thread mit fester Schrittweite. Er zeichnet das fertige Bild in einen Puffer, und die Oberfläche holt nur fertige Bilder ab. Wird die Simulation langsamer als Echtzeit, läuft sie langsamer, statt Schritte aufzustauen.
 - **Darstellung:**
   - ein Pixel pro Zelle, ohne Glättung skaliert;
@@ -102,6 +120,15 @@ Die Einheiten stehen in der Datei.
 | Dampf | Gas | steigt schnell, kondensiert unter 90 °C zu Wasser |
 | Lava | flüssig | zäh, 1250 °C, erstarrt unter 850 °C (mit Erstarrungswärme) zu Stein |
 | Asche, Holzkohle, Glas | entstehen | Asche und Holzkohle schwimmen; Holzkohle glüht lange ohne Flamme; Glas ist fest und durchsichtig |
+| Gras | Erde mit Gras | wächst im Licht auf feuchte Erde daneben, hält Erde zusammen, brennt gut, stirbt an Salz und Hitze zu Erde |
+| Moos | Leben | wächst in dunklen, feuchten Höhlen an Wänden und Decken |
+| Ranke | fest (Struktur) | wächst zum nächsten Wasser, trägt als Brücke oder Leiter |
+| Samen | Pulver | keimt auf feuchter Erde im Licht zu Busch oder Baum |
+| Stamm, Laub | fest (Struktur) | ein Baum; durchgebrannt oder abgesägt fällt der obere Teil; stirbt an Salzwasser zu Totholz |
+| Fisch | Leben | schwimmt in Süßwasser, stirbt in Salzwasser, in Hitze und an Land |
+| Glühwürmchen | Leben | schwirrt im Dunkeln und leuchtet schwach |
+| Wurm | Leben | lockert Erde, Wasser sickert ein |
+| Vogel | Leben | fliegt bei Feuer oder Rauch davon |
 
 ## Projektstruktur
 
@@ -109,6 +136,8 @@ Die Einheiten stehen in der Datei.
 sim/                        Partikelsimulation, reines Kotlin (ohne Android)
   World.kt                  Zustand und Schritt: Wärme, Feuer, Phasen, Bewegung, Chunks, Schnappschüsse
   Materials.kt              materials.json lesen, flache Tabellen für den Schritt
+  Light.kt                  Lichtfeld: Tageslicht, Lichtquellen, Durchlass
+  Life.kt                   Pflanzen (Zufallsticks) und Tiere
   Session.kt                Pinsel, Undo, Reset, Aktionsprotokoll, Wiedergabe
   SimRunner.kt              eigener Thread, feste Schrittweite, fertige Bilder, Leistungswerte
   Renderer.kt               Pixelbild, Dunst- und Glühschicht, Hintergrund
@@ -121,6 +150,7 @@ app/                        Android-App (Kotlin, Jetpack Compose)
   audio/SoundManager.kt     Effekte (SoundPool) und Musik (MediaPlayer)
   data/                     Einstellungen, Fortschritt
 docs/PHASE1.md              Bericht zu Phase 1: Zusammenfassung, Abweichungen, Messwerte
+docs/PHASE2.md              Bericht zu Phase 1b und 2: Zusammenfassung, Abweichungen, Messwerte
 docs/v2/                    Unterlagen der Raster-Version (Leitfaden V2)
 ```
 

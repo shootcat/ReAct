@@ -193,7 +193,7 @@ private class TitleScene(materials: MaterialTable) {
         if (t % 600 == 60) world.paint(fire, 60, 38, 2, 0.8f)
         world.step()
         if (world.step >= LOOP) world.restore(start)
-        renderer.render(pixels, t)
+        renderer.render(pixels, t, running = true)
         renderer.renderLayers(haze, light)
         renderer.renderFlames(flames)
         flameBitmap.setPixels(flames, 0, renderer.flameWidth, 0, 0, renderer.flameWidth, renderer.flameHeight)

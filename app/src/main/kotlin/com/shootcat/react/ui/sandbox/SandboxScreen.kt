@@ -96,13 +96,13 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-/** Materials in the bar, in this order (Leitfaden V3, Phase 1). */
 /** The materials in the bar, by kind. Rock is level ground and never in the player's hands (Leitfaden V3, 3.1.6). */
 private val CATEGORIES = listOf(
     "Lose" to listOf("sand", "earth", "gravel", "clay", "salt", "snow", "rubble", "ore_rubble", "charcoal", "ash"),
     "Flüssig" to listOf("water", "saltwater", "lava", "molten_metal", "steam", "smoke"),
     "Bauen" to listOf("wood", "brick", "stone", "glass", "metal", "ice"),
     "Hitze" to listOf("fire", "ember", "lava"),
+    "Leben" to listOf("seed", "grass", "moss", "vine", "fish", "firefly", "worm", "bird"),
 )
 
 /** Brush radii in cells; 0 places a single particle. */
@@ -156,7 +156,8 @@ fun SandboxScreen(
                 runner.runBlocking { s ->
                     val results = Benchmark.runAll(materials, s.width, s.height, steps = 300)
                     val render = Benchmark.renderMillis(Benchmark.sandboxWorld(materials, s.width, s.height))
-                    Benchmark.report(results, render, device)
+                    val paused = Benchmark.renderMillis(Benchmark.sandboxWorld(materials, s.width, s.height), paused = true)
+                    Benchmark.report(results, render, device, paused)
                 }
             }
             Log.i("REACT", text)

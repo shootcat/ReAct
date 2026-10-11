@@ -170,3 +170,113 @@ Desktop (Linux, Java 21, 4 Kerne), je 600 Schritte:
 | Bild erzeugen | 0,98 ms | 0,93 ms |
 
 Auf dem Handy bitte wieder „Leistung messen“; die Grenze von 8 ms pro Schritt (6.1) ist weit entfernt.
+
+**Build:** [`beta-63`](https://github.com/shootcat/ReAct/releases/tag/beta-63). Der erste Lauf (62) war rot: Auf 411 dp Breite drückte die Pinselauswahl den Reiter „Hitze“ auf null Breite, der App-Test fand „Feuer“ nicht. Die Reiter rollen jetzt seitlich, die Pinselknöpfe sind 32 dp groß. Screenshots `10_bauen_vorschau` (halbtransparente Vorschau beim Ziehen) und `11_gebaut` (Ziegelrahmen mit Holzbrett fällt als ein Stück) geprüft.
+
+## Phase 2b: Flora, Fauna, Licht
+
+### Zusammenfassung
+
+**Licht (4.2, Licht 1 bis 3)**
+
+- **Lichtfeld** in Blöcken zu 2 × 2 Zellen, Werte von 0 (dunkel) bis 1 (Tageslicht). Die Simulation rechnet es alle 8 Schritte neu (`Light.kt`), nur mit Addition, Multiplikation und Vergleichen, also deterministisch. Es gehört zum Zustand und steckt im Schnappschuss, damit Undo und Wiedergabe exakt bleiben.
+- **Lichtquellen:**
+  - Himmel: fällt von oben senkrecht ein und streut von dort langsam in alle Richtungen (bleibt pro Block zu 95 % erhalten). So ist der Schatten unter der Brücke oder einem Baum gedämpft, aber nicht schwarz, und Tageslicht reicht ein Stück in einen Höhleneingang.
+  - Feuer 1,0; Lava und flüssiges Metall 0,8; Brennendes und Glut 0,7; alles ab 480 °C glüht, je heißer, desto heller (heißes Metall, heißer Sand, heißer Fels); Glühwürmchen 0,35. Licht von Quellen fällt schneller ab (86 % pro Block).
+- **Was Licht durchlässt** (Feld `light_pass` pro Zelle):
+  - Luft ganz;
+  - Wasser 0,985, Salzwasser 0,98 (ein 20 Zellen tiefer Teich ist unten etwa halb so hell);
+  - Glas 0,99, Eis 0,95;
+  - Laub 0,75, Ranke und Moos 0,6;
+  - Rauch 0,85, Dampf 0,93.
+  - Feste Stoffe, Pulver und Fels halten es auf. Ein Block lässt den kleineren Wert aus „quer durch“ und „senkrecht durch“ durch; so hält eine Wand Licht auf, egal wie sie im Raster liegt.
+- **Höhlen ohne Lichtquelle sind wirklich dunkel:** Die Grotte unter dem Hügel ist schwarz bis auf die Glühwürmchen, die Lavahöhle leuchtet von innen.
+- **Pflanzen wachsen nur mit Licht:** Gras braucht 0,45, Samen 0,35, Bäume 0,3, Ranken 0,25. Moos ist die Ausnahme aus 4.2.2: Es wächst nur unter 0,2.
+- **Darstellung:**
+  - Luft, Wasser und Glas zeigen das echte Licht, ebenso der Hintergrund dahinter.
+  - Selbstleuchtendes (Feuer, Glut, Lava, Glühendes, Glühwürmchen) wird nicht abgedunkelt.
+  - Rauch in einer dunklen Höhle ist dunkel.
+  - Die Helligkeit folgt dem Auge (1 − (1 − Licht)²): Halbschatten wirkt hell, Dunkel bleibt dunkel.
+
+**Flora (4.2, Flora 1 bis 6)**
+
+- **Wächst langsam:** Statt jede Pflanze in jedem Schritt anzusehen, bekommen pro Schritt 1093 zufällig gewählte Zellen einen „Zufallstick“ (eine pro 64 Zellen), also jede Zelle etwa einmal pro Sekunde. Pflanzen halten ihren Chunk deshalb nicht wach.
+- **Brennt gut:** Gras zündet bei 230 °C, Laub bei 240 °C, Welkes bei 200 °C; Flammen und Rauch wie Holz. Ein Grasbrand läuft den ganzen Hang entlang.
+- **Hält Erde zusammen:** Erde unter oder neben Wurzeln (Gras, Moos, Ranke, Stamm, bis drei Zellen tief) rutscht nicht und wird nicht weggespült, auch nass nicht. Eine nasse Erdwand mit Grasnarbe steht, eine nackte sackt zusammen.
+1. **Gras** ist Erde mit Gras darauf. Es breitet sich auf feuchte Erde daneben aus (eben, eine Stufe hinauf oder hinab), nur an der Oberfläche und nur im Licht, etwa eine Zelle alle 3 bis 4 Sekunden je Rand. Auf trockener Erde und im Dunkeln wächst es nicht. Halme werden in die Luft darüber gezeichnet.
+2. **Moos** wächst an Wänden, Böden und Decken dunkler Höhlen, so weit es feucht ist: bis zu 6 Zellen von Wasser oder nassem Grund entfernt.
+3. **Ranken** suchen in 30 Zellen Umkreis das nächste Wasser und wachsen Zelle für Zelle zur Wasseroberfläche, über Kanten hinweg und um Hindernisse herum; ohne Wasser in Reichweite hängen sie herab. Sie sind fest: An Fels verankert tragen sie als lebende Brücke oder Leiter. Bis 64 Zellen lang, mit gelegentlichen Verzweigungen.
+4. **Samen** keimen auf feuchter Erde (oder Gras) im Licht, zu 60 % zum Baum, sonst zum Busch.
+5. **Bäume** wachsen an der Spitze: ein Stamm von 14 bis 21 Zellen, im oberen Teil Äste zur Seite, am Ende eine Krone aus Laub, an den Astenden kleine Kronen. Stamm, Äste und Laub sind fest, also eine Struktur nach 3.1:
+   - Am Fuß abgesägt fällt der Baum als Ganzes, mit jedem Blatt.
+   - Brennt der Stamm unten durch, kommt der obere Teil herunter. Meist hat das Feuer die Krone dann schon erfasst, weil Flammen am Stamm hochsteigen.
+   - Neue Zellen gehören sofort zur Struktur des Baums. So muss beim Wachsen nicht neu nach Strukturen gesucht werden; die Suche läuft nur, wenn ein Baum an Fels oder eine andere Struktur stößt.
+   - Ausgewachsene Bäume lassen ab und zu einen Samen fallen.
+6. **Absterben:**
+   - Gras, Moos, Ranken, Samen und Laub sterben über 60 bis 70 °C und neben Salz oder Salzwasser. Gras wird zu Erde (nass bleibt nass), der Rest zu „Welkes“, einem leichten, gut brennbaren Pulver.
+   - Ein Stamm in Salzwasser (oder über 150 °C) wird zu Totholz. Das Sterben wandert den Stamm hinauf, und Laub neben Totholz welkt.
+
+**Fauna (4.2, Fauna 1 bis 4)**, Tiere sind Zellen wie alles andere, mit einfachen Regeln:
+1. **Fische** schwimmen in Süßwasser hin und her, ab und zu auf und ab, und wenden an Hindernissen. In Salzwasser oder über 38 °C sterben sie sofort. An Land zappeln sie, fallen und ersticken nach 4 Sekunden. Was bleibt, ist ein toter Fisch, der treibt und nach 40 Sekunden verschwindet. Gezeichnet mit Schwanzflosse.
+2. **Glühwürmchen** schwirren durch die Luft, geben schwaches Licht (0,35) und blinken. In hellere Bereiche fliegen sie nur selten: Freigelassen an der Grenze zwischen Höhle und Tageslicht sammeln sie sich im Dunkeln.
+3. **Würmer** kriechen langsam durch Erde, meist seitwärts, und lockern sie (Markierung pro Zelle). Nasse lockere Erde gibt ihr Wasser an trockene Erde darunter weiter; so sickert Wasser auf Wurmerde viel tiefer ein, eine Pfütze darauf verschwindet. Außerhalb der Erde trocknen Würmer nach 15 Sekunden aus.
+4. **Vögel** sitzen auf Bäumen und Brücke, hüpfen selten. Sehen sie Feuer oder Rauch in 14 Zellen Umkreis, fliegen sie auf und davon, aus der Welt hinaus (nur Stimmung). Gezeichnet mit Kopf, im Flug mit schlagenden Flügeln.
+
+**Startlandschaft:** Gras auf dem Hügel, am Teich ist die Erde feucht. Zwei Bäume und ein Busch, eine Ranke wächst vom unteren Baum zum Teich. Sechs Fische im Teich, sechs Würmer in der Erde, drei Vögel. Unter dem Hügel eine geschlossene, dunkle Grotte mit Wasser, Moos an den feuchten Wänden und acht Glühwürmchen.
+
+**App:** Neue Kategorie **Leben** in der Leiste: Samen, Gras, Moos, Ranke, Fisch, Glühwürmchen, Wurm, Vogel. „Leistung messen“ misst zusätzlich die voll aktive Welt mit Pflanzen, Tieren und Licht und das Bild in der Pause.
+
+**Tests** (alle grün, 65 in `sim`):
+- `LightTest`: Tageslicht, geschlossene Höhle dunkel, Öffnung lässt Licht ein; Wasser und Glas lassen durch, Stein nicht; Feuer, Glut, Lava, heißes Metall und Glühwürmchen erhellen eine dunkle Höhle.
+- `FloraTest`: Gras nur auf feuchter Erde und im Licht; Moos nur im Dunkeln; Ranke erreicht Wasser und bleibt am Fels; Samen wird zu Baum oder Busch, nicht im Dunkeln und nicht ohne Wasser; Baum fällt abgesägt als Ganzes; durchgebrannter Stamm; Absterben durch Salzwasser und heißen Sand, Baum in Salzwasser; Wurzeln halten eine nasse Erdwand.
+- `FaunaTest`: Fische schwimmen und bleiben im Wasser; sterben in Salzwasser, heißem Wasser, an Land; Glühwürmchen sammeln sich im Dunkeln; Würmer lassen Wasser einsickern; Vögel fliehen vor Feuer.
+
+Bilder in `docs/phase2/`:
+- `sandbox_start.png`: die Startlandschaft;
+- `life_hill.png`, `life_minute.png`: der Hang am Start und eine Minute später;
+- `life_fire.png`, `life_after_fire.png`: Feuer im Baum am Hang, der Grasbrand läuft den Hang hinauf;
+- `life_grotto.png`: die dunkle Grotte;
+- `tree.png`, `tree_cut.png`: ein Baum, abgesägt;
+- `vine.png`: eine Ranke wächst vom Fels zum Wasser;
+- `seed_grown.png`: ein Samen ist zum Busch geworden;
+- `materials.png`: alle Materialien, ohne Licht gezeichnet.
+
+### Abweichungen mit Begründung
+
+1. **Gras ist ein Erdmaterial („Erde mit Gras“), keine Zelle Halm über der Erde.** Als eigene Zelle in der Luft wäre jedes Grasbüschel für Wasser eine Wand. So fließt Wasser über die Wiese, und Gras stirbt zu Erde zurück. Die Halme sind nur gezeichnet.
+2. **Moos wächst gerade im Dunkeln.** Der Leitfaden sagt „Pflanzen wachsen nur mit Licht“ und „Moos wächst in dunklen, nassen Höhlen“. Moos ist hier die Ausnahme (`light_max` 0,2); alle anderen brauchen Licht.
+3. **Feste Stoffe werden im Dunkeln nicht schwarz, sondern höchstens auf 58 % abgedunkelt** (Schnittfläche). Ganz physikalisch wäre der ganze Fels unter der Oberfläche schwarz, mit allen Erzadern. Höhlen selbst (Luft, Wasser, Hintergrund) sind wirklich dunkel. Für die Pflanzen gilt nur das echte Licht.
+4. **Licht in Blöcken zu 2 × 2 Zellen, alle 8 Schritte neu.** Zellgenau und in jedem Schritt wäre es etwa 30-mal so teuer. Beim Zeichnen nutzt die App das Licht der Simulation, solange sie läuft (es kann bis zu 8 Schritte alt sein, das sieht man nicht). In der Pause rechnet das Bild sein eigenes, damit Platziertes sofort leuchtet.
+5. **Neue Materialien über die Liste hinaus:** Totholz (abgestorbener Stamm), Welkes (abgestorbene Pflanzen), toter Fisch. Ohne sie müssten Pflanzen und Fische einfach verschwinden.
+6. **Neue Felder:**
+   - `organism` (Verhalten);
+   - `light_need`, `light_max`, `grow`, `grow_size`, `grows_on`;
+   - `lives_in`, `move`;
+   - `dies_above`, `dies_in_salt`, `death_product`;
+   - `roots`, `light_pass`.
+
+   Das Verhalten selbst (wie ein Baum wächst, wie ein Fisch schwimmt) steht im Code in `Life.kt`. Allgemeine Regeln für Lebewesen statt Rezepte; die Werte stehen in der Datei.
+7. **Tiere halten ihren Chunk wach,** weil sie sich in jedem Schritt bewegen können. Die Startlandschaft hat deshalb 51 statt 33 wache Chunks (Teich, Grotte, Hang). Das kostet die meiste zusätzliche Zeit im Spielplatz.
+8. **Glühwürmchen suchen das Dunkel nicht aktiv,** sie meiden hellere Plätze. Im gleichmäßigen Tageslicht schwirren sie frei herum; geraten sie ins Dunkel, bleiben sie dort.
+9. **Vögel kommen nicht zurück**, wenn sie einmal weggeflogen sind (Stimmung, kein Spielelement).
+10. **Zwei ältere Tests waren vom Zufall abhängig** („Salz schmilzt Eis und Schnee“, „Salzwasser siedet“). Die Zufallsticks verbrauchen Zufallszahlen, dadurch kippten sie. Sie vergleichen jetzt mit einer Kontrollgruppe ohne Salz und zählen Siedevorgänge statt sichtbaren Dampf. Am Verhalten hat sich nichts geändert.
+11. **Der Leistungstest wärmt jetzt 300 statt 60 Schritte vor.** Mit 60 fiel das Nachübersetzen des Just-in-time-Compilers in die gemessenen Schritte; die Werte schwankten um das Dreifache.
+
+### Leistung
+
+Desktop (Linux, Java 21, 4 Kerne), je 600 Schritte nach 300 zum Vorwärmen, je zwei Läufe; Phase 2a auf derselben Maschine mit demselben Verfahren nachgemessen:
+
+| Welt | Phase 2a | Phase 2b |
+|---|---|---|
+| Leere Welt | 0,00 ms | 0,10 ms (Licht alle 8 Schritte, Zufallsticks) |
+| Leere Welt, alle Chunks wach | 0,26 bis 0,31 ms | 0,33 bis 0,37 ms |
+| Voll aktive Welt (alle 77 Chunks wach) | 3,51 bis 3,63 ms | 3,89 bis 4,13 ms |
+| **Voll aktive Welt mit Pflanzen, Tieren und Licht** | – | **4,02 bis 4,28 ms** |
+| Spielplatz mit Feuer, Sand und Wasser | 0,91 bis 1,06 ms | 1,81 bis 1,86 ms |
+| Bild erzeugen, laufend | 1,23 bis 1,39 ms | 1,30 bis 1,82 ms |
+| Bild erzeugen in der Pause (eigenes Licht) | – | 1,83 bis 2,55 ms |
+
+- Das Licht kostet pro Berechnung 0,4 ms (leere Welt) bis 1,2 ms (mit Lava und Feuer). Alle 8 Schritte macht das 0,05 bis 0,15 ms pro Schritt.
+- Die voll aktive Welt mit Pflanzen, Tieren und Licht liegt bei rund 4 ms, also bei der Hälfte der Grenze von 8 ms (6.1) – auf diesem Rechner, der in Phase 1 etwa halb so schnell war wie das Galaxy Z Fold2 (voll aktive Welt 4,4 ms hier gegen 2,0 ms auf dem Handy).
+- **Bitte auf dem Handy erneut „Leistung messen“.** Die neue Zeile „Voll aktive Welt mit Pflanzen, Tieren und Licht“ ist der Wert für 6.1.
+

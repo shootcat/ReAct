@@ -134,6 +134,26 @@ class AppSmokeTest {
         shot("08_einstellungen")
     }
 
+    /** Plants, animals and light (2b): the living start world, seeds and fireflies placed, the dark grotto up close. */
+    @Test
+    fun lifeAndLight(): Unit = ActivityScenario.launch(MainActivity::class.java).use {
+        compose.waitForIdle()
+        compose.onNodeWithText("Spielplatz").performClick()
+        run(2000)
+        shot("12_leben")
+        compose.onNodeWithTag("category_Leben").performScrollTo().performClick()
+        compose.onNodeWithTag("material_Samen").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("Pinsel 1").performClick()
+        paint(70, 140, holdMillis = 100)
+        compose.onNodeWithTag("material_Glühwürmchen").performScrollTo().performClick()
+        paint(44, 205, holdMillis = 100)
+        run(1500)
+        // two fingers zoom in on the grotto under the hill: dark, with fireflies and moss
+        compose.onNodeWithTag("world").performTouchInput { pinch(cellToOffset(44, 212), 4f) }
+        run(1500)
+        shot("13_hoehle")
+    }
+
     /** The supply bar with large system font, scrolled half way: no label may run into another (3.4). */
     @Test
     @Config(sdk = [34], qualifiers = "w411dp-h891dp-xxhdpi", fontScale = 1.3f)
