@@ -14,6 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.shootcat.react.ui.book.BookScreen
 import com.shootcat.react.ui.sandbox.SandboxScreen
 import com.shootcat.react.ui.settings.SettingsScreen
 import com.shootcat.react.ui.theme.Palette
@@ -42,6 +43,11 @@ fun ReactApp(viewModel: AppViewModel) {
                         onChange = viewModel::updateSettings,
                         onBack = viewModel::back,
                     )
+                    state.screen == Screen.BOOK && viewModel.book != null -> BookScreen(
+                        book = viewModel.book,
+                        found = state.discoveries,
+                        onBack = viewModel::back,
+                    )
                     else -> SandboxScreen(
                         runner = viewModel.sandbox(),
                         materials = materials,
@@ -53,6 +59,8 @@ fun ReactApp(viewModel: AppViewModel) {
                         onMode = viewModel::selectMode,
                         onSettings = { viewModel.updateSettings(it) },
                         onOpenSettings = { viewModel.open(Screen.SETTINGS) },
+                        onOpenBook = { viewModel.open(Screen.BOOK) },
+                        onDiscovered = viewModel::discovered,
                         onBack = viewModel::back,
                     )
                 }

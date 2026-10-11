@@ -12,11 +12,13 @@ import androidx.compose.ui.test.TouchInjectionScope
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ActivityScenario
 import com.shootcat.react.sim.Terrain
@@ -152,6 +154,54 @@ class AppSmokeTest {
         compose.onNodeWithTag("world").performTouchInput { pinch(cellToOffset(44, 212), 4f) }
         run(1500)
         shot("13_hoehle")
+    }
+
+    /**
+     * Procuring and the discovery book (4.3): only the bucket, the hand and the store; a log picked up and
+     * made into planks, built with; water scooped from the pond and poured on the hill; then the book.
+     */
+    @Test
+    fun procureAndBook(): Unit = ActivityScenario.launch(MainActivity::class.java).use {
+        compose.waitForIdle()
+        compose.onNodeWithText("Spielplatz").performClick()
+        run(1500)
+        compose.onNodeWithContentDescription("Menü").performClick()
+        compose.onNodeWithText("Modus: nur Beschaffen").performClick()
+        run(500)
+        compose.onNodeWithTag("category_Werkzeug").performScrollTo().performClick()
+        compose.onNodeWithTag("material_Hand").performClick()
+        // the fallen log on the dune
+        compose.onNodeWithTag("world").performTouchInput {
+            down(cellToOffset(156, 153))
+            up()
+        }
+        run(500)
+        shot("14_hand")
+        compose.onNodeWithTag("material_Zu Brettern").performClick()
+        run(500)
+        compose.onNodeWithTag("category_Lager").performScrollTo().performClick()
+        compose.onNodeWithTag("material_Holz").performClick()
+        compose.onNodeWithTag("mode_Linie").performClick()
+        drag(118, 120, 150, 120)
+        run(1500)
+        shot("15_lager_gebaut")
+        // the bucket: water from the pond onto the hill
+        compose.onNodeWithTag("mode_Pinsel").performClick()
+        compose.onNodeWithTag("category_Werkzeug").performScrollTo().performClick()
+        compose.onNodeWithTag("material_Schöpfen").performClick()
+        paint(100, 172, holdMillis = 400)
+        compose.onNodeWithTag("material_Gießen").performClick()
+        paint(40, 95, holdMillis = 800)
+        run(1500)
+        shot("16_eimer")
+        compose.onNodeWithContentDescription("Menü").performClick()
+        compose.onNodeWithText("Entdeckungsbuch").performClick()
+        run(500)
+        shot("17_buch")
+        compose.onNodeWithTag("book").performScrollToNode(hasTestTag("entry_firefly_shine"))
+        compose.onNodeWithTag("entry_firefly_shine").performClick()
+        run(2000)
+        shot("18_buch_szene")
     }
 
     /** The supply bar with large system font, scrolled half way: no label may run into another (3.4). */

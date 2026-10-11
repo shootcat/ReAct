@@ -6,7 +6,7 @@ REACT wird ein Physik-Puzzle mit fein simulierter Materie, im Stil von Noita ode
 - Sand rieselt, Wasser fließt, Holz brennt, Lava erstarrt, Dampf steigt auf.
 - Was passiert, ergibt sich aus den **Eigenschaften** der Materialien (Dichte, Zündpunkt, Wärmeleitung …), nicht aus Rezepten.
 
-**Stand: Phase 1 „Spielplatz“ ist freigegeben; fertig sind Phase 1b, 2a (Bauen, Materialien) und 2b (Pflanzen, Tiere, Licht), in Arbeit ist 2c** (Leitfaden V3, aktualisierte Fassung). Berichte: [`docs/PHASE1.md`](docs/PHASE1.md), [`docs/PHASE2.md`](docs/PHASE2.md).
+**Stand: Phase 1 „Spielplatz“ ist freigegeben; fertig sind Phase 1b, 2a (Bauen, Materialien), 2b (Pflanzen, Tiere, Licht) und 2c (Beschaffen, Entdeckungsbuch). Phase 2 wartet auf die Freigabe** (Leitfaden V3, aktualisierte Fassung). Berichte: [`docs/PHASE1.md`](docs/PHASE1.md), [`docs/PHASE2.md`](docs/PHASE2.md).
 
 Die Raster-Version mit Leveln (Leitfaden V1 und V2) ist nicht mehr Teil dieses Branches. Sie liegt hier:
 - Commit `a7fc414` (Tag `grid-legacy`),
@@ -39,10 +39,17 @@ Alle Builds sind mit demselben Schlüssel signiert und installieren sich als Upd
    - Dazu der Radierer, den es nur im Spielplatz gibt. Fels ist Gelände und nicht in der Hand des Spielers.
 3. **Malen und Schütten** mit einem Finger. Material landet nur dort, wo Luft ist, nie in Fels oder anderem Material. Ein liegen gelassener Finger schüttet weiter. Lose Stoffe fallen gestreut, feste Stoffe werden als geschlossene Form gezeichnet. Fünf Pinselgrößen, die kleinste setzt genau ein Partikel.
    - **Bauwerkzeuge:** Pinsel, Linie, Rechteck und Rahmen. Beim Ziehen zeigt eine halbtransparente Vorschau, was entsteht; Loslassen baut es. Das geht auch in der Pause.
+   - **Werkzeug:**
+     - Eimer: schöpft eine Sorte loses oder flüssiges Material, gießt es mit seiner Temperatur wieder aus.
+     - Hand: trägt lose Objekte, nicht zu schwer, nicht zu heiß, nicht in Fels verankert.
+     - „Zu Brettern“ / „Ins Lager“: ein Stamm ergibt 3 Bretter pro Zelle.
+   - **Modus „nur Beschaffen“** (Menü): keine unendliche Leiste mehr, nur Eimer, Hand und das Lager. Gebaut wird mit dem, was beschafft wurde.
 4. **Zwei Finger** zoomen (bis sechsfach) und verschieben. Kommt der zweite Finger in den ersten 70 ms, entsteht kein Klecks.
 5. **Pause, Normal, Schnell.** Normal sind 60 Schritte pro Sekunde, Schnell bis zu 180. In der Pause lassen sich mehrere Dinge setzen, die dann gemeinsam starten.
 6. **↶ Rückgängig** nimmt den letzten Strich zurück, bis zu 25 Striche. **↺ Neu beginnen** stellt die Startlandschaft wieder her und lässt sich ebenfalls rückgängig machen.
 7. Im **Menü** (Zahnrad) gibt es:
+   - **Modus**: unendlicher Vorrat oder nur Beschaffen,
+   - **Entdeckungsbuch**: jede zum ersten Mal beobachtete Eigenschaft („Neu: Sand behält Wärme“), mit kleiner Animation,
    - **Leistung messen** (Ergebnis zum Kopieren),
    - **Leistungsanzeige**: Schritte pro Sekunde, ms pro Schritt, ms pro Bild, wache Chunks,
    - **Alles leeren**,
@@ -138,7 +145,8 @@ sim/                        Partikelsimulation, reines Kotlin (ohne Android)
   Materials.kt              materials.json lesen, flache Tabellen für den Schritt
   Light.kt                  Lichtfeld: Tageslicht, Lichtquellen, Durchlass
   Life.kt                   Pflanzen (Zufallsticks) und Tiere
-  Session.kt                Pinsel, Undo, Reset, Aktionsprotokoll, Wiedergabe
+  Discoveries.kt            Entdeckungsbuch: Einträge (discoveries.json), Beobachtung, Szenen
+  Session.kt                Pinsel, Bauformen, Eimer, Hand, Lager, Undo, Reset, Aktionsprotokoll, Wiedergabe
   SimRunner.kt              eigener Thread, feste Schrittweite, fertige Bilder, Leistungswerte
   Renderer.kt               Pixelbild, Dunst- und Glühschicht, Hintergrund
   Terrain.kt                Startlandschaft des Spielplatzes (Rauschen nur aus Ganzzahl-Hashes)
@@ -146,6 +154,7 @@ sim/                        Partikelsimulation, reines Kotlin (ohne Android)
 app/                        Android-App (Kotlin, Jetpack Compose)
   ui/sandbox/               Spielplatz: Weltansicht, Gesten, Leiste, Tempo, Messung
   ui/title/                 Startbildschirm mit kleiner echter Simulation
+  ui/book/                  Entdeckungsbuch
   ui/settings/              Einstellungen
   audio/SoundManager.kt     Effekte (SoundPool) und Musik (MediaPlayer)
   data/                     Einstellungen, Fortschritt

@@ -283,3 +283,96 @@ Desktop (Linux, Java 21, 4 Kerne), je 600 Schritte nach 300 zum Vorwärmen, je z
 
 **Build:** [`beta-64`](https://github.com/shootcat/ReAct/releases/tag/beta-64). CI grün. Screenshots `12_leben` (lebende Startwelt) und `13_hoehle` (dunkle Grotte mit Glühwürmchen, herangezoomt, Kategorie „Leben“ in der Leiste) geprüft.
 
+## Phase 2c: Beschaffen und Entdeckungsbuch
+
+### Zusammenfassung
+
+**Spielplatz-Modus (4.3):** Im Menü schaltet „Modus: nur Beschaffen“ zwischen dem unendlichen Vorrat (bisher) und dem Beschaffen um. Beim Beschaffen zeigt die Leiste nur noch die Kategorien **Werkzeug** (Eimer, Hand) und **Lager**. Pinsel, Bauformen und Radierer aus dem Nichts gibt es dann nicht. Die Kopfzeile zeigt „Nur Beschaffen · Eimer 120/200“. Auch im unendlichen Modus stehen Eimer und Hand unter „Werkzeug“ bereit.
+
+**Eimer**
+- „Schöpfen“: Der Finger nimmt lose und flüssige Stoffe auf, **eine Sorte pro Ladung** (was unter dem Finger liegt), bis der Eimer voll ist. Die Größe ist pro Level einstellbar (`Session.bucketSize`), im Spielplatz 200 Zellen.
+- **Nimmt nicht auf** (Feld `bucketable` plus Regeln):
+  - Feuer und alles, was brennt (auch Glut);
+  - Lava und flüssiges Metall;
+  - Gase;
+  - Fels und vom Level verankerten Boden;
+  - feste Strukturen.
+  Ein Test prüft alle neun Fälle.
+- **Behält die Temperatur:** Beim Schöpfen mittelt sich die Temperatur des Inhalts. Im Eimer kühlt er langsam auf die Umgebung ab (Hälfte des Unterschieds in etwa 20 Sekunden). Heißer Sand kommt nach 5 Sekunden noch mit über 300 °C wieder heraus.
+- „Gießen“: verteilt den Inhalt in die Luft unter dem Finger, mit der Temperatur aus dem Eimer. Danach gelten die normalen Regeln: Wasser aus dem Eimer auf Lava kocht und lässt sie zu Stein erstarren.
+
+**Hand**
+- Greift mit einem Tippen das Objekt unter dem Finger:
+  - eine ganze lose Struktur (Stamm, Stein, Metall, Glas, Ziegel, Eis, Totholz, Holz);
+  - oder einen Klumpen Holzkohle (bis 30 Körner).
+- **Grenzen:**
+  - „Das ist fest verankert“: in Fels eingebaut, also seitlich oder von oben berührt. Was nur auf dem Boden liegt, lässt sich heben.
+  - „Zu schwer“: über 120 Einheiten (Dichte / 1000 je Zelle). Ein Stamm von 170 Zellen geht, ein Stein von 46, ein Metallbarren von 15.
+  - „Zu heiß zum Anfassen“: über 60 °C, oder es brennt.
+  - „Das lässt sich nicht greifen“: etwa ein Baum mit Laub.
+- Beim Ziehen zeigt eine halbtransparente Vorschau, wo das Objekt landet. Losgelassen wird es dort abgelegt, wenn Platz ist, und fällt dann nach 3.1.
+- **Ins Lager / Zu Brettern:** Ein Stamm in der Hand ergibt **3 Bretter (Holz) pro Zelle** (`split_into`, `split_yield`), Totholz 2. Stein, Metall, Glas, Ziegel und Eis gehen 1 : 1 ins Lager.
+
+**Bauen aus Beschafftem:** Beim Beschaffen bauen Pinsel, Linie, Rechteck und Rahmen nur mit Material aus dem Lager und verbrauchen es Zelle für Zelle. Eine Linie, die länger ist als der Vorrat, endet, wo das Holz ausgeht.
+
+**Rückgängig und Protokoll:** Eimer, Hand, Lager und Modus gehören zum Zustand.
+- Jeder Handgriff ist rückgängig zu machen, Rückgängig gibt auch Bretter und Stamm zurück.
+- Alles steht im Protokoll und spielt deterministisch gleich ab (Test `procuring plays back the same`).
+
+**Startlandschaft:** Auf der Düne liegen jetzt ein umgestürzter Stamm (28 Zellen, ergibt 84 Bretter) und ein loser Stein zum Tragen. Der Holzstapel auf dem Hügel ist als Ganzes zu schwer.
+
+**Entdeckungsbuch**
+- **54 Einträge** in `sim/src/main/resources/discoveries.json`, je eine Eigenschaft eines Materials:
+  - „Sand behält Wärme“, „Wasser löscht Feuer“, „Salz taut Eis und Schnee auch in der Kälte“;
+  - „Holz brennt nicht, solange es nass ist“, „Metall leitet Wärme sehr gut“;
+  - „Fisch lebt nur in Süßwasser“, „Vogel flieht vor Feuer und Rauch“ …
+  - Nie „X + Y → Z“; ein Test prüft, dass kein Eintrag wie ein Rezept aussieht.
+- **Wie entdeckt wird:**
+  - Die Welt zählt pro Material, was ihm passiert (`World.seen`): entzündet, verbrannt, gelöscht, erstickt, verkohlt, geschmolzen, vom Salz getaut, gesiedet, Salz zurückgelassen, erstarrt, kondensiert, gelöst, aufgesogen, weggespült, eingesickert, gewachsen, an Hitze oder Salz gestorben, erstickt, geflohen, gegraben, gefallen.
+  - Dazu sieht eine Abtastung alle halbe Sekunde ein Viertel der Zeilen an. Sie erkennt, was nur der Zustand zeigt: behält Wärme (heiß und heißer als alle Nachbarn), glüht, schwimmt, trägt Wärme weiter (Metall), leuchtet im Dunkeln, nass und heiß, ohne zu brennen.
+  - Zählen und Abtasten ändern die Welt nicht (Test).
+- **Einblendung:** Ein neuer Eintrag erscheint oben über der Welt als „Neu: Sand behält Wärme“, mit leisem Ton. Mehrere kommen nacheinander, je etwa 2,5 Sekunden. Dieselbe Einblendung meldet auch, was Hand und Eimer tun („Zu schwer“, „Ins Lager: 84 × Holz“).
+- **Das Buch** (Menü → Entdeckungsbuch): alle Materialien mit ihren Einträgen.
+  - Entdecktes steht als Satz da, Unentdecktes als „…“; Materialien ohne Entdeckung heißen „???“.
+  - Ein Tippen auf einen Eintrag spielt seine **kurze Animation**: eine kleine eigene Welt von 48 × 32 Zellen, 20 Sekunden in Schleife, die genau diese Eigenschaft zeigt.
+  - Für jeden der 54 Einträge prüft ein Test, dass seine Szene die Eigenschaft innerhalb der 20 Sekunden wirklich auslöst.
+  - Gefundene Einträge werden dauerhaft gespeichert.
+
+**Tests** (alle grün, 77 in `sim`):
+- `SupplyTest` (7): Eimer, verbotene Stoffe, Temperatur und Mischen, Hand, Grenzen der Hand, Lager und Bauen, Wiedergabe.
+- `DiscoveryTest` (5): Eigenschaften statt Rezepte, jede Szene zeigt ihren Eintrag, jeder Eintrag wird einmal gemeldet, Beobachten ändert nichts, Bilder.
+- App-Rauchtest `procureAndBook`:
+  - Modus umschalten;
+  - Stamm greifen (`14_hand`), zu Brettern machen, eine Linie bauen (`15_lager_gebaut`);
+  - Wasser aus dem Teich schöpfen und auf den Hügel gießen (`16_eimer`);
+  - das Buch (`17_buch`) und eine Szene (`18_buch_szene`).
+
+Bilder: `docs/phase2/book_scenes.png` zeigt sechs Szenen, wie das Buch sie zeigt: Sand behält Wärme, Salz taut Eis, nasses Holz, durchbrennender Stamm, Moos im Dunkeln, Vogel flieht.
+
+### Abweichungen mit Begründung
+
+1. **„Verankert“ heißt für die Hand: in Fels eingebaut** (seitlich oder von oben berührt). Nach der Strukturregel 3.1 gilt alles als verankert, was Fels berührt, auch ein Stamm, der auf dem Felsboden liegt. Den muss man aber aufheben können. Wofür 3.1 gilt (stehen oder fallen), ändert sich nicht.
+2. **Gewicht als Summe der Dichten** (120 Einheiten), Temperaturgrenze 60 °C. Beides sind feste Werte in `Session`, bei Bedarf pro Level einstellbar wie die Eimergröße.
+3. **Ins Lager kommen nur feste Objekte.** Ein Klumpen Holzkohle lässt sich tragen und ablegen, aber nicht lagern; loses Material transportiert der Eimer.
+4. **Eis und Schnee brauchen jetzt Schmelzwärme** (`latent_heat` 160). Ohne sie schmolz ein Eisblock in Wasser von 20 °C in einer halben Sekunde, „Eis schwimmt“ war nicht zu sehen. Salz taut weiter ohne Wärme.
+5. **Die Animationen sind kleine echte Simulationen**, keine gezeichneten Filme. Dunkle Szenen (Moos, Glühwürmchen) sind im Buch etwas aufgehellt (Grundhelligkeit 0,3 statt 0,05), sonst wäre nichts zu sehen.
+6. **„Beobachtet“ heißt: in der Welt passiert.** Der Spielplatz zeigt fast immer die ganze Welt. Deshalb melden sich gleich nach dem Start ein paar Einträge von selbst, etwa „Fels glüht in großer Hitze“ an der Lavahöhle oder „Glühwürmchen leuchtet im Dunkeln“ in der Grotte. Ob nur der sichtbare Ausschnitt zählen soll, ist für die Level zu entscheiden.
+7. **Bauen beim Beschaffen geht nur mit festen Stoffen aus dem Lager.** Lose Stoffe und Flüssigkeiten kommen ausschließlich aus dem Eimer.
+
+### Leistung
+
+Der Container wurde zwischendurch neu gestartet, der Rechner ist ein anderer. Deshalb sind 2b und 2c auf dieser Maschine mit demselben Verfahren nachgemessen (Linux, Java 21, 4 Kerne, je zwei Läufe):
+
+| Welt | Phase 2b | Phase 2c |
+|---|---|---|
+| Voll aktive Welt (alle Chunks wach) | 4,91 bis 5,21 ms | 4,73 bis 5,18 ms |
+| Voll aktive Welt mit Pflanzen, Tieren und Licht | 5,84 bis 6,34 ms | 5,31 bis 5,87 ms |
+| Spielplatz mit Feuer, Sand und Wasser | 2,22 bis 3,48 ms | 2,29 bis 2,65 ms |
+| Bild erzeugen | 2,78 bis 2,93 ms | 2,21 bis 2,98 ms |
+
+- Kein messbarer Unterschied. Das Zählen der Beobachtungen ist je ein Arrayzugriff an Stellen, an denen ohnehin ein Phasenwechsel passiert.
+- Die Abtastung fürs Buch läuft nur in der App, alle 30 Schritte über ein Viertel der Zeilen. Eimer und Hand rechnen nur, wenn der Finger sie benutzt.
+- Die Grenze von 8 ms (6.1) bleibt eingehalten; auf dem Handy bitte wieder „Leistung messen“.
+
+**Hier stoppe ich und warte auf die Freigabe** (Leitfaden V3, 4.3 und 8).
+

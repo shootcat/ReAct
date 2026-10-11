@@ -76,6 +76,7 @@ import androidx.compose.ui.unit.sp
 import com.shootcat.react.audio.SoundManager
 import com.shootcat.react.data.Settings
 import com.shootcat.react.sim.Benchmark
+import com.shootcat.react.sim.Discoveries
 import com.shootcat.react.sim.Event
 import com.shootcat.react.sim.Kind
 import com.shootcat.react.sim.MaterialTable
@@ -96,8 +97,13 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
+/** The player's tools (Leitfaden V3, 4.3) and what was procured: categories of their own in the bar. */
+private const val TOOLS = "Werkzeug"
+private const val STORE = "Lager"
+
 /** The materials in the bar, by kind. Rock is level ground and never in the player's hands (Leitfaden V3, 3.1.6). */
 private val CATEGORIES = listOf(
+    TOOLS to emptyList(),
     "Lose" to listOf("sand", "earth", "gravel", "clay", "salt", "snow", "rubble", "ore_rubble", "charcoal", "ash"),
     "Flüssig" to listOf("water", "saltwater", "lava", "molten_metal", "steam", "smoke"),
     "Bauen" to listOf("wood", "brick", "stone", "glass", "metal", "ice"),
@@ -127,6 +133,8 @@ fun SandboxScreen(
     onMode: (BuildMode) -> Unit,
     onSettings: (Settings) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenBook: () -> Unit,
+    onDiscovered: (List<Discoveries.Entry>) -> Unit,
     onBack: () -> Unit,
 ) {
     var speed by remember { mutableStateOf(runner.speed) }
@@ -136,13 +144,35 @@ fun SandboxScreen(
     var measuring by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
+    /** Short notices over the world, one after the other: discoveries and what the hand or bucket did. */
+    val notices = remember { ArrayDeque<String>() }
+    var notice by remember { mutableStateOf<String?>(null) }
+
     LaunchedEffect(runner) {
         val events = IntArray(Event.COUNT)
+        var lastNotice = runner.stats.noticeCount
+        var shownFor = 0
         while (true) {
             delay(120)
             stats = runner.stats
             runner.takeEvents(events)
             playEvents(sound, events)
+            val found = runner.takeFound()
+            if (found.isNotEmpty()) {
+                onDiscovered(found)
+                found.forEach { notices.addLast("Neu: ${it.sentence}") }
+                sound.play("condense", 0.6f)
+            }
+            if (stats.noticeCount != lastNotice) {
+                lastNotice = stats.noticeCount
+                if (stats.notice.isNotEmpty()) notices.addLast(stats.notice)
+            }
+            // each notice stays about 2.5 seconds
+            if (notice != null && ++shownFor >= NOTICE_TICKS) notice = null
+            if (notice == null && notices.isNotEmpty()) {
+                notice = notices.removeFirst()
+                shownFor = 0
+            }
         }
     }
 
@@ -169,7 +199,7 @@ fun SandboxScreen(
     Column(Modifier.fillMaxSize()) {
         TopBar(
             title = "Spielplatz",
-            overline = "Kosten ${stats.cost} · Vorrat ∞",
+            overline = if (stats.supply == Session.Supply.PROCURE) "Nur Beschaffen · Eimer ${stats.bucketAmount}/${stats.bucketSize}" else "Kosten ${stats.cost} · Vorrat ∞",
             onBack = onBack,
             modifier = Modifier.padding(horizontal = 8.dp),
         ) {
@@ -178,6 +208,23 @@ fun SandboxScreen(
             Box {
                 RoundIconButton(Glyph.GEAR, "Menü", { menu = true }, size = 44.dp)
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, containerColor = Palette.surfaceHigh) {
+                    val procuring = stats.supply == Session.Supply.PROCURE
+                    DropdownMenuItem(
+                        text = { Text(if (procuring) "Modus: unendlicher Vorrat" else "Modus: nur Beschaffen", color = Palette.text) },
+                        onClick = {
+                            menu = false
+                            val next = if (procuring) Session.Supply.UNLIMITED else Session.Supply.PROCURE
+                            runner.post { it.setSupply(next) }
+                            if (next == Session.Supply.PROCURE) onTool(Session.HAND)
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Entdeckungsbuch", color = Palette.text) },
+                        onClick = {
+                            menu = false
+                            onOpenBook()
+                        },
+                    )
                     DropdownMenuItem(text = { Text("Leistung messen", color = Palette.text) }, onClick = ::measure)
                     DropdownMenuItem(
                         text = { Text(if (settings.performance) "Leistungsanzeige aus" else "Leistungsanzeige an", color = Palette.text) },
@@ -206,8 +253,9 @@ fun SandboxScreen(
 
         Box(Modifier.weight(1f).fillMaxWidth()) {
             val radius = if (settings.brush in BRUSHES) settings.brush else 3
-            WorldView(runner, tool, radius, mode, materials, sound, Modifier.fillMaxSize())
+            WorldView(runner, tool, radius, mode, materials, sound, stats.held, Modifier.fillMaxSize())
             if (settings.performance) PerformanceOverlay(stats, Modifier.align(Alignment.TopStart).padding(8.dp))
+            notice?.let { NoticeBanner(it, Modifier.align(Alignment.TopCenter).padding(top = 40.dp, start = 16.dp, end = 16.dp)) }
             if (speed == SimRunner.Speed.PAUSE) {
                 Text(
                     "Pause",
@@ -234,16 +282,25 @@ fun SandboxScreen(
             }
             ModeSelector(mode, onMode)
         }
-        var category by rememberSaveable { mutableIntStateOf(CATEGORIES.indexOfFirst { (_, ids) -> materials.idOrNull(ids.first()) != null && ids.any { materials.idOrNull(it) == tool } }.coerceAtLeast(0)) }
+        // procuring: only the tools and what is in store (Leitfaden V3, 4.3)
+        val categories = if (stats.supply == Session.Supply.PROCURE) listOf(TOOLS to emptyList(), STORE to emptyList()) else CATEGORIES
+        var chosen by rememberSaveable {
+            mutableStateOf(if (tool <= Session.SCOOP) TOOLS else CATEGORIES.firstOrNull { (_, ids) -> ids.any { materials.idOrNull(it) == tool } }?.first ?: "Lose")
+        }
+        val category = categories.indexOfFirst { it.first == chosen }.coerceAtLeast(0)
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            CategoryTabs(category, Modifier.weight(1f)) { category = it }
+            CategoryTabs(categories.map { it.first }, category, Modifier.weight(1f)) { chosen = categories[it].first }
             BrushSelector(settings.brush) { onSettings(settings.copy(brush = it)) }
         }
-        MaterialBar(materials, CATEGORIES[category].second, tool, onTool)
+        when (categories[category].first) {
+            TOOLS -> ToolBar(materials, stats, tool, onTool) { runner.post { it.store() } }
+            STORE -> StoreBar(materials, stats, tool, onTool)
+            else -> MaterialBar(materials, categories[category].second, tool, onTool)
+        }
     }
 
     if (measuring) {
@@ -293,6 +350,7 @@ private fun WorldView(
     mode: BuildMode,
     materials: MaterialTable,
     sound: SoundManager,
+    held: Session.Held?,
     modifier: Modifier,
 ) {
     val w = runner.width
@@ -335,6 +393,9 @@ private fun WorldView(
 
     /** The shape being built: start and end cell, shown before the finger lets go (4.1.5). */
     var preview by remember { mutableStateOf<Pair<Pair<Int, Int>, Pair<Int, Int>>?>(null) }
+
+    /** Where the held object would be put down, while the finger is on the world. */
+    var handAt by remember { mutableStateOf<Pair<Int, Int>?>(null) }
 
     fun scale(): Float = min(view.width / w.toFloat(), view.height / h.toFloat()) * zoom
     fun origin(): Offset {
@@ -383,7 +444,39 @@ private fun WorldView(
                         e.changes.forEach { it.consume() }
                     }
 
-                    if (currentMode != BuildMode.BRUSH) {
+                    if (currentTool == Session.HAND) {
+                        // the hand acts where the finger lets go: picks up there, or puts down what it holds
+                        var at = cell(start)
+                        handAt = at
+                        var cancelled = false
+                        while (true) {
+                            val e = awaitPointerEvent()
+                            val pressed = e.changes.filter { it.pressed }
+                            if (pressed.isEmpty()) break
+                            if (pressed.size >= 2) {
+                                cancelled = true
+                                handAt = null
+                                transform(e)
+                                continue
+                            }
+                            if (cancelled) continue
+                            at = cell(pressed.first().position)
+                            handAt = at
+                            pressed.first().consume()
+                        }
+                        handAt = null
+                        if (!cancelled) {
+                            val (x, y) = at
+                            runner.post {
+                                it.press(x, y, Session.HAND, 0)
+                                it.release()
+                            }
+                            sound.play("place", 0.5f)
+                        }
+                        return@awaitEachGesture
+                    }
+
+                    if (currentMode != BuildMode.BRUSH && currentTool >= Session.ERASER) {
                         // a shape: drag from one corner (or end) to the other, see it, let go to build it
                         val from = cell(start)
                         preview = from to from
@@ -492,6 +585,124 @@ private fun WorldView(
         drawImage(flameImage, dstOffset = dstOffset, dstSize = dstSize, filterQuality = FilterQuality.Low)
         drawImage(lightImage, dstOffset = dstOffset, dstSize = dstSize, filterQuality = FilterQuality.Low)
         preview?.let { (a, b) -> drawPreview(a, b, mode, radius, tool, materials, o, s) }
+        val h = held
+        handAt?.let { (x, y) -> if (h != null) drawHeld(h, x, y, materials, o, s) }
+    }
+}
+
+/** The held object where it would be put down, half transparent. */
+private fun DrawScope.drawHeld(h: Session.Held, x: Int, y: Int, materials: MaterialTable, o: Offset, s: Float) {
+    for (k in 0 until h.size) {
+        val c = Color(materials.color[h.mat[k].toInt()]).copy(alpha = 0.65f)
+        drawRect(c, Offset(o.x + (x + h.dx[k]) * s, o.y + (y + h.dy[k]) * s), Size(s, s))
+    }
+}
+
+/** A short notice over the world. */
+@Composable
+private fun NoticeBanner(text: String, modifier: Modifier) {
+    Text(
+        text,
+        color = Palette.text,
+        style = MaterialTheme.typography.labelLarge,
+        textAlign = TextAlign.Center,
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color(0xE0141C28))
+            .border(1.dp, Palette.accent, RoundedCornerShape(14.dp))
+            .padding(horizontal = 14.dp, vertical = 8.dp)
+            .testTag("notice"),
+    )
+}
+
+/** Bucket and hand (Leitfaden V3, 4.3), with what they hold; and the button that puts a held object into store. */
+@Composable
+private fun ToolBar(materials: MaterialTable, stats: SimRunner.Stats, tool: Int, onTool: (Int) -> Unit, onStore: () -> Unit) {
+    CompositionLocalProvider(LocalOverscrollFactory provides null) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .testTag("tool_bar")
+                .clipToBounds()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            val bucket = if (stats.bucketAmount > 0) "${materials.spec(stats.bucketMaterial).name} ${stats.bucketAmount}" else "leer"
+            MaterialChip("Schöpfen", bucket, tool == Session.SCOOP, { onTool(Session.SCOOP) }) { BucketIcon(stats, materials, false) }
+            MaterialChip("Gießen", "${stats.bucketAmount}/${stats.bucketSize}", tool == Session.POUR, { onTool(Session.POUR) }) { BucketIcon(stats, materials, true) }
+            val held = stats.held
+            MaterialChip("Hand", if (held != null) "${materials.spec(held.main).name} ${held.size}" else "leer", tool == Session.HAND, { onTool(Session.HAND) }) {
+                HandIcon(if (held != null) Color(materials.color[held.main]) else null)
+            }
+            if (held != null) {
+                val splits = materials.splitInto[held.main] != held.main
+                MaterialChip(if (splits) "Zu Brettern" else "Ins Lager", "aus der Hand", false, onStore) {
+                    Swatch(materials.color[materials.splitInto[held.main]], 0.1f, held.main)
+                }
+            }
+        }
+    }
+}
+
+/** What was procured, to build with: every material in store and how much of it. */
+@Composable
+private fun StoreBar(materials: MaterialTable, stats: SimRunner.Stats, tool: Int, onTool: (Int) -> Unit) {
+    CompositionLocalProvider(LocalOverscrollFactory provides null) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .testTag("store_bar")
+                .clipToBounds()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            val inStore = stats.stock.indices.filter { stats.stock[it] > 0 }
+            if (inStore.isEmpty()) {
+                Text(
+                    "Leer. Greife mit der Hand einen Stamm, ein Stück Stein, Metall oder Glas und lege es ins Lager.",
+                    color = Palette.textDim,
+                    fontSize = 12.sp,
+                    modifier = Modifier.width(320.dp).padding(8.dp),
+                )
+            }
+            for (m in inStore) {
+                MaterialChip(materials.spec(m).name, "${stats.stock[m]} Zellen", tool == m, { onTool(m) }) {
+                    Swatch(materials.color[m], materials.colorVariance[m], m)
+                }
+            }
+        }
+    }
+}
+
+/** A bucket, filled up to how full it is, tipped over for pouring. */
+@Composable
+private fun BucketIcon(stats: SimRunner.Stats, materials: MaterialTable, tipped: Boolean) {
+    Canvas(Modifier.size(30.dp)) {
+        val u = size.width
+        val fill = if (stats.bucketSize > 0) stats.bucketAmount / stats.bucketSize.toFloat() else 0f
+        val content = if (stats.bucketAmount > 0) Color(materials.color[stats.bucketMaterial]) else Color.Transparent
+        if (tipped) {
+            drawRect(Palette.textDim, Offset(u * 0.1f, u * 0.3f), Size(u * 0.6f, u * 0.4f), style = Stroke(width = u * 0.08f))
+            drawRect(content, Offset(u * 0.72f, u * 0.5f), Size(u * 0.18f, u * 0.45f * fill.coerceAtLeast(0.15f)))
+        } else {
+            drawRect(content, Offset(u * 0.24f, u * (0.85f - 0.6f * fill)), Size(u * 0.52f, u * 0.6f * fill))
+            drawRect(Palette.textDim, Offset(u * 0.2f, u * 0.2f), Size(u * 0.6f, u * 0.68f), style = Stroke(width = u * 0.08f))
+        }
+    }
+}
+
+/** An open hand, holding a block of what it carries. */
+@Composable
+private fun HandIcon(holding: Color?) {
+    Canvas(Modifier.size(30.dp)) {
+        val u = size.width
+        for (k in 0 until 4) drawLine(Palette.textDim, Offset(u * (0.25f + k * 0.16f), u * 0.55f), Offset(u * (0.25f + k * 0.16f), u * 0.15f), strokeWidth = u * 0.1f, cap = StrokeCap.Round)
+        drawCircle(Palette.textDim, u * 0.28f, Offset(u * 0.5f, u * 0.68f))
+        if (holding != null) drawRect(holding, Offset(u * 0.3f, u * 0.5f), Size(u * 0.4f, u * 0.3f))
     }
 }
 
@@ -572,13 +783,13 @@ private fun ModeSelector(current: BuildMode, onSelect: (BuildMode) -> Unit) {
 
 /** The kinds of material in the bar. */
 @Composable
-private fun CategoryTabs(current: Int, modifier: Modifier, onSelect: (Int) -> Unit) {
+private fun CategoryTabs(names: List<String>, current: Int, modifier: Modifier, onSelect: (Int) -> Unit) {
     // scrolls on narrow screens instead of squeezing the last tab to nothing
     Row(modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        for ((k, entry) in CATEGORIES.withIndex()) {
+        for ((k, name) in names.withIndex()) {
             val selected = k == current
             Text(
-                entry.first,
+                name,
                 color = if (selected) Palette.background else Palette.text,
                 fontSize = 12.sp,
                 maxLines = 1,
@@ -588,7 +799,7 @@ private fun CategoryTabs(current: Int, modifier: Modifier, onSelect: (Int) -> Un
                     .background(if (selected) Palette.accent else Palette.surfaceHigh)
                     .clickable { onSelect(k) }
                     .padding(horizontal = 8.dp, vertical = 6.dp)
-                    .testTag("category_${entry.first}"),
+                    .testTag("category_$name"),
             )
         }
     }
@@ -602,8 +813,14 @@ private const val TWO = 2
 private const val MOVED = 3
 private const val MAX_ZOOM = 6f
 
+/** How many polls of 120 ms a notice stays. */
+private const val NOTICE_TICKS = 21
+
 private fun strokeSound(sound: SoundManager, materials: MaterialTable, tool: Int) {
-    if (tool == Session.ERASER) return
+    if (tool < 0) {
+        if (tool == Session.SCOOP || tool == Session.POUR) sound.play("splash", 0.4f)
+        return
+    }
     when {
         materials.spawnBurning[tool] -> sound.play("whoosh", 0.6f)
         materials.kind[tool] == Kind.LIQUID -> sound.play("splash", 0.5f)

@@ -3,9 +3,13 @@ package com.shootcat.react.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import com.shootcat.react.audio.SoundManager
+import com.shootcat.react.data.Progress
+import com.shootcat.react.data.ProgressStore
 import com.shootcat.react.data.Settings
 import com.shootcat.react.data.SettingsStore
 import com.shootcat.react.sim.Backdrop
+import com.shootcat.react.sim.Discoveries
+import com.shootcat.react.sim.DiscoveryWatch
 import com.shootcat.react.sim.MaterialTable
 import com.shootcat.react.sim.Session
 import com.shootcat.react.sim.SimRunner
@@ -16,7 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
-enum class Screen { TITLE, SANDBOX, SETTINGS }
+enum class Screen { TITLE, SANDBOX, SETTINGS, BOOK }
 
 data class AppUiState(
     val screen: Screen = Screen.TITLE,
@@ -27,6 +31,8 @@ data class AppUiState(
     val tool: Int = -2,
     /** How the finger builds: paint, line, rectangle, frame. */
     val mode: BuildMode = BuildMode.BRUSH,
+    /** Ids of the discovery book entries found so far (Leitfaden V3, 4.3). */
+    val discoveries: Set<String> = emptySet(),
     val loadError: String? = null,
 )
 
@@ -38,14 +44,20 @@ data class AppUiState(
 class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private val settingsStore = SettingsStore(app)
+    private val progressStore = ProgressStore(app)
+    private var progress: Progress = progressStore.load()
     val sound = SoundManager(app)
 
     val materials: MaterialTable? = runCatching { MaterialTable.load() }.getOrNull()
+
+    /** The discovery book: entries and their little scenes. */
+    val book: Discoveries? = materials?.let { runCatching { Discoveries.load(it) }.getOrNull() }
 
     private val _state = MutableStateFlow(
         AppUiState(
             settings = settingsStore.load(),
             tool = materials?.idOrNull("sand") ?: 1,
+            discoveries = progress.discoveries,
             loadError = if (materials == null) "materials.json konnte nicht gelesen werden" else null,
         ),
     )
@@ -65,23 +77,32 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val mt = materials ?: error("no materials")
         val session = Session(mt, Terrain.WIDTH, Terrain.HEIGHT, Terrain.SEED) { Terrain.sandbox(it) }
         return SimRunner(session, Backdrop.of(session.world)).also {
+            book?.let { b -> it.watch = DiscoveryWatch(b, progress.discoveries) }
             runner = it
             updateThread()
         }
     }
 
+    /** New entries for the discovery book: kept for good. */
+    fun discovered(entries: List<Discoveries.Entry>) {
+        if (entries.isEmpty()) return
+        progress = progress.copy(discoveries = progress.discoveries + entries.map { it.id })
+        progressStore.save(progress)
+        _state.update { it.copy(discoveries = progress.discoveries) }
+    }
+
     fun open(screen: Screen) {
         _state.update {
-            if (screen == Screen.SETTINGS) it.copy(screen = screen, returnTo = it.screen) else it.copy(screen = screen)
+            if (screen == Screen.SETTINGS || screen == Screen.BOOK) it.copy(screen = screen, returnTo = it.screen) else it.copy(screen = screen)
         }
         updateThread()
     }
 
-    /** Back: from the settings to where they were opened, from the sandbox to the title. */
+    /** Back: from the settings or the book to where they were opened, from the sandbox to the title. */
     fun back() {
         _state.update {
             when (it.screen) {
-                Screen.SETTINGS -> it.copy(screen = it.returnTo)
+                Screen.SETTINGS, Screen.BOOK -> it.copy(screen = it.returnTo)
                 else -> it.copy(screen = Screen.TITLE)
             }
         }
