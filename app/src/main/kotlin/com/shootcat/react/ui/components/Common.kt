@@ -35,8 +35,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.shootcat.react.engine.Reaction
-import com.shootcat.react.engine.model.TypeCatalog
 import com.shootcat.react.ui.theme.Palette
 
 /** Slim top bar: optional back arrow, a small title and action icons on the right. */
@@ -155,64 +153,5 @@ fun PillButton(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-    }
-}
-
-/** Book icon with a counter – opens the Discovery Log. */
-@Composable
-fun DiscoveryBadge(found: Int, total: Int, onClick: () -> Unit) {
-    Row(
-        Modifier
-            .height(40.dp)
-            .clip(RoundedCornerShape(50))
-            .background(Palette.surfaceHigh)
-            .clickable(onClick = onClick)
-            .testTag("discoveries")
-            .semantics { contentDescription = "Entdeckungen" }
-            .padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        GlyphIcon(Glyph.LOG, color = Palette.accent, size = 18.dp)
-        Spacer(Modifier.width(6.dp))
-        Text(
-            "$found/$total",
-            style = MaterialTheme.typography.labelLarge,
-            color = Palette.text,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
-
-/** A reaction drawn only with symbols: [fire] + [ice] → [water]. */
-@Composable
-fun ReactionSymbols(
-    reaction: Reaction,
-    types: TypeCatalog,
-    modifier: Modifier = Modifier,
-    iconSize: Dp = 28.dp,
-    silhouette: Boolean = false,
-) {
-    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        reaction.inputs.forEachIndexed { i, token ->
-            if (i > 0) GlyphIcon(Glyph.PLUS, color = Palette.textDim, size = iconSize * 0.6f)
-            ObjectIcon(token.typeId, types, state = token.state, silhouette = silhouette, size = iconSize, symbol = token.symbol)
-        }
-        GlyphIcon(Glyph.ARROW, color = Palette.textDim, size = iconSize * 0.75f, modifier = Modifier.padding(horizontal = 2.dp))
-        ObjectIcon(reaction.output.typeId, types, state = reaction.output.state, silhouette = silhouette, size = iconSize, symbol = reaction.output.symbol)
-    }
-}
-
-/** Small numbered circle for a simulation phase (1 state, 2 physics, 3 signal). */
-@Composable
-fun PhaseBadge(number: Int, modifier: Modifier = Modifier) {
-    Box(
-        modifier
-            .size(20.dp)
-            .clip(CircleShape)
-            .background(Palette.outline),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text("$number", fontSize = 11.sp, color = Palette.text, fontWeight = FontWeight.Bold)
     }
 }

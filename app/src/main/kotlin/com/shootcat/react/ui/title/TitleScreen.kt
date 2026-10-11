@@ -1,5 +1,6 @@
 package com.shootcat.react.ui.title
 
+import android.graphics.Bitmap
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -8,54 +9,60 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.shootcat.react.BuildConfig
-import com.shootcat.react.engine.model.Position
-import com.shootcat.react.engine.model.TypeCatalog
+import com.shootcat.react.sim.MaterialTable
+import com.shootcat.react.sim.Renderer
+import com.shootcat.react.sim.World
 import com.shootcat.react.ui.components.Glyph
 import com.shootcat.react.ui.components.PillButton
 import com.shootcat.react.ui.components.RoundIconButton
-import com.shootcat.react.ui.components.drawGameObject
 import com.shootcat.react.ui.theme.Palette
+import kotlinx.coroutines.delay
 import kotlin.math.PI
 import kotlin.math.sin
 
 private const val TAU = (2 * PI).toFloat()
 
-/** Animated start screen: a small reaction plays in a loop above the title. */
+/** Start screen: a tiny live world of the real simulation above the title. */
 @Composable
 fun TitleScreen(
-    types: TypeCatalog,
+    materials: MaterialTable,
     onPlay: () -> Unit,
-    onDiscoveries: () -> Unit,
     onSettings: () -> Unit,
 ) {
     val transition = rememberInfiniteTransition(label = "title")
@@ -64,18 +71,6 @@ fun TitleScreen(
         targetValue = 1f,
         animationSpec = infiniteRepeatable(tween(18000, easing = LinearEasing), RepeatMode.Restart),
         label = "time",
-    )
-    val cycle by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(4600, easing = LinearEasing), RepeatMode.Restart),
-        label = "cycle",
-    )
-    val flicker by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(2400, easing = LinearEasing), RepeatMode.Restart),
-        label = "flicker",
     )
     val fade = remember { Animatable(0f) }
     LaunchedEffect(Unit) { fade.animateTo(1f, tween(900)) }
@@ -90,8 +85,8 @@ fun TitleScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Spacer(Modifier.weight(1f))
-            Canvas(Modifier.size(280.dp, 170.dp)) { drawEmblem(types, cycle, flicker) }
-            Spacer(Modifier.height(12.dp))
+            LiveScene(materials, Modifier.fillMaxWidth().aspectRatio(TitleScene.W / TitleScene.H.toFloat()))
+            Spacer(Modifier.height(20.dp))
             Text(
                 "REACT",
                 style = TextStyle(
@@ -103,12 +98,9 @@ fun TitleScreen(
                 ),
             )
             Spacer(Modifier.weight(1.2f))
-            PillButton(Glyph.PLAY, "Spielen", onPlay, Modifier.fillMaxWidth(0.72f), primary = true)
+            PillButton(Glyph.PLAY, "Spielplatz", onPlay, Modifier.fillMaxWidth(0.72f), primary = true)
             Spacer(Modifier.height(24.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                RoundIconButton(Glyph.LOG, "Entdeckungen", onDiscoveries, size = 56.dp, tint = Palette.accent)
-                RoundIconButton(Glyph.GEAR, "Einstellungen", onSettings, size = 56.dp)
-            }
+            RoundIconButton(Glyph.GEAR, "Einstellungen", onSettings, size = 56.dp)
             Spacer(Modifier.height(32.dp))
             Text(
                 BuildConfig.VERSION_NAME,
@@ -119,42 +111,93 @@ fun TitleScreen(
     }
 }
 
-/** Fire and ice drift together, melt into water, the water boils off as steam – then it starts over. */
-private fun DrawScope.drawEmblem(types: TypeCatalog, p: Float, flicker: Float) {
-    val c = size.height * 0.42f
-    val cx = size.width / 2
-    val top = size.height * 0.5f - c / 2
-    fun ease(t: Float) = t * t * (3 - 2 * t)
-    fun phase(from: Float, to: Float) = ((p - from) / (to - from)).coerceIn(0f, 1f)
+/** The little world of the title, stepped once per frame on the UI thread (it is tiny). */
+@Composable
+private fun LiveScene(materials: MaterialTable, modifier: Modifier) {
+    val scene = remember(materials) { TitleScene(materials) }
+    var frame by remember { mutableIntStateOf(0) }
+    LaunchedEffect(scene) {
+        while (true) {
+            scene.advance()
+            frame++
+            delay(16)
+        }
+    }
+    Canvas(modifier.clip(RoundedCornerShape(18.dp))) {
+        @Suppress("UNUSED_EXPRESSION")
+        frame
+        val dst = IntSize(size.width.toInt(), size.height.toInt())
+        drawImage(scene.image, dstSize = dst, filterQuality = FilterQuality.None)
+        drawImage(scene.hazeImage, dstSize = dst, filterQuality = FilterQuality.Low)
+        drawImage(scene.lightImage, dstSize = dst, filterQuality = FilterQuality.Low)
+    }
+}
 
-    val approach = ease(phase(0f, 0.38f))
-    val fadeOut = 1f - phase(0.88f, 1f)
-    val fireX = cx - c * 2.1f + c * 1.1f * approach
-    val rightX = cx + c * 1.1f - c * 1.05f * approach
+/** Lava runs down into a pond and sets, sand trickles onto a dune, a log burns: then it all begins again. */
+private class TitleScene(materials: MaterialTable) {
+    private val world = World(W, H, materials, 11L)
+    private val start: World.Snapshot
+    private val renderer: Renderer
+    private val pixels = IntArray(W * H)
+    private val haze: IntArray
+    private val light: IntArray
+    private val bitmap = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888)
+    private val hazeBitmap: Bitmap
+    private val lightBitmap: Bitmap
+    val image = bitmap.asImageBitmap()
+    val hazeImage: ImageBitmap
+    val lightImage: ImageBitmap
+    private val lava = materials.id("lava")
+    private val sand = materials.id("sand")
+    private val fire = materials.id("fire")
 
-    val melt = phase(0.4f, 0.55f)
-    val boil = phase(0.6f, 0.78f)
-    val rise = phase(0.6f, 1f)
-
-    // Contact flash.
-    val flash = 1f - kotlin.math.abs(p - 0.42f) / 0.08f
-    if (flash > 0f) {
-        val center = Offset(cx, top + c / 2)
-        drawCircle(
-            brush = Brush.radialGradient(listOf(Palette.signal.copy(alpha = 0.5f * flash), Color.Transparent), center, c * 1.6f),
-            radius = c * 1.6f,
-            center = center,
-        )
+    init {
+        val rock = materials.id("rock")
+        val water = materials.id("water")
+        val wood = materials.id("wood")
+        val earth = materials.id("earth")
+        for (x in 0 until W) {
+            // a slope on the left, a pond in the middle, a shelf on the right
+            val ground = when {
+                x < 34 -> 22 + x
+                x < 86 -> 56 + ((x - 60) * (x - 60)) / 260
+                else -> 50 - (x - 86) / 3
+            }.coerceIn(10, H - 1)
+            for (y in ground until H) world.set(x, y, if (y < ground + 3 && x > 86) earth else rock)
+        }
+        for (x in 34 until 86) for (y in 50 until H) if (world.material(x, y) == MaterialTable.AIR) world.set(x, y, water)
+        for (x in 52 until 70) for (y in 40 until 43) world.set(x, y, wood)
+        for (x in 59 until 62) for (y in 43 until 50) world.set(x, y, wood)
+        world.wakeAll()
+        start = world.snapshot()
+        renderer = Renderer(world, IntArray(W * H) { BACKGROUND })
+        haze = IntArray(renderer.layerWidth * renderer.layerHeight)
+        light = IntArray(renderer.layerWidth * renderer.layerHeight)
+        hazeBitmap = Bitmap.createBitmap(renderer.layerWidth, renderer.layerHeight, Bitmap.Config.ARGB_8888)
+        lightBitmap = Bitmap.createBitmap(renderer.layerWidth, renderer.layerHeight, Bitmap.Config.ARGB_8888)
+        hazeImage = hazeBitmap.asImageBitmap()
+        lightImage = lightBitmap.asImageBitmap()
     }
 
-    drawGameObject(types.create("f", "FIRE", Position(0, 0)), Offset(fireX, top), c, fadeOut, flicker)
-    if (melt < 1f) drawGameObject(types.create("i", "ICE", Position(0, 0)), Offset(rightX, top), c, (1f - melt) * fadeOut)
-    if (melt > 0f && boil < 1f) {
-        drawGameObject(types.create("w", "WATER", Position(0, 0)), Offset(rightX, top), c, melt * (1f - boil) * fadeOut, flicker)
+    fun advance() {
+        val t = world.step
+        if (t % 600 < 200 && t % 2 == 0) world.paint(lava, 6, 4, 1)
+        if (t % 3 == 0) world.paint(sand, W - 14, 2, 1, 0.5f)
+        if (t % 600 == 60) world.paint(fire, 60, 38, 2, 0.8f)
+        world.step()
+        if (world.step >= LOOP) world.restore(start)
+        renderer.render(pixels, t)
+        renderer.renderLayers(haze, light)
+        bitmap.setPixels(pixels, 0, W, 0, 0, W, H)
+        hazeBitmap.setPixels(haze, 0, renderer.layerWidth, 0, 0, renderer.layerWidth, renderer.layerHeight)
+        lightBitmap.setPixels(light, 0, renderer.layerWidth, 0, 0, renderer.layerWidth, renderer.layerHeight)
     }
-    if (boil > 0f) {
-        val y = top - c * 0.9f * rise
-        drawGameObject(types.create("s", "STEAM", Position(0, 0)), Offset(rightX, y), c, boil * (1f - phase(0.8f, 1f)), flicker)
+
+    companion object {
+        const val W = 120
+        const val H = 64
+        const val LOOP = 1800
+        const val BACKGROUND = 0xFF141C28.toInt()
     }
 }
 

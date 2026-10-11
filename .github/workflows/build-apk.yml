@@ -27,11 +27,27 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Rule engine tests, UI smoke test and debug APK
-        run: ./gradlew :engine:test :app:testDebugUnitTest assembleDebug --stacktrace
+      - name: Simulation tests, UI smoke test and APK
+        run: ./gradlew :sim:test :app:testDebugUnitTest assembleDebug --stacktrace
 
-      - name: Name APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk REACT-beta.apk
+      - name: Name APK and write release notes
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk REACT-beta.apk
+          {
+            echo "Automatischer Beta-Build ${{ github.run_number }} aus \`${{ github.ref_name }}\` (${{ github.sha }})."
+            echo
+            echo "**Installation:** \`REACT-beta.apk\` auf dem Android-Gerät öffnen und installieren."
+            echo "Jeder Build ist mit demselben Schlüssel signiert und installiert sich als Update über den vorherigen."
+            echo
+            echo "**Leistung auf dem Gerät messen:** im Spielplatz oben rechts das Zahnrad, dann „Leistung messen“."
+            echo "Das Ergebnis lässt sich mit „Kopieren“ weitergeben."
+            echo
+            echo "Zum Vergleich, gemessen auf dem CI-Rechner (JVM, kein Handy):"
+            echo
+            echo '```'
+            cat sim/build/benchmark.md
+            echo '```'
+          } > release-notes.md
 
       - uses: actions/upload-artifact@v4
         with:
@@ -39,13 +55,15 @@ jobs:
           path: |
             REACT-beta.apk
             app/build/screenshots/*.png
+            sim/build/pictures/*.png
+            sim/build/benchmark.md
 
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: test-reports-${{ github.run_number }}
           path: |
-            engine/build/reports/tests/
+            sim/build/reports/tests/
             app/build/reports/tests/
 
       - name: Publish release with APK
@@ -58,8 +76,4 @@ jobs:
           files: |
             REACT-beta.apk
             app/build/screenshots/*.png
-          body: |
-            Automatischer Beta-Build ${{ github.run_number }} aus `${{ github.ref_name }}` (${{ github.sha }}).
-
-            **Installation:** `REACT-beta.apk` auf dem Android-Gerät öffnen und installieren.
-            Jeder Build ist mit demselben Schlüssel signiert und installiert sich als Update über den vorherigen.
+          body_path: release-notes.md

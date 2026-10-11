@@ -5,12 +5,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import com.shootcat.react.ui.GameViewModel
+import com.shootcat.react.ui.AppViewModel
 import com.shootcat.react.ui.ReactApp
 
 class MainActivity : ComponentActivity() {
 
-    private val viewModel: GameViewModel by viewModels()
+    private val viewModel: AppViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

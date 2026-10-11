@@ -1,150 +1,59 @@
 package com.shootcat.react.ui
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.shootcat.react.engine.model.TypeCatalog
-import com.shootcat.react.ui.components.Glyph
-import com.shootcat.react.ui.components.GlyphIcon
-import com.shootcat.react.ui.components.ReactionSymbols
-import com.shootcat.react.ui.discovery.DiscoveryScreen
-import com.shootcat.react.ui.level.CompletionOverlay
-import com.shootcat.react.ui.level.LevelScreen
-import com.shootcat.react.ui.map.WorldMapScreen
+import com.shootcat.react.ui.sandbox.SandboxScreen
 import com.shootcat.react.ui.settings.SettingsScreen
 import com.shootcat.react.ui.theme.Palette
 import com.shootcat.react.ui.theme.ReactTheme
 import com.shootcat.react.ui.title.TitleScreen
-import com.shootcat.react.ui.worlds.WorldSelectScreen
 
 @Composable
-fun ReactApp(viewModel: GameViewModel) {
+fun ReactApp(viewModel: AppViewModel) {
     val state by viewModel.state.collectAsState()
-    val onEvent: (GameEvent) -> Unit = viewModel::onEvent
-    val haptic = LocalHapticFeedback.current
 
-    BackHandler(enabled = state.screen != Screen.TITLE || state.completion != null) {
-        onEvent(GameEvent.Back)
-    }
-    LaunchedEffect(state.toast?.id, state.completion != null) {
-        if (state.settings.haptics && (state.toast != null || state.completion != null)) {
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-        }
-    }
+    BackHandler(enabled = state.screen != Screen.TITLE) { viewModel.back() }
 
     ReactTheme {
         Surface(Modifier.fillMaxSize(), color = Palette.background) {
             Box(Modifier.fillMaxSize().safeDrawingPadding()) {
-                val content = state.content
-                val session = state.session
+                val materials = viewModel.materials
                 when {
-                    content == null -> LoadError(state.loadError)
+                    materials == null -> LoadError(state.loadError)
                     state.screen == Screen.TITLE -> TitleScreen(
-                        types = content.types,
-                        onPlay = { onEvent(GameEvent.OpenWorlds) },
-                        onDiscoveries = { onEvent(GameEvent.OpenDiscoveries) },
-                        onSettings = { onEvent(GameEvent.OpenSettings) },
-                    )
-                    state.screen == Screen.DISCOVERIES -> DiscoveryScreen(
-                        content = content,
-                        progress = state.progress,
-                        isUnlocked = state::isUnlocked,
-                        onBack = { onEvent(GameEvent.CloseOverlay) },
+                        materials = materials,
+                        onPlay = { viewModel.open(Screen.SANDBOX) },
+                        onSettings = { viewModel.open(Screen.SETTINGS) },
                     )
                     state.screen == Screen.SETTINGS -> SettingsScreen(
                         settings = state.settings,
-                        onChange = { onEvent(GameEvent.UpdateSettings(it)) },
-                        onResetProgress = { onEvent(GameEvent.ResetProgress) },
-                        onBack = { onEvent(GameEvent.CloseOverlay) },
+                        onChange = viewModel::updateSettings,
+                        onBack = viewModel::back,
                     )
-                    state.screen == Screen.LEVEL && session != null -> LevelScreen(
-                        session = session,
-                        content = content,
+                    else -> SandboxScreen(
+                        runner = viewModel.sandbox(),
+                        materials = materials,
                         settings = state.settings,
-                        previewDrop = viewModel::previewDrop,
-                        onEvent = onEvent,
-                    )
-                    state.screen == Screen.WORLDS -> WorldSelectScreen(
-                        content = content,
-                        progress = state.progress,
-                        isWorldUnlocked = state::isWorldUnlocked,
-                        solvedIn = state::solvedIn,
-                        onOpenWorld = { onEvent(GameEvent.OpenWorld(it)) },
-                        onOpenLog = { onEvent(GameEvent.OpenDiscoveries) },
-                        onOpenSettings = { onEvent(GameEvent.OpenSettings) },
-                        onBack = { onEvent(GameEvent.OpenTitle) },
-                    )
-                    else -> WorldMapScreen(
-                        content = content,
-                        world = content.world(state.worldNumber) ?: content.worlds.first(),
-                        progress = state.progress,
-                        isUnlocked = state::isUnlocked,
-                        onOpenLevel = { onEvent(GameEvent.OpenLevel(it)) },
-                        onOpenLog = { onEvent(GameEvent.OpenDiscoveries) },
-                        onOpenSettings = { onEvent(GameEvent.OpenSettings) },
-                        onBack = { onEvent(GameEvent.Back) },
+                        tool = state.tool,
+                        sound = viewModel.sound,
+                        onTool = viewModel::selectTool,
+                        onSettings = { viewModel.updateSettings(it) },
+                        onOpenSettings = { viewModel.open(Screen.SETTINGS) },
+                        onBack = viewModel::back,
                     )
                 }
-
-                val completion = state.completion
-                if (completion != null && content != null) {
-                    CompletionOverlay(
-                        completion = completion,
-                        types = content.types,
-                        onNext = { onEvent(GameEvent.NextLevel) },
-                        onReplay = { onEvent(GameEvent.Replay) },
-                    )
-                }
-
-                val toast = state.toast
-                if (toast != null && content != null && state.screen == Screen.LEVEL && completion == null) {
-                    DiscoveryToast(
-                        toast = toast,
-                        types = content.types,
-                        modifier = Modifier.align(Alignment.TopCenter).padding(top = 60.dp, start = 24.dp, end = 24.dp),
-                    )
-                }
-            }
-        }
-    }
-}
-
-/** New discoveries, shown as symbols only. Touches pass through to the board – the world keeps running. */
-@Composable
-private fun DiscoveryToast(toast: Toast, types: TypeCatalog, modifier: Modifier = Modifier) {
-    Column(
-        modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(Palette.surfaceHigh)
-            .border(1.dp, Palette.accent, RoundedCornerShape(20.dp))
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        for (reaction in toast.reactions) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                GlyphIcon(Glyph.SPARK, color = Palette.accent, size = 18.dp)
-                ReactionSymbols(reaction, types, iconSize = 32.dp)
             }
         }
     }
@@ -153,7 +62,7 @@ private fun DiscoveryToast(toast: Toast, types: TypeCatalog, modifier: Modifier 
 @Composable
 private fun LoadError(message: String?) {
     Column(Modifier.fillMaxSize().padding(24.dp)) {
-        Text("Level-Daten konnten nicht geladen werden.", color = Palette.danger, fontWeight = FontWeight.Bold)
+        Text("Die Materialdaten konnten nicht geladen werden.", color = Palette.danger, fontWeight = FontWeight.Bold)
         Text(message ?: "Unbekannter Fehler", color = Palette.textDim)
     }
 }

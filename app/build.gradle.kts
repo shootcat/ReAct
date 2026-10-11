@@ -31,6 +31,14 @@ android {
         }
     }
 
+    buildTypes {
+        getByName("debug") {
+            // The beta APK is measured on the phone (steps per second); a debuggable app runs slower on ART
+            // and would understate the simulation. Debug key and package stay the same, so updates work.
+            isDebuggable = false
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -43,7 +51,7 @@ android {
 
     testOptions {
         unitTests {
-            // Robolectric smoke test needs the merged assets (level files) and resources.
+            // Robolectric smoke test needs the merged resources (sounds, materials.json).
             isIncludeAndroidResources = true
             all {
                 it.maxHeapSize = "2g"
@@ -63,7 +71,7 @@ kotlin {
 }
 
 dependencies {
-    implementation(project(":engine"))
+    implementation(project(":sim"))
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)

@@ -16,9 +16,8 @@ dependencyResolutionManagement {
 
 rootProject.name = "REACT"
 
-// Pure Kotlin rule engine of the grid version (no Android dependency, testable on any JVM).
-include(":engine")
-// Pure Kotlin particle simulation of version 3 (no Android dependency, testable on any JVM).
+// Pure Kotlin particle simulation (no Android dependency, testable on any JVM).
+// The grid engine of versions 1 and 2 stays at commit a7fc414 (tag grid-legacy).
 include(":sim")
-// Android app: Jetpack Compose UI on top of the engine.
+// Android app: Jetpack Compose UI on top of the simulation.
 include(":app")

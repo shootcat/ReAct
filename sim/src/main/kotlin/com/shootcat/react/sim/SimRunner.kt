@@ -20,16 +20,29 @@ class SimRunner(val session: Session, backdrop: IntArray) {
 
     private val renderer = Renderer(session.world, backdrop)
     private val inbox = ConcurrentLinkedQueue<(Session) -> Unit>()
-    private val n = session.world.size
+
+    val width get() = session.world.width
+    val height get() = session.world.height
+    val layerWidth get() = renderer.layerWidth
+    val layerHeight get() = renderer.layerHeight
+
+    /** One finished picture: the cells, and the soft haze and glow layers ([Renderer.renderLayers]). */
+    class Frame(size: Int, layerSize: Int) {
+        val pixels = IntArray(size)
+        val haze = IntArray(layerSize)
+        val light = IntArray(layerSize)
+    }
 
     private val lock = Any()
-    private var back = IntArray(n)
-    private var ready = IntArray(n)
-    private var front = IntArray(n)
+    private fun newFrame() = Frame(session.world.size, renderer.layerWidth * renderer.layerHeight)
+    private var back = newFrame()
+    private var ready = newFrame()
+    private var front = newFrame()
     private var fresh = false
 
     @Volatile
     private var running = false
+    private var frameNumber = 0
     private var thread: Thread? = null
 
     /** What the performance overlay shows. */
@@ -76,7 +89,7 @@ class SimRunner(val session: Session, backdrop: IntArray) {
     }
 
     /** The newest finished picture, or null if nothing changed since the last call (UI thread). */
-    fun takeFrame(): IntArray? {
+    fun takeFrame(): Frame? {
         synchronized(lock) {
             if (!fresh) return null
             val t = front
@@ -157,7 +170,8 @@ class SimRunner(val session: Session, backdrop: IntArray) {
 
             val after = System.nanoTime()
             if (dirty && after - lastRender >= FRAME_NANOS) {
-                renderer.render(back, renders)
+                renderer.render(back.pixels, frameNumber++)
+                renderer.renderLayers(back.haze, back.light)
                 synchronized(lock) {
                     val t = back
                     back = ready
