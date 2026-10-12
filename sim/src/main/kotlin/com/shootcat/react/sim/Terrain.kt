@@ -213,7 +213,11 @@ object Terrain {
         val trunk = mt.id("trunk")
         val logX = ox + (150 * sx).toInt()
         val logTop = (logX until logX + 14).minOf { surface[it] } - 2
-        for (x in logX until logX + 14) for (y in logTop until logTop + 2) if (world.material(x, y) == air) world.set(x, y, trunk)
+        for (x in logX until logX + 14) {
+            for (y in logTop until logTop + 2) if (world.material(x, y) == air) world.set(x, y, trunk)
+            // sand drifted up under it, so it lies along its whole length and does not tip off the crest
+            for (y in logTop + 2 until h) if (world.material(x, y) == air) world.set(x, y, mt.id("sand")) else break
+        }
         val stoneX = ox + (176 * sx).toInt()
         val stoneTop = (stoneX until stoneX + 4).minOf { surface[it] } - 3
         for (x in stoneX until stoneX + 4) for (y in stoneTop until stoneTop + 3) if (world.material(x, y) == air) world.set(x, y, mt.id("stone"))

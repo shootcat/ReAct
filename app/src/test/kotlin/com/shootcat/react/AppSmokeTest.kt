@@ -175,7 +175,7 @@ class AppSmokeTest {
         compose.onNodeWithTag("material_Hand").performClick()
         // the fallen log on the dune
         compose.onNodeWithTag("world").performTouchInput {
-            down(cellToOffset(156, 153))
+            down(cellToOffset(156, 151))
             up()
         }
         run(500)

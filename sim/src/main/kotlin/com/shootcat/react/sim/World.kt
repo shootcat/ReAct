@@ -429,7 +429,8 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             for (n in intArrayOf(if (x > 0) c - 1 else -1, if (x < width - 1) c + 1 else -1, c - width, c + width)) {
                 if (n < 0 || n >= size || n in seen) continue
                 val q = mat[n].toInt()
-                if (solid && kindOf[q] == Kind.SOLID || !solid && q == m) {
+                // like structures: a log leaning on a bridge is a piece of its own
+                if (solid && kindOf[q] == Kind.SOLID && plantOf[q] == plantOf[m] || !solid && q == m) {
                     seen += n
                     stack.addLast(n)
                 } else if (n != c + width && (materials.anchored[q] || (flags[n].toInt() and Flag.ANCHORED) != 0)) {
