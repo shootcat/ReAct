@@ -3,7 +3,7 @@
 A mine under a hill. From the surface a shaft leads down to the gallery. In the gallery a heap of salt, a
 little sand, a seep spring in a hollow, ore rubble and, at its end, a glowing vent: a small pool of lava over
 magma. In the floor of the gallery the shaft to the deep chamber, stopped with ice. In the deep chamber a bed
-of sand, and beside it a pocket of lava over magma behind a plug of earth. The tools only reach what is open
+of sand, and beside it a pocket of lava over magma behind a plug of earth. Veins of ore run through the tuff. The tools only reach what is open
 to the sky: until the ice is gone, the deep chamber is out of reach.
 """
 import sys, os
@@ -93,12 +93,21 @@ for k in range(1, 5):
     for y in range(MOUTH[3] - k + 1, MOUTH[3] + 1):
         c.put(MOUTH[0] - k, y, 'earth', False)
 
+# veins of ore in the tuff, out of reach and away from the heat: what the ore rubble in the gallery came from
+for x0, y0, x1, y1, seed in ((142, 30, 172, 36, 1.3), (98, 60, 118, 70, 2.9), (44, 84, 66, 94, 4.1)):
+    for x in range(x0, x1 + 1):
+        t = (x - x0) / max(1, x1 - x0)
+        yc = y0 + (y1 - y0) * t + (fbm(x / 6, seed, 3) - 0.5) * 4
+        for y in range(int(yc), int(yc) + 2):
+            if c.get(x, y) == 'ash':
+                c.put(x, y, 'ore', True)
+
 c.save(OUT)
 print('saved')
 
 if len(sys.argv) > 1:
     x0, y0, x1, y1 = map(int, sys.argv[1:5])
     key = {'air': '.', 'rock': '#', 'earth': 'e', 'grass': 'g', 'salt': '+', 'sand': 's', 'spring': 'S', 'ore_rubble': 'o',
-           'ash': 'a', 'lava': 'L', 'magma': 'M', 'ice': 'I', 'trunk': 'T'}
+           'ash': 'a', 'lava': 'L', 'magma': 'M', 'ice': 'I', 'trunk': 'T', 'ore': 'O'}
     for y in range(y0, y1 + 1):
         print('%3d ' % y + ''.join(key.get(c.get(x, y), '?') for x in range(x0, x1 + 1)))
