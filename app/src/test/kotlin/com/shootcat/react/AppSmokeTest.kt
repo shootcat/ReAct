@@ -21,7 +21,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ActivityScenario
-import com.shootcat.react.sim.Terrain
+import com.shootcat.react.sim.WorldSize
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -31,7 +31,6 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
 import java.time.Duration
-import kotlin.math.min
 
 /**
  * Starts the real app on the JVM: the title, the sandbox with a little play (fire, water, lava, pause,
@@ -90,14 +89,17 @@ class AppSmokeTest {
         compose.onNodeWithTag("speed_Pause").performClick()
         compose.onNodeWithTag("category_Bauen").performScrollTo().performClick()
         compose.onNodeWithTag("material_Ziegel").performScrollTo().performClick()
+        brushMenu()
         compose.onNodeWithTag("mode_Rahmen").performClick()
         drag(150, 60, 185, 95, finish = false)
         shot("10_bauen_vorschau")
         compose.onNodeWithTag("world").performTouchInput { up() }
         run(200)
         compose.onNodeWithTag("material_Holz").performScrollTo().performClick()
+        brushMenu()
         compose.onNodeWithTag("mode_Linie").performClick()
         drag(140, 58, 195, 58)
+        brushMenu()
         compose.onNodeWithTag("mode_Pinsel").performClick()
         compose.onNodeWithTag("speed_Normal").performClick()
         run(1500)
@@ -145,6 +147,7 @@ class AppSmokeTest {
         shot("12_leben")
         compose.onNodeWithTag("category_Leben").performScrollTo().performClick()
         compose.onNodeWithTag("material_Samen").performScrollTo().performClick()
+        brushMenu()
         compose.onNodeWithContentDescription("Pinsel 1").performClick()
         paint(70, 140, holdMillis = 100)
         compose.onNodeWithTag("material_Glühwürmchen").performScrollTo().performClick()
@@ -181,11 +184,13 @@ class AppSmokeTest {
         run(500)
         compose.onNodeWithTag("category_Lager").performScrollTo().performClick()
         compose.onNodeWithTag("material_Holz").performClick()
+        brushMenu()
         compose.onNodeWithTag("mode_Linie").performClick()
         drag(118, 120, 150, 120)
         run(1500)
         shot("15_lager_gebaut")
         // the bucket: water from the pond onto the hill
+        brushMenu()
         compose.onNodeWithTag("mode_Pinsel").performClick()
         compose.onNodeWithTag("category_Werkzeug").performScrollTo().performClick()
         compose.onNodeWithTag("material_Schöpfen").performClick()
@@ -223,12 +228,75 @@ class AppSmokeTest {
         shot("09_leiste_grosse_schrift")
     }
 
-    /** The screen position of cell (x, y) inside the world view, as the view fits the world in. */
+    /** Landscape (4a.5): the world beside a column of controls; a new world from a landscape; the column folded away. */
+    @Test
+    @Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xxhdpi")
+    fun landscapeNewWorldAndFold(): Unit = ActivityScenario.launch(MainActivity::class.java).use {
+        compose.waitForIdle()
+        compose.onNodeWithText("Spielplatz").performClick()
+        run(1500)
+        shot("19_querformat")
+        compose.onNodeWithContentDescription("Menü").performClick()
+        compose.onNodeWithText("Neue Welt …").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("template_VOLCANO").performScrollTo().performClick()
+        compose.onNodeWithTag("size_MEDIUM").performScrollTo().performClick()
+        shot("20_neue_welt", compose.onNodeWithTag("create_world"))
+        compose.onNodeWithTag("create_world").performClick()
+        run(2500)
+        shot("21_vulkan_quer")
+        compose.onNodeWithTag("fold").performClick()
+        run(800)
+        compose.onNodeWithTag("current_tool").assertExists()
+        shot("22_leiste_eingeklappt_quer")
+    }
+
+    /** Portrait (4a.5): the snowy mountain and the caves, the bar folded to one slim row and out again. */
+    @Test
+    fun templatesAndFoldedBar(): Unit = ActivityScenario.launch(MainActivity::class.java).use {
+        compose.waitForIdle()
+        compose.onNodeWithText("Spielplatz").performClick()
+        run(800)
+        for ((template, name) in listOf("MOUNTAIN" to "23_berg", "CAVES" to "24_hoehlen", "ISLAND" to "25_insel", "COAST" to "26_kueste")) {
+            compose.onNodeWithContentDescription("Menü").performClick()
+            compose.onNodeWithText("Neue Welt …").performClick()
+            compose.waitForIdle()
+            compose.onNodeWithTag("template_$template").performScrollTo().performClick()
+            compose.onNodeWithTag("create_world").performClick()
+            run(2000)
+            shot(name)
+        }
+        compose.onNodeWithTag("fold").performClick()
+        run(500)
+        compose.onNodeWithTag("current_tool").assertExists()
+        shot("27_leiste_eingeklappt")
+        compose.onNodeWithTag("unfold").performClick()
+        run(300)
+        compose.onNodeWithTag("material_bar").assertExists()
+        // the corner: speed and the shape of the brush
+        brushMenu()
+        shot("28_pinselform")
+    }
+
+    /**
+     * The screen position of cell (x, y) of the start landscape as it was drawn for 200 × 350 cells: in the
+     * wide meadow it lies unstretched in the middle, and the view fills its height, centred (4a.5).
+     */
     private fun TouchInjectionScope.cellToOffset(x: Int, y: Int): Offset {
-        val s = min(width / Terrain.WIDTH.toFloat(), height / Terrain.HEIGHT.toFloat())
-        val ox = (width - Terrain.WIDTH * s) / 2f
-        val oy = (height - Terrain.HEIGHT * s) / 2f
-        return Offset(ox + (x + 0.5f) * s, oy + (y + 0.5f) * s)
+        val world = WorldSize.MEDIUM
+        val k = world.height / 350f
+        val left = ((world.width - 200f * k) / 2f).toInt()
+        val cx = left + (x * k).toInt()
+        val cy = (y * k).toInt()
+        val s = height / world.height.toFloat()
+        val ox = (width - world.width * s) / 2f
+        return Offset(ox + (cx + 0.5f) * s, (cy + 0.5f) * s)
+    }
+
+    /** Opens the shapes and sizes of the brush in the corner of the world. */
+    private fun brushMenu() {
+        compose.onNodeWithTag("brush_shape").performClick()
+        compose.waitForIdle()
     }
 
     /** Puts a finger down on cell (x, y) and keeps it there for a while: the brush keeps pouring. */

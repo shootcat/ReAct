@@ -16,6 +16,10 @@ import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,6 +30,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
@@ -46,6 +51,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -82,6 +88,9 @@ import com.shootcat.react.sim.Kind
 import com.shootcat.react.sim.MaterialTable
 import com.shootcat.react.sim.Session
 import com.shootcat.react.sim.SimRunner
+import com.shootcat.react.sim.Template
+import com.shootcat.react.sim.Terrain
+import com.shootcat.react.sim.WorldSize
 import com.shootcat.react.ui.components.Glyph
 import com.shootcat.react.ui.components.RoundIconButton
 import com.shootcat.react.ui.components.TopBar
@@ -92,6 +101,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.geometry.Size
 import kotlin.math.abs
+import kotlin.math.ceil
+import kotlin.math.floor
 import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
@@ -135,9 +146,11 @@ fun SandboxScreen(
     onOpenSettings: () -> Unit,
     onOpenBook: () -> Unit,
     onDiscovered: (List<Discoveries.Entry>) -> Unit,
+    onNewWorld: (Template, WorldSize) -> Unit,
     onBack: () -> Unit,
 ) {
-    var speed by remember { mutableStateOf(runner.speed) }
+    var speed by remember(runner) { mutableStateOf(runner.speed) }
+    var newWorld by remember { mutableStateOf(false) }
     var stats by remember { mutableStateOf(runner.stats) }
     var menu by remember { mutableStateOf(false) }
     var benchmark by remember { mutableStateOf<String?>(null) }
@@ -184,10 +197,10 @@ fun SandboxScreen(
                 "${Runtime.getRuntime().availableProcessors()} Kerne"
             val text = withContext(Dispatchers.Default) {
                 runner.runBlocking { s ->
-                    val results = Benchmark.runAll(materials, s.width, s.height, steps = 300)
-                    val render = Benchmark.renderMillis(Benchmark.sandboxWorld(materials, s.width, s.height))
-                    val paused = Benchmark.renderMillis(Benchmark.sandboxWorld(materials, s.width, s.height), paused = true)
-                    Benchmark.report(results, render, device, paused)
+                    val results = Benchmark.runAll(materials, steps = 300)
+                    val render = Benchmark.renderMillis(Benchmark.sandboxWorld(materials, Terrain.WIDTH, Terrain.HEIGHT))
+                    val paused = Benchmark.renderMillis(Benchmark.sandboxWorld(materials, Terrain.WIDTH, Terrain.HEIGHT), paused = true)
+                    Benchmark.report(results, render, device, paused, Benchmark.renderLargest(materials))
                 }
             }
             Log.i("REACT", text)
@@ -196,18 +209,35 @@ fun SandboxScreen(
         }
     }
 
-    Column(Modifier.fillMaxSize()) {
+    // procuring: only the tools and what is in store (Leitfaden V3, 4.3)
+    val categories = if (stats.supply == Session.Supply.PROCURE) listOf(TOOLS to emptyList(), STORE to emptyList()) else CATEGORIES
+    var chosen by rememberSaveable {
+        mutableStateOf(if (tool <= Session.SCOOP) TOOLS else CATEGORIES.firstOrNull { (_, ids) -> ids.any { materials.idOrNull(it) == tool } }?.first ?: "Lose")
+    }
+    val category = categories.indexOfFirst { it.first == chosen }.coerceAtLeast(0)
+    val folded = settings.barFolded
+    fun fold(on: Boolean) = onSettings(settings.copy(barFolded = on))
+
+    @Composable
+    fun header(modifier: Modifier) {
         TopBar(
             title = "Spielplatz",
             overline = if (stats.supply == Session.Supply.PROCURE) "Nur Beschaffen · Eimer ${stats.bucketAmount}/${stats.bucketSize}" else "Kosten ${stats.cost} · Vorrat ∞",
             onBack = onBack,
-            modifier = Modifier.padding(horizontal = 8.dp),
+            modifier = modifier,
         ) {
             RoundIconButton(Glyph.UNDO, "Rückgängig", { runner.post { it.undo() } }, size = 44.dp, enabled = stats.canUndo)
             RoundIconButton(Glyph.RESET, "Neu beginnen", { runner.post { it.reset() } }, size = 44.dp)
             Box {
                 RoundIconButton(Glyph.GEAR, "Menü", { menu = true }, size = 44.dp)
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, containerColor = Palette.surfaceHigh) {
+                    DropdownMenuItem(
+                        text = { Text("Neue Welt …", color = Palette.text) },
+                        onClick = {
+                            menu = false
+                            newWorld = true
+                        },
+                    )
                     val procuring = stats.supply == Session.Supply.PROCURE
                     DropdownMenuItem(
                         text = { Text(if (procuring) "Modus: unendlicher Vorrat" else "Modus: nur Beschaffen", color = Palette.text) },
@@ -250,52 +280,33 @@ fun SandboxScreen(
                 }
             }
         }
+    }
 
-        Box(Modifier.weight(1f).fillMaxWidth()) {
+    @Composable
+    fun world(modifier: Modifier) {
+        Box(modifier) {
             val radius = if (settings.brush in BRUSHES) settings.brush else 3
             WorldView(runner, tool, radius, mode, materials, sound, stats.held, Modifier.fillMaxSize())
             if (settings.performance) PerformanceOverlay(stats, Modifier.align(Alignment.TopStart).padding(8.dp))
             notice?.let { NoticeBanner(it, Modifier.align(Alignment.TopCenter).padding(top = 40.dp, start = 16.dp, end = 16.dp)) }
-            if (speed == SimRunner.Speed.PAUSE) {
-                Text(
-                    "Pause",
-                    color = Palette.text,
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(8.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(Color(0xAA0B0F15))
-                        .padding(horizontal = 12.dp, vertical = 4.dp),
-                )
-            }
+            // speed and the shape of the brush, small, in a corner of the world (4a.5)
+            CornerControls(
+                speed = speed,
+                onSpeed = {
+                    speed = it
+                    runner.speed = it
+                },
+                mode = mode,
+                onMode = onMode,
+                brush = settings.brush,
+                onBrush = { onSettings(settings.copy(brush = it)) },
+                modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
+            )
         }
+    }
 
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            SpeedSelector(speed, Modifier.weight(1f)) {
-                speed = it
-                runner.speed = it
-            }
-            ModeSelector(mode, onMode)
-        }
-        // procuring: only the tools and what is in store (Leitfaden V3, 4.3)
-        val categories = if (stats.supply == Session.Supply.PROCURE) listOf(TOOLS to emptyList(), STORE to emptyList()) else CATEGORIES
-        var chosen by rememberSaveable {
-            mutableStateOf(if (tool <= Session.SCOOP) TOOLS else CATEGORIES.firstOrNull { (_, ids) -> ids.any { materials.idOrNull(it) == tool } }?.first ?: "Lose")
-        }
-        val category = categories.indexOfFirst { it.first == chosen }.coerceAtLeast(0)
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            CategoryTabs(categories.map { it.first }, category, Modifier.weight(1f)) { chosen = categories[it].first }
-            BrushSelector(settings.brush) { onSettings(settings.copy(brush = it)) }
-        }
+    @Composable
+    fun bar() {
         when (categories[category].first) {
             TOOLS -> ToolBar(materials, stats, tool, onTool) { runner.post { it.store() } }
             STORE -> StoreBar(materials, stats, tool, onTool)
@@ -303,12 +314,68 @@ fun SandboxScreen(
         }
     }
 
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        if (maxWidth > maxHeight) {
+            // landscape: the world as large as it gets, the controls in a column beside it
+            Row(Modifier.fillMaxSize()) {
+                world(Modifier.weight(1f).fillMaxHeight())
+                Column(Modifier.width(if (folded) 64.dp else SIDE_PANEL).fillMaxHeight().background(Palette.background)) {
+                    if (folded) {
+                        FoldButton(folded = true, vertical = true, onClick = { fold(false) }, modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp))
+                        CurrentTool(materials, tool, stats, Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp))
+                    } else {
+                        header(Modifier.padding(horizontal = 4.dp))
+                        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            CategoryTabs(categories.map { it.first }, category, Modifier.weight(1f)) { chosen = categories[it].first }
+                            FoldButton(folded = false, vertical = true, onClick = { fold(true) })
+                        }
+                        Box(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
+                            when (categories[category].first) {
+                                TOOLS, STORE -> bar()
+                                else -> MaterialGrid(materials, categories[category].second, tool, onTool)
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            // portrait: the bar below the world, two rows at most when unfolded (4a.5)
+            Column(Modifier.fillMaxSize()) {
+                header(Modifier.padding(horizontal = 8.dp))
+                world(Modifier.weight(1f).fillMaxWidth())
+                Row(
+                    Modifier.fillMaxWidth().padding(start = 12.dp, end = 8.dp, top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    if (folded) {
+                        CurrentTool(materials, tool, stats, Modifier.weight(1f))
+                    } else {
+                        CategoryTabs(categories.map { it.first }, category, Modifier.weight(1f)) { chosen = categories[it].first }
+                    }
+                    FoldButton(folded = folded, vertical = false, onClick = { fold(!folded) })
+                }
+                if (!folded) bar() else Spacer(Modifier.height(6.dp))
+            }
+        }
+    }
+
+    if (newWorld) {
+        NewWorldDialog(
+            onDismiss = { newWorld = false },
+            onCreate = { t, size ->
+                newWorld = false
+                onNewWorld(t, size)
+            },
+        )
+    }
+
     if (measuring) {
         AlertDialog(
             onDismissRequest = {},
             containerColor = Palette.surface,
             title = { Text("Messung läuft", color = Palette.text) },
-            text = { Text("Leere, voll aktive und belebte Welt mit je 300 Schritten. Das dauert einige Sekunden.", color = Palette.textDim) },
+            text = { Text("Leere, voll aktive und belebte Welt, dazu die größte Welt, mit je 300 Schritten. Das dauert etwa eine halbe Minute.", color = Palette.textDim) },
             confirmButton = {},
         )
     }
@@ -374,7 +441,8 @@ private fun WorldView(
         while (true) {
             val f = runner.takeFrame()
             if (f != null) {
-                bitmap.setPixels(f.pixels, 0, w, 0, 0, w, h)
+                // only the part on screen was drawn
+                bitmap.setPixels(f.pixels, f.y0 * w + f.x0, w, f.x0, f.y0, f.x1 - f.x0 + 1, f.y1 - f.y0 + 1)
                 hazeBitmap.setPixels(f.haze, 0, lw, 0, 0, lw, lh)
                 lightBitmap.setPixels(f.light, 0, lw, 0, 0, lw, lh)
                 flameBitmap.setPixels(f.flames, 0, fw, 0, 0, fw, fh)
@@ -385,8 +453,8 @@ private fun WorldView(
     }
 
     var view by remember { mutableStateOf(IntSize.Zero) }
-    var zoom by remember { mutableFloatStateOf(1f) }
-    var pan by remember { mutableStateOf(Offset.Zero) }
+    var zoom by remember(runner) { mutableFloatStateOf(1f) }
+    var pan by remember(runner) { mutableStateOf(Offset.Zero) }
     val currentTool by rememberUpdatedState(tool)
     val currentRadius by rememberUpdatedState(radius)
     val currentMode by rememberUpdatedState(mode)
@@ -397,7 +465,10 @@ private fun WorldView(
     /** Where the held object would be put down, while the finger is on the world. */
     var handAt by remember { mutableStateOf<Pair<Int, Int>?>(null) }
 
-    fun scale(): Float = min(view.width / w.toFloat(), view.height / h.toFloat()) * zoom
+    // the world fills the height of the view and is wider than it (4a.5); two fingers pan and zoom, out to the whole world
+    fun base(): Float = if (view.height > 0) view.height / h.toFloat() else 1f
+    fun minZoom(): Float = min(1f, min(view.width / w.toFloat(), view.height / h.toFloat()) / base())
+    fun scale(): Float = base() * zoom
     fun origin(): Offset {
         val s = scale()
         return Offset((view.width - w * s) / 2f + pan.x, (view.height - h * s) / 2f + pan.y)
@@ -414,9 +485,27 @@ private fun WorldView(
         return ((p.x - o.x) / s).toInt().coerceIn(0, w - 1) to ((p.y - o.y) / s).toInt().coerceIn(0, h - 1)
     }
 
+    // the part of the world on screen, and a margin, is all the simulation thread draws
+    LaunchedEffect(runner) {
+        snapshotFlow { Triple(view, zoom, pan) }.collect {
+            if (view.width == 0 || view.height == 0) return@collect
+            val s = scale()
+            val o = origin()
+            runner.viewport = intArrayOf(
+                (floor(-o.x / s).toInt() - VIEW_MARGIN).coerceIn(0, w - 1),
+                (floor(-o.y / s).toInt() - VIEW_MARGIN).coerceIn(0, h - 1),
+                (ceil((view.width - o.x) / s).toInt() + VIEW_MARGIN).coerceIn(0, w - 1),
+                (ceil((view.height - o.y) / s).toInt() + VIEW_MARGIN).coerceIn(0, h - 1),
+            )
+        }
+    }
+
     Canvas(
         modifier
-            .onSizeChanged { view = it }
+            .onSizeChanged {
+                view = it
+                pan = clampPan(pan)
+            }
             .testTag("world")
             .semantics { contentDescription = "Welt" }
             .pointerInput(runner) {
@@ -434,7 +523,7 @@ private fun WorldView(
                         val panBy = e.calculatePan()
                         val before = origin()
                         val s0 = scale()
-                        zoom = (zoom * factor).coerceIn(1f, MAX_ZOOM)
+                        zoom = (zoom * factor).coerceIn(minZoom(), MAX_ZOOM)
                         val s1 = scale()
                         // keep the point under the fingers where it is, then follow the fingers
                         val worldPoint = (centroid - before) / s0
@@ -741,6 +830,23 @@ private fun DrawScope.drawPreview(
     drawRect(Color.White.copy(alpha = 0.35f), Offset(o.x + left * s, o.y + top * s), Size(width, height), style = Stroke(width = 1f))
 }
 
+/** The icon of a way of building: a brush, a line, a filled rectangle, a frame. */
+@Composable
+private fun ModeIcon(m: BuildMode, tint: Color, size: androidx.compose.ui.unit.Dp) {
+    Canvas(Modifier.size(size)) {
+        val u = this.size.width
+        when (m) {
+            BuildMode.BRUSH -> {
+                drawCircle(tint, u * 0.22f, Offset(u * 0.38f, u * 0.6f))
+                drawCircle(tint, u * 0.12f, Offset(u * 0.72f, u * 0.3f))
+            }
+            BuildMode.LINE -> drawLine(tint, Offset(u * 0.1f, u * 0.9f), Offset(u * 0.9f, u * 0.1f), strokeWidth = u * 0.18f, cap = StrokeCap.Round)
+            BuildMode.RECT -> drawRect(tint, Offset(u * 0.1f, u * 0.2f), Size(u * 0.8f, u * 0.6f))
+            BuildMode.FRAME -> drawRect(tint, Offset(u * 0.14f, u * 0.24f), Size(u * 0.72f, u * 0.52f), style = Stroke(width = u * 0.14f))
+        }
+    }
+}
+
 /** Paint, line, filled rectangle, frame: one small icon each. */
 @Composable
 private fun ModeSelector(current: BuildMode, onSelect: (BuildMode) -> Unit) {
@@ -764,18 +870,7 @@ private fun ModeSelector(current: BuildMode, onSelect: (BuildMode) -> Unit) {
                     .testTag("mode_$label"),
                 contentAlignment = Alignment.Center,
             ) {
-                Canvas(Modifier.size(18.dp)) {
-                    val u = size.width
-                    when (m) {
-                        BuildMode.BRUSH -> {
-                            drawCircle(tint, u * 0.22f, Offset(u * 0.38f, u * 0.6f))
-                            drawCircle(tint, u * 0.12f, Offset(u * 0.72f, u * 0.3f))
-                        }
-                        BuildMode.LINE -> drawLine(tint, Offset(u * 0.1f, u * 0.9f), Offset(u * 0.9f, u * 0.1f), strokeWidth = u * 0.18f, cap = StrokeCap.Round)
-                        BuildMode.RECT -> drawRect(tint, Offset(u * 0.1f, u * 0.2f), Size(u * 0.8f, u * 0.6f))
-                        BuildMode.FRAME -> drawRect(tint, Offset(u * 0.14f, u * 0.24f), Size(u * 0.72f, u * 0.52f), style = Stroke(width = u * 0.14f))
-                    }
-                }
+                ModeIcon(m, tint, 18.dp)
             }
         }
     }
@@ -813,6 +908,12 @@ private const val TWO = 2
 private const val MOVED = 3
 private const val MAX_ZOOM = 6f
 
+/** Width of the column beside the world in landscape. */
+private val SIDE_PANEL = 300.dp
+
+/** Cells drawn beyond the edges of the screen, so panning shows no stale picture before the next frame. */
+private const val VIEW_MARGIN = 24
+
 /** How many polls of 120 ms a notice stays. */
 private const val NOTICE_TICKS = 21
 
@@ -847,37 +948,215 @@ private fun PerformanceOverlay(stats: SimRunner.Stats, modifier: Modifier) {
     )
 }
 
+/**
+ * Speed and the shape of the brush, small, in a corner of the world (Leitfaden V3, 4a.5): pause, normal and
+ * fast as three little buttons, and one button that opens the shapes and sizes of the brush.
+ */
 @Composable
-private fun SpeedSelector(current: SimRunner.Speed, modifier: Modifier, onSelect: (SimRunner.Speed) -> Unit) {
+private fun CornerControls(
+    speed: SimRunner.Speed,
+    onSpeed: (SimRunner.Speed) -> Unit,
+    mode: BuildMode,
+    onMode: (BuildMode) -> Unit,
+    brush: Int,
+    onBrush: (Int) -> Unit,
+    modifier: Modifier,
+) {
+    var open by remember { mutableStateOf(false) }
     Row(
         modifier
             .clip(RoundedCornerShape(50))
-            .background(Palette.surfaceHigh)
+            .background(Color(0xCC0B0F15))
             .padding(3.dp),
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        for ((speed, label) in listOf(SimRunner.Speed.PAUSE to "Pause", SimRunner.Speed.NORMAL to "Normal", SimRunner.Speed.FAST to "Schnell")) {
-            val selected = speed == current
+        for ((s, label) in listOf(SimRunner.Speed.PAUSE to "Pause", SimRunner.Speed.NORMAL to "Normal", SimRunner.Speed.FAST to "Schnell")) {
+            val selected = s == speed
+            val tint = if (selected) Palette.background else Palette.text
             Box(
                 Modifier
-                    .weight(1f)
-                    .height(36.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(if (selected) Palette.accent else Palette.surfaceHigh)
-                    .clickable { onSelect(speed) }
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(if (selected) Palette.accent else Color.Transparent)
+                    .clickable { onSpeed(s) }
+                    .semantics { contentDescription = label }
                     .testTag("speed_$label"),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    label,
-                    color = if (selected) Palette.background else Palette.text,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                )
+                Canvas(Modifier.size(14.dp)) {
+                    val u = size.width
+                    fun play(left: Float, w: Float) {
+                        val path = androidx.compose.ui.graphics.Path().apply {
+                            moveTo(left, u * 0.1f)
+                            lineTo(left + w, u * 0.5f)
+                            lineTo(left, u * 0.9f)
+                            close()
+                        }
+                        drawPath(path, tint)
+                    }
+                    when (s) {
+                        SimRunner.Speed.PAUSE -> {
+                            drawRect(tint, Offset(u * 0.15f, u * 0.1f), Size(u * 0.24f, u * 0.8f))
+                            drawRect(tint, Offset(u * 0.61f, u * 0.1f), Size(u * 0.24f, u * 0.8f))
+                        }
+                        SimRunner.Speed.NORMAL -> play(u * 0.2f, u * 0.7f)
+                        SimRunner.Speed.FAST -> {
+                            play(0f, u * 0.5f)
+                            play(u * 0.5f, u * 0.5f)
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.width(4.dp))
+        Box {
+            Box(
+                Modifier
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(if (open) Palette.accent else Palette.surfaceHigh)
+                    .clickable { open = !open }
+                    .semantics { contentDescription = "Pinselform" }
+                    .testTag("brush_shape"),
+                contentAlignment = Alignment.Center,
+            ) {
+                ModeIcon(mode, if (open) Palette.background else Palette.text, 16.dp)
+            }
+            DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = Palette.surfaceHigh) {
+                Column(Modifier.padding(horizontal = 10.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ModeSelector(mode) {
+                        onMode(it)
+                        open = false
+                    }
+                    BrushSelector(brush) {
+                        onBrush(it)
+                        open = false
+                    }
+                }
             }
         }
     }
+}
+
+/** Folds the bar away or out again: a small arrow. */
+@Composable
+private fun FoldButton(folded: Boolean, vertical: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val label = if (folded) "Leiste ausklappen" else "Leiste einklappen"
+    Box(
+        modifier
+            .size(36.dp)
+            .clip(CircleShape)
+            .background(Palette.surfaceHigh)
+            .clickable(onClick = onClick)
+            .semantics { contentDescription = label }
+            .testTag(if (folded) "unfold" else "fold"),
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(Modifier.size(14.dp)) {
+            val u = size.width
+            // a chevron: down to fold below the world, up to unfold; sideways in the column beside it
+            val (a, b, c) = when {
+                !vertical && !folded -> Triple(Offset(0.1f, 0.3f), Offset(0.5f, 0.7f), Offset(0.9f, 0.3f))
+                !vertical -> Triple(Offset(0.1f, 0.7f), Offset(0.5f, 0.3f), Offset(0.9f, 0.7f))
+                !folded -> Triple(Offset(0.3f, 0.1f), Offset(0.7f, 0.5f), Offset(0.3f, 0.9f))
+                else -> Triple(Offset(0.7f, 0.1f), Offset(0.3f, 0.5f), Offset(0.7f, 0.9f))
+            }
+            drawLine(Palette.text, a * u, b * u, strokeWidth = u * 0.16f, cap = StrokeCap.Round)
+            drawLine(Palette.text, b * u, c * u, strokeWidth = u * 0.16f, cap = StrokeCap.Round)
+        }
+    }
+}
+
+/** What the finger works with now, small: shown while the bar is folded away. */
+@Composable
+private fun CurrentTool(materials: MaterialTable, tool: Int, stats: SimRunner.Stats, modifier: Modifier) {
+    val name = when (tool) {
+        Session.ERASER -> "Radierer"
+        Session.SCOOP -> "Schöpfen"
+        Session.POUR -> "Gießen"
+        Session.HAND -> "Hand"
+        else -> if (tool >= 0) materials.spec(tool).name else ""
+    }
+    Row(modifier.testTag("current_tool"), verticalAlignment = Alignment.CenterVertically) {
+        when {
+            tool >= 0 -> Swatch(materials.color[tool], materials.colorVariance[tool], tool)
+            tool == Session.SCOOP || tool == Session.POUR -> BucketIcon(stats, materials, tool == Session.POUR)
+            tool == Session.HAND -> HandIcon(stats.held?.let { Color(materials.color[it.main]) })
+            else -> Box(Modifier.size(30.dp).clip(RoundedCornerShape(8.dp)).border(2.dp, Palette.textDim, RoundedCornerShape(8.dp)))
+        }
+        Spacer(Modifier.width(8.dp))
+        Text(name, color = Palette.text, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** The materials of a kind in rows that wrap: the bar in the column beside the world (landscape). */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun MaterialGrid(materials: MaterialTable, ids: List<String>, tool: Int, onTool: (Int) -> Unit) {
+    FlowRow(
+        Modifier.fillMaxWidth().testTag("material_bar").padding(horizontal = 10.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        MaterialChips(materials, ids, tool, onTool)
+    }
+}
+
+/** A new world: one of the landscapes in one of the sizes (Leitfaden V3, 4a.5). */
+@Composable
+private fun NewWorldDialog(onDismiss: () -> Unit, onCreate: (Template, WorldSize) -> Unit) {
+    var template by remember { mutableStateOf(Template.MEADOW) }
+    var size by remember { mutableStateOf(WorldSize.MEDIUM) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Palette.surface,
+        title = { Text("Neue Welt", color = Palette.text) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                for (t in Template.entries) {
+                    val selected = t == template
+                    Text(
+                        t.label,
+                        color = if (selected) Palette.background else Palette.text,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (selected) Palette.accent else Palette.surfaceHigh)
+                            .clickable { template = t }
+                            .padding(horizontal = 14.dp, vertical = 10.dp)
+                            .testTag("template_${t.name}"),
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+                Text("Größe", color = Palette.textDim, fontSize = 12.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for (z in WorldSize.entries) {
+                        val selected = z == size
+                        Column(
+                            Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (selected) Palette.accent else Palette.surfaceHigh)
+                                .clickable { size = z }
+                                .padding(vertical = 8.dp)
+                                .testTag("size_${z.name}"),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Text(z.label, color = if (selected) Palette.background else Palette.text, fontWeight = FontWeight.SemiBold)
+                            Text("${z.width} × ${z.height}", color = if (selected) Palette.background else Palette.textDim, fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onCreate(template, size) }, modifier = Modifier.testTag("create_world")) { Text("Anlegen") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Abbrechen") }
+        },
+    )
 }
 
 @Composable

@@ -13,7 +13,9 @@ import com.shootcat.react.sim.DiscoveryWatch
 import com.shootcat.react.sim.MaterialTable
 import com.shootcat.react.sim.Session
 import com.shootcat.react.sim.SimRunner
+import com.shootcat.react.sim.Template
 import com.shootcat.react.sim.Terrain
+import com.shootcat.react.sim.WorldSize
 import com.shootcat.react.ui.sandbox.BuildMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -71,14 +73,33 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         sound.setTrack(1)
     }
 
-    /** The sandbox simulation, built on first use: the start landscape at 200 × 350 cells. */
+    private val _world = MutableStateFlow<SimRunner?>(null)
+
+    /** The sandbox simulation as it is now; a new world replaces it. */
+    val world: StateFlow<SimRunner?> = _world.asStateFlow()
+
+    /** The sandbox simulation, built on first use from the landscape and size in the settings (4a.5). */
     fun sandbox(): SimRunner {
         runner?.let { return it }
+        val s = _state.value.settings
+        return build(templateOf(s), sizeOf(s))
+    }
+
+    /** Starts a new sandbox world from [template] in [size]; the old one is gone (4a.5). */
+    fun newWorld(template: Template, size: WorldSize) {
+        updateSettings(_state.value.settings.copy(template = template.name, worldSize = size.name))
+        runner?.stop()
+        runner = null
+        build(template, size)
+    }
+
+    private fun build(template: Template, size: WorldSize): SimRunner {
         val mt = materials ?: error("no materials")
-        val session = Session(mt, Terrain.WIDTH, Terrain.HEIGHT, Terrain.SEED) { Terrain.sandbox(it) }
+        val session = Session(mt, size.width, size.height, Terrain.SEED) { template.build(it) }
         return SimRunner(session, Backdrop.of(session.world)).also {
             book?.let { b -> it.watch = DiscoveryWatch(b, progress.discoveries) }
             runner = it
+            _world.value = it
             updateThread()
         }
     }
@@ -110,6 +131,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun selectTool(tool: Int) = _state.update { it.copy(tool = tool) }
+
+    private fun templateOf(s: Settings) = Template.entries.firstOrNull { it.name == s.template } ?: Template.MEADOW
+    private fun sizeOf(s: Settings) = WorldSize.entries.firstOrNull { it.name == s.worldSize } ?: WorldSize.MEDIUM
 
     fun selectMode(mode: BuildMode) = _state.update { it.copy(mode = mode) }
 

@@ -81,8 +81,10 @@ object Benchmark {
         val sand = materials.id("sand")
         // light the bridge and the logs, pour sand and water from above
         for (x in 0 until width step 12) world.paint(fire, x, height / 2 - 30, 3)
-        world.paint(water, width / 4, 30, 12)
-        world.paint(sand, width * 3 / 4, 30, 12)
+        for (k in 0 until maxOf(1, width / 200)) {
+            world.paint(water, width * (4 * k + 1) / (4 * maxOf(1, width / 200)), 30, 12)
+            world.paint(sand, width * (4 * k + 3) / (4 * maxOf(1, width / 200)), 30, 12)
+        }
         return world
     }
 
@@ -104,25 +106,47 @@ object Benchmark {
      * Milliseconds to turn the world into a picture once, while it runs (with the light the simulation has
      * worked out) or, with [paused], working out the light for the picture itself.
      */
-    fun renderMillis(world: World, frames: Int = 60, paused: Boolean = false): Double {
+    fun renderMillis(world: World, frames: Int = 60, paused: Boolean = false, viewWidth: Int = world.width): Double {
         val renderer = Renderer(world, IntArray(world.size))
         val out = IntArray(world.size)
         if (world.step == 0) world.step()
-        repeat(60) { renderer.render(out, it, running = !paused) }
+        val x0 = (world.width - viewWidth) / 2
+        val x1 = x0 + viewWidth - 1
+        repeat(60) { renderer.render(out, it, !paused, x0, 0, x1, world.height - 1) }
         val t0 = System.nanoTime()
-        repeat(frames) { renderer.render(out, it, running = !paused) }
+        repeat(frames) { renderer.render(out, it, !paused, x0, 0, x1, world.height - 1) }
         return (System.nanoTime() - t0) / 1e6 / frames
     }
 
-    fun runAll(materials: MaterialTable, width: Int = Terrain.WIDTH, height: Int = Terrain.HEIGHT, steps: Int = 600): List<Result> = listOf(
-        measure("Leere Welt", emptyWorld(materials, width, height), steps),
-        measure("Leere Welt, alle Chunks wach", emptyWorld(materials, width, height).also { it.keepAllAwake = true }, steps),
-        measure("Voll aktive Welt (alle Chunks wach)", fullWorld(materials, width, height), steps),
-        measure("Voll aktive Welt mit Pflanzen, Tieren und Licht", livingWorld(materials, width, height), steps),
-        measure("Spielplatz mit Feuer, Sand und Wasser", sandboxWorld(materials, width, height), steps),
-    )
+    /**
+     * The measurements of the report: the worlds of 200 × 350 cells measured since phase 1, for comparison,
+     * and the largest sandbox world ([WorldSize.LARGE]), for which 8 ms per step is the limit (4a.5).
+     */
+    fun runAll(materials: MaterialTable, steps: Int = 600): List<Result> {
+        val w = Terrain.WIDTH
+        val h = Terrain.HEIGHT
+        val big = WorldSize.LARGE
+        val size = "${big.width} × ${big.height}"
+        return listOf(
+            measure("Leere Welt", emptyWorld(materials, w, h), steps),
+            measure("Voll aktive Welt (alle Chunks wach)", fullWorld(materials, w, h), steps),
+            measure("Voll aktive Welt mit Pflanzen, Tieren und Licht", livingWorld(materials, w, h), steps),
+            measure("Spielplatz mit Feuer, Sand und Wasser", sandboxWorld(materials, w, h), steps),
+            measure("Größte Welt $size, voll aktiv", fullWorld(materials, big.width, big.height), steps),
+            measure("Größte Welt $size, voll aktiv mit Pflanzen, Tieren und Licht", livingWorld(materials, big.width, big.height), steps),
+            measure("Größte Welt $size, Wiese mit Feuer, Sand und Wasser", sandboxWorld(materials, big.width, big.height), steps),
+        )
+    }
 
-    fun report(results: List<Result>, renderMs: Double?, device: String, pausedRenderMs: Double? = null): String = buildString {
+    /** Milliseconds per picture of the largest world: all of it, and the part a phone shows (a third of its width). */
+    fun renderLargest(materials: MaterialTable): Pair<Double, Double> {
+        val big = WorldSize.LARGE
+        val all = renderMillis(sandboxWorld(materials, big.width, big.height))
+        val part = renderMillis(sandboxWorld(materials, big.width, big.height), viewWidth = big.width / 3)
+        return all to part
+    }
+
+    fun report(results: List<Result>, renderMs: Double?, device: String, pausedRenderMs: Double? = null, largest: Pair<Double, Double>? = null): String = buildString {
         appendLine("Gerät: $device")
         for (r in results) {
             appendLine(
@@ -132,5 +156,9 @@ object Benchmark {
         }
         if (renderMs != null) appendLine("Bild erzeugen: %.2f ms".format(renderMs))
         if (pausedRenderMs != null) appendLine("Bild erzeugen in der Pause (eigenes Licht): %.2f ms".format(pausedRenderMs))
+        if (largest != null) {
+            appendLine("Bild der größten Welt, ganz: %.2f ms".format(largest.first))
+            appendLine("Bild der größten Welt, sichtbarer Ausschnitt (ein Drittel): %.2f ms".format(largest.second))
+        }
     }
 }

@@ -78,18 +78,22 @@ object Terrain {
         val w = world.width
         val h = world.height
         val n = Noise(seed)
-        val sx = w / 200f
+        // the landscape is drawn for 200 × 350 cells; a wider world gets it unstretched in the middle, with
+        // more hills to the left and dunes to the right
+        val wide = w > h * 200f / 350f * 1.05f
         val sy = h / 350f
+        val sx = if (wide) sy else w / 200f
+        val ox = if (wide) ((w - 200f * sx) / 2f).toInt() else 0
 
         // the surface line: a hill on the left, a hollow with the pond in the middle, a gentle rise on the right
         val surface = IntArray(w) { x ->
-            val u = x / sx
+            val u = (x - ox) / sx
             val rough = (n.fbm(u / 26f, 0.5f, 4) - 0.5f) * 18f
-            ((profile(u) + rough) * sy).toInt().coerceIn(h / 4, h - 20)
+            ((ground(u, n) + rough) * sy).toInt().coerceIn(h / 4, h - 20)
         }
-        val deepest = (90 * sx).toInt() + (0 until (30 * sx).toInt()).maxByOrNull { surface[(90 * sx).toInt() + it] }!!
-        val bankLeft = ((60 * sx).toInt()..deepest).minOf { surface[it] }
-        val bankRight = (deepest..(150 * sx).toInt()).minOf { surface[it] }
+        val deepest = ox + (90 * sx).toInt() + (0 until (30 * sx).toInt()).maxByOrNull { surface[ox + (90 * sx).toInt() + it] }!!
+        val bankLeft = (ox + (60 * sx).toInt()..deepest).minOf { surface[it] }
+        val bankRight = (deepest..ox + (150 * sx).toInt()).minOf { surface[it] }
         val waterLine = maxOf(bankLeft, bankRight) + 2
         var pondLeft = deepest
         while (pondLeft > 0 && surface[pondLeft - 1] > waterLine) pondLeft--
@@ -97,7 +101,7 @@ object Terrain {
         while (pondRight < w - 1 && surface[pondRight + 1] > waterLine) pondRight++
 
         for (x in 0 until w) {
-            val u = x / sx
+            val u = (x - ox) / sx
             val top = surface[x]
             val soil = ((10f + 8f * n.fbm(u / 20f, 3.3f)) * sy).toInt()
             for (y in top until h) {
@@ -124,7 +128,7 @@ object Terrain {
         }
 
         // a cave in the deep rock on the right, with lava gathered at its bottom behind a crust of basalt
-        val cx = 150f * sx
+        val cx = ox + 150f * sx
         val cy = 300f * sy
         for (y in 0 until h) for (x in 0 until w) {
             val dx = (x - cx) / (34f * sx)
@@ -155,7 +159,7 @@ object Terrain {
         }
 
         // a stack of logs on the hill
-        val logX = (24 * sx).toInt()
+        val logX = ox + (24 * sx).toInt()
         for (k in 0 until 3) {
             val y0 = surface[logX + 10] - (k + 1) * (5 * sy).toInt()
             for (x in logX + k * 3 until logX + 26 - k * 3) for (y in y0 until y0 + 4) {
@@ -163,12 +167,12 @@ object Terrain {
             }
         }
 
-        if (mt.idOrNull("grass") != null) life(world, n, surface, pondLeft, pondRight, waterLine, deckY, sx, sy)
+        if (mt.idOrNull("grass") != null) life(world, n, surface, pondLeft, pondRight, waterLine, deckY, sx, sy, ox)
         world.wakeAll()
     }
 
     /** Plants and animals (2b): grass, trees, a bush, a vine, fish, worms, birds, and the grotto. */
-    private fun life(world: World, n: Noise, surface: IntArray, pondLeft: Int, pondRight: Int, waterLine: Int, deckY: Int, sx: Float, sy: Float) {
+    private fun life(world: World, n: Noise, surface: IntArray, pondLeft: Int, pondRight: Int, waterLine: Int, deckY: Int, sx: Float, sy: Float, ox: Int) {
         val mt = world.materials
         val w = world.width
         val h = world.height
@@ -186,12 +190,18 @@ object Terrain {
         }
 
         // two trees and a bush on the hill, a vine at the foot of the lower tree that grows towards the pond
-        val treeA = (14 * sx).toInt()
-        val treeB = (58 * sx).toInt()
-        val bush = (67 * sx).toInt()
+        val treeA = ox + (14 * sx).toInt()
+        val treeB = ox + (58 * sx).toInt()
+        val bush = ox + (67 * sx).toInt()
         world.plantTree(treeA, surface[treeA] - 1, tree = true)
         world.plantTree(treeB, surface[treeB] - 1, tree = true)
         world.plantTree(bush, surface[bush] - 1, tree = false)
+        // more trees on the hills to the left in a wide world
+        var extra = treeA - (40 * sx).toInt()
+        while (extra > (8 * sx).toInt()) {
+            if (world.material(extra, surface[extra]) == grass) world.plantTree(extra, surface[extra] - 1, tree = n.hash(extra, 3) < 0.7f)
+            extra -= (34 * sx + 20 * sx * n.hash(extra, 5)).toInt()
+        }
         val vineX = treeB + 1
         val vineY = surface[treeB] - 3
         if (world.material(vineX, vineY) == air) {
@@ -201,10 +211,10 @@ object Terrain {
 
         // a fallen log on the dune and a loose stone: things the hand can carry (4.3)
         val trunk = mt.id("trunk")
-        val logX = (150 * sx).toInt()
+        val logX = ox + (150 * sx).toInt()
         val logTop = (logX until logX + 14).minOf { surface[it] } - 2
         for (x in logX until logX + 14) for (y in logTop until logTop + 2) if (world.material(x, y) == air) world.set(x, y, trunk)
-        val stoneX = (176 * sx).toInt()
+        val stoneX = ox + (176 * sx).toInt()
         val stoneTop = (stoneX until stoneX + 4).minOf { surface[it] } - 3
         for (x in stoneX until stoneX + 4) for (y in stoneTop until stoneTop + 3) if (world.material(x, y) == air) world.set(x, y, mt.id("stone"))
 
@@ -228,13 +238,13 @@ object Terrain {
         // worms in the earth of the hill
         val worm = mt.id("worm")
         for (k in 0 until 6) {
-            val x = ((8 + k * 13) * sx).toInt()
+            val x = ox + ((8 + k * 13) * sx).toInt()
             val y = surface[x] + 4 + k % 3
             if (world.material(x, y) == earth) world.set(x, y, worm)
         }
 
         // a grotto under the hill: no daylight reaches it; a pool, moss on its damp walls, fireflies
-        val gx = 44f * sx
+        val gx = ox + 44f * sx
         val gy = 212f * sy
         val pool = gy + 3f * sy
         for (y in 0 until h) for (x in 0 until w) {
@@ -259,6 +269,19 @@ object Terrain {
 
     /** Height of the ground (y grows downwards) at u = 0..200, between hand-set points. */
     private val POINTS = floatArrayOf(0f, 108f, 30f, 114f, 60f, 140f, 85f, 172f, 104f, 204f, 122f, 182f, 145f, 160f, 175f, 152f, 200f, 158f)
+
+    /** The ground line at u (200 units across the drawn landscape), going on as rolling hills to the left and dunes to the right. */
+    private fun ground(u: Float, n: Noise): Float = when {
+        u < 0f -> {
+            val e = minOf(1f, -u / 25f)
+            profile(0f) * (1f - e) + (112f + (n.fbm(u / 34f, 7.7f, 3) - 0.5f) * 46f) * e
+        }
+        u > 200f -> {
+            val e = minOf(1f, (u - 200f) / 25f)
+            profile(200f) * (1f - e) + (156f + (n.fbm(u / 22f, 2.2f, 3) - 0.5f) * 26f) * e
+        }
+        else -> profile(u)
+    }
 
     private fun profile(u: Float): Float {
         var k = 0

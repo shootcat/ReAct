@@ -12,6 +12,11 @@ data class Settings(
     val performance: Boolean = false,
     /** Thickness of the brush in cells. */
     val brush: Int = 3,
+    /** The landscape and size a new sandbox world starts from (Leitfaden V3, 4a.5): names of Template and WorldSize. */
+    val template: String = "MEADOW",
+    val worldSize: String = "MEDIUM",
+    /** The bar of materials and tools is folded away. */
+    val barFolded: Boolean = false,
 )
 
 class SettingsStore(context: Context) {
@@ -25,6 +30,9 @@ class SettingsStore(context: Context) {
             music = prefs.getBoolean(KEY_MUSIC, defaults.music),
             performance = prefs.getBoolean(KEY_PERFORMANCE, defaults.performance),
             brush = prefs.getInt(KEY_BRUSH, defaults.brush),
+            template = prefs.getString(KEY_TEMPLATE, defaults.template) ?: defaults.template,
+            worldSize = prefs.getString(KEY_SIZE, defaults.worldSize) ?: defaults.worldSize,
+            barFolded = prefs.getBoolean(KEY_FOLDED, defaults.barFolded),
         )
     }
 
@@ -35,6 +43,9 @@ class SettingsStore(context: Context) {
             .putBoolean(KEY_MUSIC, settings.music)
             .putBoolean(KEY_PERFORMANCE, settings.performance)
             .putInt(KEY_BRUSH, settings.brush)
+            .putString(KEY_TEMPLATE, settings.template)
+            .putString(KEY_SIZE, settings.worldSize)
+            .putBoolean(KEY_FOLDED, settings.barFolded)
             .apply()
     }
 
@@ -44,5 +55,8 @@ class SettingsStore(context: Context) {
         const val KEY_MUSIC = "music"
         const val KEY_PERFORMANCE = "performance"
         const val KEY_BRUSH = "brush"
+        const val KEY_TEMPLATE = "template"
+        const val KEY_SIZE = "world_size"
+        const val KEY_FOLDED = "bar_folded"
     }
 }

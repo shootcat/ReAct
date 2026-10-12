@@ -93,7 +93,7 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
     }
 
     /** Works out how bright each cell is from the light field: dark caves, lit surroundings of fire. */
-    private fun computeShade(running: Boolean) {
+    private fun computeShade(running: Boolean, x0: Int, y0: Int, x1: Int, y1: Int) {
         if (!lit) {
             factor.fill(1f)
             shade.fill(1f)
@@ -108,29 +108,34 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
         val w = world.width
         val lw = light.width
         val lh = light.height
-        for (by in 0 until lh) {
+        val by0 = maxOf(0, lattice(y0, lh).first)
+        val by1 = minOf(lh - 1, lattice(y1, lh).first + 1)
+        for (by in by0..by1) {
             val r = by * lw
             val o = by * w
-            for (x in 0 until w) {
+            for (x in x0..x1) {
                 val a = factor[r + blockX[x]]
                 val b = factor[r + minOf(blockX[x] + 1, lw - 1)]
                 shadeRows[o + x] = a + (b - a) * blockTx[x]
             }
         }
-        for (y in 0 until world.height) {
-            val (y0, t) = lattice(y, lh)
-            val ra = y0 * w
-            val rb = minOf(y0 + 1, lh - 1) * w
+        for (y in y0..y1) {
+            val (ly, t) = lattice(y, lh)
+            val ra = ly * w
+            val rb = minOf(ly + 1, lh - 1) * w
             val o = y * w
-            for (x in 0 until w) {
+            for (x in x0..x1) {
                 val a = shadeRows[ra + x]
                 shade[o + x] = a + (shadeRows[rb + x] - a) * t
             }
         }
     }
 
-    /** Draws the world into [out]; [running] says the simulation is stepping, so its own light field is fresh. */
-    fun render(out: IntArray, frame: Int, running: Boolean = false) {
+    /**
+     * Draws the world into [out]; [running] says the simulation is stepping, so its own light field is fresh.
+     * Only the cells from (x0, y0) to (x1, y1) are drawn (the part on screen), the rest of [out] stays as it was.
+     */
+    fun render(out: IntArray, frame: Int, running: Boolean = false, x0: Int = 0, y0: Int = 0, x1: Int = world.width - 1, y1: Int = world.height - 1) {
         val w = world.width
         val size = world.size
         val mat = world.mat
@@ -138,13 +143,20 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
         val flags = world.flags
         val variant = world.variant
         val life = world.life
-        computeShade(running)
+        computeShade(running, x0, y0, x1, y1)
         critterCount = 0
-        depth.fill(0)
-        var x = -1
-        for (i in 0 until size) {
-            x++
-            if (x == w) x = 0
+        // how deep in clear water the first row lies, for each column
+        for (x in x0..x1) {
+            var d = 0
+            var j = (y0 - 1) * w + x
+            while (j >= 0 && d < MAX_DEPTH && clearLiquid[mat[j].toInt()]) {
+                d++
+                j -= w
+            }
+            depth[x] = d
+        }
+        for (y in y0..y1) for (x in x0..x1) {
+            val i = y * w + x
             val m = mat[i].toInt()
             if (clearLiquid[m]) depth[x]++ else depth[x] = 0
             val s = shade[i]
@@ -441,6 +453,9 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
 
         /** The least brightness of solid ground in the dark, so the ground stays readable as a cut. */
         private const val CUT_FACE = 0.58f
+
+        /** Clear water is drawn darker with depth down to this many cells. */
+        private const val MAX_DEPTH = 48
 
         /** Where cell [p] lies between the centres of blocks of 2 cells: the block left of it and how far on. */
         private fun lattice(p: Int, blocks: Int): Pair<Int, Float> {

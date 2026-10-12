@@ -24,6 +24,7 @@ import com.shootcat.react.ui.title.TitleScreen
 @Composable
 fun ReactApp(viewModel: AppViewModel) {
     val state by viewModel.state.collectAsState()
+    val world by viewModel.world.collectAsState()
 
     BackHandler(enabled = state.screen != Screen.TITLE) { viewModel.back() }
 
@@ -49,7 +50,7 @@ fun ReactApp(viewModel: AppViewModel) {
                         onBack = viewModel::back,
                     )
                     else -> SandboxScreen(
-                        runner = viewModel.sandbox(),
+                        runner = world ?: viewModel.sandbox(),
                         materials = materials,
                         settings = state.settings,
                         tool = state.tool,
@@ -61,6 +62,7 @@ fun ReactApp(viewModel: AppViewModel) {
                         onOpenSettings = { viewModel.open(Screen.SETTINGS) },
                         onOpenBook = { viewModel.open(Screen.BOOK) },
                         onDiscovered = viewModel::discovered,
+                        onNewWorld = viewModel::newWorld,
                         onBack = viewModel::back,
                     )
                 }

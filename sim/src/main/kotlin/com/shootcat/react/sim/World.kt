@@ -154,7 +154,15 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         seen[kind * materials.count + m]++
     }
 
-    private val ambient = materials.ambient
+    /** The temperature of the open air, which air comes back to (a cold mountain is colder than a meadow). */
+    var ambient = materials.ambient
+        private set
+
+    /** Sets the temperature of the surroundings and brings every cell to it, before a world is built. */
+    fun setAmbient(t: Float) {
+        ambient = t
+        temp.fill(t)
+    }
     private val kindOf = materials.kind
     private val densityOf = materials.density
     private val fireId = materials.idOrNull("fire") ?: AIR
@@ -1418,7 +1426,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
      */
     private fun pressure() {
         if (gasDirty) findGasRegions()
-        val air = materials.ambient + KELVIN
+        val air = ambient + KELVIN
         val ex = materials.expansion
         for (k in 0 until closedCount) {
             val a = closedStart[k]
@@ -1507,7 +1515,10 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             for (n in intArrayOf(if (x > 0) j - 1 else -1, if (x < w - 1) j + 1 else -1, j - w, j + w)) {
                 if (n < 0 || n >= size) continue
                 val q = mat[n].toInt()
-                if (kindOf[q] == Kind.GAS) continue
+                val k = kindOf[q]
+                if (k == Kind.GAS) continue
+                // a pool or a heap on the floor is no wall: pressure presses it down, it cannot give way
+                if (n == j + w && (k == Kind.LIQUID || k == Kind.POWDER)) continue
                 val s = if (flags[n].toInt() and Flag.ANCHORED != 0) Float.POSITIVE_INFINITY else st[q]
                 if (s < least) {
                     least = s
@@ -2075,7 +2086,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         private const val KELVIN = 273f
 
         /** Gas beyond what the region would hold as plain air (in cells of air) before anything can burst: small hot pockets in a heap do nothing. */
-        private const val MIN_EXCESS = 12f
+        private const val MIN_EXCESS = 40f
 
         /** Reach of a burst per square root of the pent-up gas; force and reach of firedamp going off, on top of the square root of the cloud's cells. */
         private const val BURST_REACH = 0.6f

@@ -414,7 +414,7 @@ class MaterialTable(val specs: List<MaterialSpec>, val ambient: Float) {
 
         /** Strength of walls without their own: built solids, and loose or liquid material that a blast pushes aside. */
         const val SOLID_STRENGTH = 5f
-        const val LOOSE_STRENGTH = 1.5f
+        const val LOOSE_STRENGTH = 2.5f
 
         /** How much better heat passes upwards out of a hotter gas than by plain conduction. */
         const val CONVECTION = 3f

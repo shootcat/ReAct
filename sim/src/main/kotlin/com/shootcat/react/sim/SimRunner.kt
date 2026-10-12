@@ -26,13 +26,31 @@ class SimRunner(val session: Session, backdrop: IntArray) {
     val layerWidth get() = renderer.layerWidth
     val layerHeight get() = renderer.layerHeight
 
-    /** One finished picture: the cells, the soft haze and glow layers and the flame layer. */
+    /**
+     * One finished picture: the cells, the soft haze and glow layers and the flame layer. Only the cells from
+     * ([x0], [y0]) to ([x1], [y1]) were drawn: the part of the world on screen.
+     */
     class Frame(size: Int, layerSize: Int, flameSize: Int) {
         val pixels = IntArray(size)
         val haze = IntArray(layerSize)
         val light = IntArray(layerSize)
         val flames = IntArray(flameSize)
+        var x0 = 0
+        var y0 = 0
+        var x1 = 0
+        var y1 = 0
     }
+
+    /**
+     * The part of the world on screen (x0, y0, x1, y1), set by whoever draws; only that part is rendered.
+     * The whole world until it is set.
+     */
+    @Volatile
+    var viewport: IntArray? = null
+        set(value) {
+            field = value
+            if (speed == Speed.PAUSE) thread?.let { LockSupport.unpark(it) }
+        }
 
     private val lock = Any()
     val flameWidth get() = renderer.flameWidth
@@ -160,6 +178,7 @@ class SimRunner(val session: Session, backdrop: IntArray) {
         var shownStep = 0f
         var shownRender = 0f
         var dirty = true
+        var shown: IntArray? = null
         while (running) {
             val now = System.nanoTime()
             val dt = now - last
@@ -199,9 +218,18 @@ class SimRunner(val session: Session, backdrop: IntArray) {
                 acc = 0L
             }
 
+            val view = viewport
+            if (view !== shown) dirty = true
             val after = System.nanoTime()
             if (dirty && after - lastRender >= FRAME_NANOS) {
-                renderer.render(back.pixels, frameNumber++, running = speed != Speed.PAUSE)
+                shown = view
+                val w = world.width
+                val h = world.height
+                back.x0 = (view?.get(0) ?: 0).coerceIn(0, w - 1)
+                back.y0 = (view?.get(1) ?: 0).coerceIn(0, h - 1)
+                back.x1 = (view?.get(2) ?: (w - 1)).coerceIn(back.x0, w - 1)
+                back.y1 = (view?.get(3) ?: (h - 1)).coerceIn(back.y0, h - 1)
+                renderer.render(back.pixels, frameNumber++, speed != Speed.PAUSE, back.x0, back.y0, back.x1, back.y1)
                 renderer.renderLayers(back.haze, back.light)
                 renderer.renderFlames(back.flames)
                 synchronized(lock) {
