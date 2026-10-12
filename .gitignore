@@ -10,3 +10,4 @@ captures/
 .cxx/
 *.apk
 !app/debug.keystore
+__pycache__/
