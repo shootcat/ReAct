@@ -270,9 +270,12 @@ Gemessen auf diesem Rechner (JVM). Er ist etwa 2,5-mal langsamer als das Galaxy 
   - `30_level1`, `32_level2`: ganzes Level im Bild, Ziel mit Grenzen, Zielbereich gestrichelt, nur Eimer und Hand bzw. nur Eimer;
   - `33_auswahl_mit_medaille`: Level 1 als gelöst markiert;
   - `34_level3_quer_nicht_erreichbar`: Querformat, „Da kommst du nicht hin“, Levelname zweizeilig, Grenzen umbrochen.
-- **Offen:** Im App-Test war Level 1 in beta-86 und beta-87 erst nach 5:42 bzw. 5:45 ohne Medaille gelöst.
-  - Ursache: Der Finger lag zu kurz auf dem Erdfenster. Der Eimer nimmt pro Schritt nur die offen liegende Schicht, und der CI-Rechner schafft neben dem Zeichnen nur etwa 40 Schritte pro Sekunde.
-  - `7a069b7` hält den Finger 1,2 s; das Ergebnis folgt mit beta-88.
+- **App-Test Level 1:** In beta-86 bis beta-88 war Level 1 erst nach 5:40 bis 5:45 ohne Medaille gelöst.
+  - Meine erste Vermutung war falsch: Der Finger lag nicht zu kurz (`7a069b7` hielt ihn 1,2 s, ohne Wirkung).
+  - Tatsächlich traf der Eimer kein Erdreich. Nach etwa 1,5 s ist Wasser aus dem Becken in den linken Rand des Pfropfs gesickert, genau auf Zelle 48/45. Der leere Eimer nimmt, was unter dem Finger liegt: 40 Zellen Wasser. Der Teich füllt sich dann nur langsam über die Ufermulde.
+  - Gegenprobe in der Simulation, Griff nach 1 bis 3 s: auf 48/45 ab 1,5 s Wasser und kein Erfolg; auf 50/45, 51/45 und 52/46 immer Erde und Gold (31 bis 43 s, 1 Griff).
+  - Der App-Test tippt jetzt auf die Mitte des Pfropfs (52/46) und verlangt Gold. Der Lösungstest greift bei 1 s und bleibt bei 48/45.
+  - Für Spieler gilt: Wer zögert und den Rand des Pfropfs antippt, schöpft Wasser. Das ist die Regel des Eimers, kein Fehler.
 
 ## Zur Freigabe
 

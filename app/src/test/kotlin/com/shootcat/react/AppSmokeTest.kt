@@ -311,11 +311,10 @@ class AppSmokeTest {
         run(1500)
         compose.onNodeWithTag("level_hud").assertExists()
         shot("30_level1")
-        // the level begins with all of it on screen; one bucket out of the earth in the window of the rock
-        // wall (brush 3, the bucket is the first tool). The bucket takes only the layer that lies open, one
-        // layer per step, so the finger stays down for well over the 20 steps of the test of the level: on
-        // the CI machine this world runs at about 40 steps a second next to the drawing of the screen.
-        compose.onNodeWithTag("world").performTouchInput { down(levelCell(48, 45, 220, 140)) }
+        // the level begins with all of it on screen; one bucket out of the middle of the earth in the window
+        // of the rock wall (brush 3, the bucket is the first tool). Not its left edge: after a second and a
+        // half the pool has seeped in there, and an empty bucket takes what lies under the finger, water.
+        compose.onNodeWithTag("world").performTouchInput { down(levelCell(52, 46, 220, 140)) }
         run(1200)
         compose.onNodeWithTag("world").performTouchInput { up() }
         run(300)
@@ -330,9 +329,10 @@ class AppSmokeTest {
             throw AssertionError("Level 1 nicht gelöst. Auf dem Bildschirm:\n" + compose.onAllNodes(isRoot()).printToString(Int.MAX_VALUE))
         }
         shot("31_level1_medaille", compose.onNodeWithTag("level_end"))
-        File("build/screenshots/level1_medaille.txt").writeText(
-            compose.onNodeWithTag("medal").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)?.joinToString { it.text } ?: "",
-        )
+        // one bucket out of the window is the gold of this level (TrockenerTeichTest: 31 to 38 s, 1 action)
+        val medal = compose.onNodeWithTag("medal").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)?.joinToString { it.text } ?: ""
+        File("build/screenshots/level1_medaille.txt").writeText(medal)
+        if (medal != "Gold") throw AssertionError("Level 1 mit einem Eimer aus dem Fenster: $medal statt Gold")
         compose.onNodeWithTag("level_next").performClick()
         run(1500)
         shot("32_level2")
