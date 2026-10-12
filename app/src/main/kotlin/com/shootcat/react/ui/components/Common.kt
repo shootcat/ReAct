@@ -44,6 +44,7 @@ fun TopBar(
     onBack: (() -> Unit)?,
     modifier: Modifier = Modifier,
     overline: String? = null,
+    titleLines: Int = 1,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     Row(
@@ -77,7 +78,7 @@ fun TopBar(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = Palette.text,
-                maxLines = 1,
+                maxLines = titleLines,
                 overflow = TextOverflow.Ellipsis,
             )
         }

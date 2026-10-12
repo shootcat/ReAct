@@ -311,14 +311,11 @@ class AppSmokeTest {
         run(1500)
         compose.onNodeWithTag("level_hud").assertExists()
         shot("30_level1")
-        // the whole level on screen: zoomed out as far as it goes
-        compose.onNodeWithTag("world").performTouchInput { pinch(center, 0.2f) }
-        run(500)
-        // one bucket out of the earth in the window of the rock wall (brush 3, the bucket is the first tool)
-        compose.onNodeWithTag("world").performTouchInput {
-            down(levelCell(48, 45, 220, 140))
-            up()
-        }
+        // the level begins with all of it on screen; one bucket out of the earth in the window of the rock
+        // wall, the finger held a moment as in the test of the level (brush 3, the bucket is the first tool)
+        compose.onNodeWithTag("world").performTouchInput { down(levelCell(48, 45, 220, 140)) }
+        run(400)
+        compose.onNodeWithTag("world").performTouchInput { up() }
         run(300)
         compose.onNodeWithTag("speed_Schnell").performClick()
         var waited = 0

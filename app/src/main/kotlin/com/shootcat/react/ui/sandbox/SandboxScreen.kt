@@ -261,14 +261,16 @@ fun SandboxScreen(
     val folded = settings.barFolded
     fun fold(on: Boolean) = onSettings(settings.copy(barFolded = on))
 
+    /** The name of the level and its controls; [narrow] in the column beside the world: the name may wrap. */
     @Composable
-    fun levelHeader(level: LevelMode, modifier: Modifier) {
+    fun levelHeader(level: LevelMode, modifier: Modifier, narrow: Boolean) {
         val spec = level.play.level.spec
         TopBar(
             title = spec.name,
-            overline = "${spec.area} · ${spec.tier}",
+            overline = if (narrow) spec.area else "${spec.area} · ${spec.tier}",
             onBack = onBack,
             modifier = modifier,
+            titleLines = if (narrow) 2 else 1,
         ) {
             RoundIconButton(Glyph.UNDO, "Rückgängig", { runner.post { it.undo() } }, size = 44.dp, enabled = stats.canUndo)
             RoundIconButton(Glyph.RESET, "Neu beginnen", level.onRestart, size = 44.dp)
@@ -309,9 +311,9 @@ fun SandboxScreen(
     }
 
     @Composable
-    fun header(modifier: Modifier) {
+    fun header(modifier: Modifier, narrow: Boolean = false) {
         if (level != null) {
-            levelHeader(level, modifier)
+            levelHeader(level, modifier, narrow)
             return
         }
         TopBar(
@@ -381,7 +383,12 @@ fun SandboxScreen(
     fun world(modifier: Modifier, hud: Boolean = false) {
         Box(modifier) {
             val radius = if (settings.brush in BRUSHES) settings.brush else 3
-            WorldView(runner, tool, radius, mode, materials, sound, stats.held, Modifier.fillMaxSize(), level?.play?.level?.spec?.goals?.map { it.area } ?: emptyList())
+            WorldView(
+                runner, tool, radius, mode, materials, sound, stats.held, Modifier.fillMaxSize(),
+                goalAreas = level?.play?.level?.spec?.goals?.map { it.area } ?: emptyList(),
+                // a level begins with all of it on screen: the player sees what there is before zooming in
+                fitOnStart = level != null,
+            )
             if (level != null && hud) LevelHud(level.play, stats, Modifier.align(Alignment.TopStart).padding(8.dp).width(300.dp))
             if (settings.performance) PerformanceOverlay(stats, Modifier.align(Alignment.TopStart).padding(8.dp))
             notice?.let { NoticeBanner(it, Modifier.align(Alignment.TopCenter).padding(top = 40.dp, start = 16.dp, end = 16.dp)) }
@@ -420,7 +427,7 @@ fun SandboxScreen(
                         FoldButton(folded = true, vertical = true, onClick = { fold(false) }, modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp))
                         CurrentTool(materials, tool, stats, Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp))
                     } else {
-                        header(Modifier.padding(horizontal = 4.dp))
+                        header(Modifier.padding(horizontal = 4.dp), narrow = true)
                         if (level != null) LevelHud(level.play, stats, Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp))
                         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                             CategoryTabs(categories.map { it.first }, category, Modifier.weight(1f)) { chosen = categories[it].first }
@@ -533,6 +540,7 @@ private fun WorldView(
     held: Session.Held?,
     modifier: Modifier,
     goalAreas: List<List<List<Int>>> = emptyList(),
+    fitOnStart: Boolean = false,
 ) {
     val w = runner.width
     val h = runner.height
@@ -569,6 +577,7 @@ private fun WorldView(
     var view by remember { mutableStateOf(IntSize.Zero) }
     var zoom by remember(runner) { mutableFloatStateOf(1f) }
     var pan by remember(runner) { mutableStateOf(Offset.Zero) }
+    var fitted by remember(runner) { mutableStateOf(!fitOnStart) }
     val currentTool by rememberUpdatedState(tool)
     val currentRadius by rememberUpdatedState(radius)
     val currentMode by rememberUpdatedState(mode)
@@ -618,6 +627,10 @@ private fun WorldView(
         modifier
             .onSizeChanged {
                 view = it
+                if (!fitted && it.width > 0 && it.height > 0) {
+                    zoom = minZoom()
+                    fitted = true
+                }
                 pan = clampPan(pan)
             }
             .testTag("world")

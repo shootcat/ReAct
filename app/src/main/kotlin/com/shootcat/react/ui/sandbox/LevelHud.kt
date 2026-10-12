@@ -4,6 +4,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -97,6 +99,7 @@ fun clock(seconds: Float): String {
  * What the level asks and how it is going: each goal with its progress, the time of the world, the actions
  * taken, and the three medals with their limits; a medal whose limit is already passed is dimmed.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun LevelHud(play: Play, stats: SimRunner.Stats, modifier: Modifier = Modifier) {
     var progress by remember(play) { mutableStateOf(play.progress) }
@@ -141,8 +144,11 @@ fun LevelHud(play: Play, stats: SimRunner.Stats, modifier: Modifier = Modifier) 
             Text(clock(seconds), color = Palette.text, fontSize = 12.sp, modifier = Modifier.testTag("level_time"))
             Text(if (actions == 1) "1 Griff" else "$actions Griffe", color = Palette.text, fontSize = 12.sp, modifier = Modifier.testTag("level_actions"))
             Spacer(Modifier.weight(1f))
-            for ((limit, medal) in listOf(rating.gold to Medal.GOLD, rating.silver to Medal.SILVER, rating.bronze to Medal.BRONZE)) {
-                LimitChip(medal, limit, seconds <= limit.seconds && actions <= limit.actions)
+            // the three medals wrap as a whole where the row is narrow (the column beside the world)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                for ((limit, medal) in listOf(rating.gold to Medal.GOLD, rating.silver to Medal.SILVER, rating.bronze to Medal.BRONZE)) {
+                    LimitChip(medal, limit, seconds <= limit.seconds && actions <= limit.actions)
+                }
             }
         }
     }
