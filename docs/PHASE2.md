@@ -509,3 +509,25 @@ Aufteilung eines Schritts der größten belebten Welt (lokal, 15,2 ms):
   1. Licht in großen Welten alle 16 statt 8 Schritte;
   2. die Strukturen gedrosselt, mit den Strukturlisten im Schnappschuss, damit Undo exakt bleibt;
   3. als letztes Mittel eine kleinere größte Welt (560 × 320).
+- **CI-Rechner** (Java 17, beta-80), umgerechnet mit dem Faktor 3,7 aus 2b:
+
+  | Welt | CI | Fold2 (umgerechnet) |
+  |---|---|---|
+  | Voll aktive Welt 200 × 350 | 4,28 ms | 1,2 ms |
+  | Dieselbe mit Pflanzen, Tieren und Licht | 7,99 ms | 2,2 ms |
+  | **Größte Welt 600 × 340, voll aktiv mit Pflanzen, Tieren und Licht** | **8,78 ms** | **2,4 ms** |
+  | Größte Welt 600 × 340, voll aktiv | 9,72 ms | 2,6 ms |
+  | Größte Welt, Wiese | 1,16 ms | 0,3 ms |
+  | Bild der größten Welt, ganz / sichtbares Drittel | 1,47 / 1,02 ms | 0,4 / 0,3 ms |
+
+  - Der CI-Rechner trägt die große Welt deutlich besser als dieser Rechner (8,78 statt 15 bis 18 ms). Er schwankt aber ebenfalls: In Lauf 75 maß er für die kleine belebte Welt 5,39 ms, in Lauf 80 7,99 ms.
+  - Beide Hochrechnungen liegen unter 8 ms: 2,4 ms über den CI-Rechner, 6,5 bis 7,5 ms über diesen Rechner. Den gültigen Wert liefert nur „Leistung messen“ auf dem Fold2.
+
+**Build:** [`beta-80`](https://github.com/shootcat/ReAct/releases/tag/beta-80). CI grün.
+- **Vorher rote Läufe:** Die Läufe davor scheiterten am App-Test, nicht an der App. Ein Test klappte die Leiste ein oder legte eine neue Vorlage an, und die Einstellung blieb für den nächsten Test stehen. Deshalb fand dieser seinen Reiter nicht. Jetzt stellen solche Tests am Ende die Grundwerte her. Fehlt ein Reiter, gibt der Fehler den ganzen Bildschirm aus.
+- **Geprüfte Screenshots:**
+  - `02_spielplatz`: Wiese mit Teich, mittlere Größe;
+  - `19_querformat`: Bedienung als Spalte neben der Welt;
+  - `21`–`24`: Vulkan quer, Leiste eingeklappt quer und hoch, Berg mit Schnee;
+  - `27`: Höhlensystem;
+  - `28`: Pinselmenü mit Formen und Größen.
