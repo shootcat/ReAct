@@ -9,8 +9,12 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -77,38 +81,63 @@ fun TitleScreen(
 
     Box(Modifier.fillMaxSize()) {
         Canvas(Modifier.fillMaxSize()) { drawBackdrop(time) }
-        Column(
-            Modifier
-                .fillMaxSize()
-                .graphicsLayer { alpha = fade.value }
-                .padding(horizontal = 32.dp, vertical = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Spacer(Modifier.weight(1f))
-            LiveScene(materials, Modifier.fillMaxWidth().aspectRatio(TitleScene.W / TitleScene.H.toFloat()))
-            Spacer(Modifier.height(20.dp))
-            Text(
-                "REACT",
-                style = TextStyle(
-                    fontSize = 56.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 16.sp,
-                    color = Palette.accent,
-                    shadow = Shadow(color = Palette.accentDeep.copy(alpha = 0.6f), offset = Offset.Zero, blurRadius = 32f),
-                ),
-            )
-            Spacer(Modifier.weight(1.2f))
-            PillButton(Glyph.PLAY, "Spielplatz", onPlay, Modifier.fillMaxWidth(0.72f), primary = true)
-            Spacer(Modifier.height(24.dp))
-            RoundIconButton(Glyph.GEAR, "Einstellungen", onSettings, size = 56.dp)
-            Spacer(Modifier.height(32.dp))
-            Text(
-                BuildConfig.VERSION_NAME,
-                style = MaterialTheme.typography.labelSmall,
-                color = Palette.textDim.copy(alpha = 0.6f),
-            )
+        BoxWithConstraints(Modifier.fillMaxSize().graphicsLayer { alpha = fade.value }) {
+            if (maxWidth > maxHeight) {
+                // landscape: the little world on the left, title and buttons beside it
+                Row(
+                    Modifier.fillMaxSize().padding(horizontal = 32.dp, vertical = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(32.dp),
+                ) {
+                    LiveScene(materials, Modifier.weight(1f).aspectRatio(TitleScene.W / TitleScene.H.toFloat()))
+                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Title()
+                        Spacer(Modifier.height(24.dp))
+                        Buttons(onPlay, onSettings)
+                    }
+                }
+            } else {
+                Column(
+                    Modifier.fillMaxSize().padding(horizontal = 32.dp, vertical = 24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Spacer(Modifier.weight(1f))
+                    LiveScene(materials, Modifier.fillMaxWidth().aspectRatio(TitleScene.W / TitleScene.H.toFloat()))
+                    Spacer(Modifier.height(20.dp))
+                    Title()
+                    Spacer(Modifier.weight(1.2f))
+                    Buttons(onPlay, onSettings)
+                }
+            }
         }
     }
+}
+
+@Composable
+private fun Title() {
+    Text(
+        "REACT",
+        style = TextStyle(
+            fontSize = 56.sp,
+            fontWeight = FontWeight.Black,
+            letterSpacing = 16.sp,
+            color = Palette.accent,
+            shadow = Shadow(color = Palette.accentDeep.copy(alpha = 0.6f), offset = Offset.Zero, blurRadius = 32f),
+        ),
+    )
+}
+
+@Composable
+private fun ColumnScope.Buttons(onPlay: () -> Unit, onSettings: () -> Unit) {
+    PillButton(Glyph.PLAY, "Spielplatz", onPlay, Modifier.fillMaxWidth(0.72f), primary = true)
+    Spacer(Modifier.height(24.dp))
+    RoundIconButton(Glyph.GEAR, "Einstellungen", onSettings, size = 56.dp)
+    Spacer(Modifier.height(32.dp))
+    Text(
+        BuildConfig.VERSION_NAME,
+        style = MaterialTheme.typography.labelSmall,
+        color = Palette.textDim.copy(alpha = 0.6f),
+    )
 }
 
 /** The little world of the title, stepped once per frame on the UI thread (it is tiny). */

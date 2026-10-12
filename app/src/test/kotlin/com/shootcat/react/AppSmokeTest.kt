@@ -273,9 +273,9 @@ class AppSmokeTest {
         compose.onNodeWithTag("unfold").performClick()
         run(300)
         compose.onNodeWithTag("material_bar").assertExists()
-        // the corner: speed and the shape of the brush
+        // the corner: speed and the shape of the brush; the menu is a window of its own
         brushMenu()
-        shot("28_pinselform")
+        shot("28_pinselform", compose.onNodeWithTag("mode_Pinsel"))
     }
 
     /**
