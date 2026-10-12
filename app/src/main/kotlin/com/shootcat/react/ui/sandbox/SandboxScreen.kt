@@ -106,7 +106,7 @@ private val CATEGORIES = listOf(
     TOOLS to emptyList(),
     "Lose" to listOf("sand", "earth", "gravel", "clay", "salt", "snow", "rubble", "ore_rubble", "charcoal", "ash"),
     "Flüssig" to listOf("water", "saltwater", "lava", "molten_metal", "steam", "smoke"),
-    "Bauen" to listOf("wood", "brick", "stone", "glass", "metal", "ice"),
+    "Bauen" to listOf("wood", "brick", "stone", "basalt", "glass", "metal", "ice"),
     "Hitze" to listOf("fire", "ember", "lava"),
     "Leben" to listOf("seed", "grass", "moss", "vine", "fish", "firefly", "worm", "bird"),
 )

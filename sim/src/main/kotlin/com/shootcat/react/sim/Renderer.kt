@@ -36,6 +36,11 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
 
     /** Brightness in total darkness; little scenes in the discovery book lift it so a dark cave still shows. */
     var ambient = AMBIENT
+        set(value) {
+            field = value
+            backdropMin = maxOf(BACKDROP_MIN, value)
+        }
+    private var backdropMin = BACKDROP_MIN
 
     /** Brightness per block of the light field, and per cell, smoothly in between. */
     private val factor = FloatArray(light.width * light.height)
@@ -143,7 +148,7 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
             if (clearLiquid[m]) depth[x]++ else depth[x] = 0
             val s = shade[i]
             if (m == AIR) {
-                val bg = if (s < 0.995f) darken(backdrop[i], s) else backdrop[i]
+                val bg = if (s < 0.995f) darken(backdrop[i], maxOf(s, backdropMin)) else backdrop[i]
                 // gaps inside falling water or a flame are drawn filled, so streams and flames hold together
                 val up = if (i >= w) mat[i - w].toInt() else AIR
                 val down = if (i < size - w) mat[i + w].toInt() else AIR
@@ -160,7 +165,7 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
             val v = variant[i].toInt() and 0xFF
             var c = palette[m * SHADES + (v and (SHADES - 1))]
             val see = mt.opacity[m] < 1f || m == firefly
-            val bg = if (!see) 0 else if (s < 0.995f) darken(backdrop[i], s) else backdrop[i]
+            val bg = if (!see) 0 else if (s < 0.995f) darken(backdrop[i], maxOf(s, backdropMin)) else backdrop[i]
             val f = flags[i].toInt()
             val t = temp[i]
             if (clearLiquid[m]) {
@@ -195,6 +200,16 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
                     // brushed metal: a soft diagonal shine
                     val y = i / w
                     c = scale(c, 0.9f + 0.25f * wave((x + y * 2) and 63))
+                }
+                Pattern.PORES -> {
+                    // porous basalt: gas bubbles of one to three cells, uneven tone; it goes with the cells
+                    val left = x > 0 && mat[i - 1].toInt() == m && (variant[i - 1].toInt() and 15) == 0
+                    val up = i >= w && mat[i - w].toInt() == m && (variant[i - w].toInt() and 15) == 0
+                    c = when {
+                        (v and 15) < 2 -> scale(c, 0.45f)
+                        left || up -> scale(c, 0.55f)
+                        else -> scale(c, 0.86f + ((v shr 4) and 7) * 0.04f)
+                    }
                 }
             }
             if (mt.speckle[m] > 0f && (v ushr 4) < (mt.speckle[m] * 16f).toInt()) {
@@ -411,8 +426,11 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
     }
 
     companion object {
-        /** Brightness in total darkness. */
-        private const val AMBIENT = 0.05f
+        /** Brightness in total darkness: an unlit cave is dim, never a black hole (4a.1.4). */
+        private const val AMBIENT = 0.25f
+
+        /** The least brightness of the scenery behind the world (the cave wall) in the dark. */
+        private const val BACKDROP_MIN = 0.7f
 
         /** The least brightness of solid ground in the dark, so the ground stays readable as a cut. */
         private const val CUT_FACE = 0.58f
@@ -491,7 +509,7 @@ object Backdrop {
                         // cave wall: dark rock with soft patches, darker in the depth
                         val depth = ((y - top[x]) / 120f).coerceIn(0f, 1f)
                         val tex = n.fbm(x / 9f, y / 9f, 3)
-                        Renderer.scale(0x3a302a or Renderer.OPAQUE, (0.75f + 0.5f * tex) * (1f - 0.35f * depth))
+                        Renderer.scale(0x463a32 or Renderer.OPAQUE, (0.75f + 0.5f * tex) * (1f - 0.25f * depth))
                     }
                     y >= nearLine -> Renderer.mix(near or Renderer.OPAQUE, skyLow or Renderer.OPAQUE, 0.25f)
                     y >= farLine -> Renderer.mix(far or Renderer.OPAQUE, skyLow or Renderer.OPAQUE, 0.35f)

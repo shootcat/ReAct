@@ -68,6 +68,7 @@ object Pattern {
     const val BRICK = 2
     const val MASONRY = 3
     const val SHEEN = 4
+    const val PORES = 5
 }
 
 /** One entry of `materials.json`, exactly as written there. */
@@ -237,6 +238,7 @@ class MaterialTable(val specs: List<MaterialSpec>, val ambient: Float) {
             "brick" -> Pattern.BRICK
             "masonry" -> Pattern.MASONRY
             "sheen" -> Pattern.SHEEN
+            "pores" -> Pattern.PORES
             else -> error("${specs[it].id}: unknown pattern ${specs[it].pattern}")
         }
     }
@@ -285,6 +287,12 @@ class MaterialTable(val specs: List<MaterialSpec>, val ambient: Float) {
     val diesInSalt = BooleanArray(count) { specs[it].diesInSalt }
     val deathProduct = IntArray(count) { ref(specs[it].deathProduct, AIR) }
     val roots = BooleanArray(count) { specs[it].roots }
+
+    /** Solid parts of plants (trunk, leaves, vine, dead wood): they form structures of their own, apart from built ones. */
+    val plant = BooleanArray(count) { kind[it] == Kind.SOLID && ((organism[it] != Organism.NONE && !animal[it]) || roots[it]) }
+
+    /** Soft plant parts (leaves, vine): they carry nothing heavy, a falling block tears through them. */
+    val soft = BooleanArray(count) { organism[it] == Organism.LEAF || organism[it] == Organism.VINE }
     val splitInto = IntArray(count) { ref(specs[it].splitInto, it) }
     val splitYield = IntArray(count) { specs[it].splitYield }
     val opacity = FloatArray(count) { specs[it].opacity }

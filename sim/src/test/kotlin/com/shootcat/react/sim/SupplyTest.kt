@@ -79,7 +79,7 @@ class SupplyTest {
         for (i in 0 until s.world.size) if (s.world.mat[i].toInt() == sand && i % 64 > 30) hottest = maxOf(hottest, s.world.temp[i])
         assertTrue(hottest > 280f, "the sand comes out hot: $hottest")
 
-        // water from the bucket onto lava: it boils, the lava sets to stone
+        // water from the bucket onto lava: it boils, the lava sets to basalt
         val pan = session { _, _ -> }
         pan.fill("water", 2, 56, 20, 61)
         pan.fill("lava", 34, 58, 61, 61)
@@ -89,7 +89,7 @@ class SupplyTest {
         pan.run(2f)
         pan.release()
         pan.run(3f)
-        assertTrue(pan.world.events[Event.BOIL] > 0 && pan.count("stone") > 0, "boiled and set: ${pan.count("stone")} stone")
+        assertTrue(pan.world.events[Event.BOIL] > 0 && pan.count("basalt") > 0, "boiled and set: ${pan.count("basalt")} basalt")
     }
 
     @Test

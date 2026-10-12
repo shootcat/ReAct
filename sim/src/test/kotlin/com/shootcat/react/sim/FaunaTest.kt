@@ -98,4 +98,56 @@ class FaunaTest {
         assertEquals(1, perch(false), "without danger it stays")
         assertEquals(0, perch(true), "with fire nearby it flies off and away")
     }
+
+    @Test
+    fun `a tap puts down one animal, a stroke only a few, well apart`() {
+        val materials = Lab.materials
+        val s = Session(materials, 64, 64, 4L) { w ->
+            val rock = materials.id("rock")
+            for (y in 62..63) for (x in 0..63) w.set(x, y, rock)
+            for (y in 40..61) for (x in 0..31) w.set(x, y, materials.id("water"))
+            for (y in 40..61) for (x in 32..63) w.set(x, y, materials.id("earth"))
+        }
+        val fish = materials.id("fish")
+        val worm = materials.id("worm")
+        // a big brush, a tap just above the water: one fish, and it goes into the water
+        s.press(15, 38, fish, 8)
+        repeat(30) { s.tick() }
+        s.release()
+        assertEquals(1, s.world.count(fish), "one tap, one fish")
+        val at = (0 until s.world.size).first { s.world.mat[it].toInt() == fish }
+        assertTrue(at / 64 >= 40, "it is in the water")
+        // a worm tapped onto the earth goes into it
+        s.press(48, 39, worm, 8)
+        s.release()
+        assertEquals(1, s.world.count(worm))
+        assertTrue((0 until s.world.size).first { s.world.mat[it].toInt() == worm } / 64 >= 40, "the worm is in the earth")
+        // a stroke across the whole width
+        val birds = materials.id("bird")
+        s.press(2, 10, birds, 6)
+        for (x in 3..61) s.drag(x, 10)
+        s.release()
+        val put = (0 until s.world.size).filter { s.world.mat[it].toInt() == birds }.map { it % 64 }.sorted()
+        assertTrue(put.size in 4..6, "a few birds along the stroke: $put")
+        assertTrue(put.zipWithNext().all { (a, b) -> b - a >= Session.ANIMAL_SPACING }, "well apart: $put")
+    }
+
+    @Test
+    fun `fish on land make no heap, they flop about one by one, die and rot away`() {
+        val lab = Lab()
+        // a heap of fish on the rock floor, as if tipped out of a net
+        lab.rect("fish", 28, 55, 33, 61)
+        val heap = lab.count("fish")
+        lab.seconds(2f)
+        lab.picture("fish_on_land")
+        var top = 61
+        for (y in 0 until 62) for (x in 0 until 64) if (lab.at(x, y) == "fish") top = minOf(top, y)
+        assertTrue(top >= 58, "the heap has come apart: highest fish in row $top")
+        assertTrue(lab.countIn("fish", 2, 0, 27, 61) + lab.countIn("fish", 34, 0, 61, 61) > heap / 3, "they flopped off to the sides")
+        lab.seconds(4f)
+        assertEquals(0, lab.count("fish"), "out of the water they die")
+        assertEquals(heap, lab.count("dead_fish"))
+        lab.seconds(60f)
+        assertEquals(0, lab.count("dead_fish"), "and rot away within a minute")
+    }
 }

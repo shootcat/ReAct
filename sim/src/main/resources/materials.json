@@ -12,7 +12,7 @@
       "burn_heat": "Wärme, die eine brennende Zelle pro Schritt abgibt (Grad bei Wärmekapazität 1)",
       "lifetime": "Rauch verfliegt nach oben aus der Welt; im geschlossenen Raum hält er sich lange, so erstickt dort das Feuer",
       "salt_melt_temp": "Schmelzpunkt, solange Salziges (Salz, Salzwasser) daneben liegt: Salz lässt Eis und Schnee ohne Wärme schmelzen",
-      "pattern": "Darstellung fester Stoffe: planks, brick, masonry, sheen; speckle_color und speckle für Einschlüsse (Erz)",
+      "pattern": "Darstellung fester Stoffe: planks, brick, masonry, sheen, pores (Basalt); speckle_color und speckle für Einschlüsse (Erz)",
       "light": "emits_light und light_pass 0 bis 1: eigenes Licht; Anteil des Lichts, den eine Zelle durchlässt (ohne Angabe 0 bei blocks_light, sonst 1)",
       "store": "split_into, split_yield: was ein gegriffenes Objekt im Lager ergibt (ein Stamm 3 Bretter je Zelle)",
       "life": "organism: Verhalten (grass, moss, vine, seed, tree, leaf, fish, firefly, worm, bird); light_need, light_max: Licht zum Wachsen; grow: Wahrscheinlichkeit pro Zufallstick (etwa einmal pro Sekunde und Zelle); move: Wahrscheinlichkeit pro Schritt, sich zu bewegen; dies_above: Temperatur, über der es stirbt"
@@ -56,6 +56,16 @@
       "dissolves_in": null, "dissolved_product": null,
       "bucketable": false, "grabbable": true, "emits_light": 0, "blocks_light": true,
       "color": "#8c8781", "color_variance": 0.12, "pattern": "masonry", "cost": 2
+    },
+    {
+      "id": "basalt", "name": "Basalt", "kind": "solid", "density": 2900, "anchored": false,
+      "flammable": false,
+      "wet_blocks_burning": false, "absorbs": 0,
+      "melt_temp": 1150, "melt_product": "lava",
+      "conductivity": 0.3, "heat_capacity": 2.0, "hardness": 0.9, "erodes_in_water": false,
+      "dissolves_in": null, "dissolved_product": null,
+      "bucketable": false, "grabbable": true, "emits_light": 0, "blocks_light": true,
+      "color": "#46423f", "color_variance": 0.22, "pattern": "pores", "cost": 2
     },
     {
       "id": "rubble", "name": "Geröll", "kind": "powder", "density": 2600, "anchored": false,
@@ -291,7 +301,7 @@
       "id": "lava", "name": "Lava", "kind": "liquid", "density": 2600, "anchored": false,
       "flammable": false,
       "wet_blocks_burning": false, "absorbs": 0,
-      "latent_heat": 300, "freeze_temp": 850, "freeze_product": "stone",
+      "latent_heat": 300, "freeze_temp": 850, "freeze_product": "basalt",
       "conductivity": 0.25, "heat_capacity": 2.0, "hardness": 0, "erodes_in_water": false,
       "dissolves_in": null, "dissolved_product": null,
       "spread": 1, "reach": 6, "viscosity": 0.8, "temp": 1250,

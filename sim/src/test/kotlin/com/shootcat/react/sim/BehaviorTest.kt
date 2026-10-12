@@ -139,7 +139,7 @@ class BehaviorTest {
     }
 
     @Test
-    fun `lava meeting water makes stone and steam`() {
+    fun `lava meeting water makes basalt and steam`() {
         val lab = Lab()
         lab.rect("water", 2, 45, 61, 61)
         lab.rect("lava", 25, 30, 38, 36)
@@ -149,12 +149,12 @@ class BehaviorTest {
             steam = maxOf(steam, lab.count("steam"))
         }
         lab.picture("lava_water")
-        assertTrue(lab.count("stone") > 40, "stone: ${lab.count("stone")}")
+        assertTrue(lab.count("basalt") > 40, "basalt: ${lab.count("basalt")}")
         assertTrue(steam > 20, "steam: $steam")
     }
 
     @Test
-    fun `lava sets wood alight and cools to stone`() {
+    fun `lava sets wood alight and cools to basalt`() {
         val lab = Lab()
         lab.rect("wood", 10, 50, 53, 61)
         lab.rect("lava", 28, 44, 35, 49)
@@ -163,7 +163,7 @@ class BehaviorTest {
         lab.seconds(40f)
         lab.picture("lava_wood")
         assertEquals(0, lab.count("lava"), "the lava has set")
-        assertTrue(lab.count("stone") > 20)
+        assertTrue(lab.count("basalt") > 20)
     }
 
     @Test

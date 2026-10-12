@@ -98,4 +98,121 @@ class StructureTest {
         assertTrue(lab.countIn("rubble", 10, 20, 13, 40) < 10, "the rubble has come down")
         assertEquals(84, lab.countIn("stone", 40, 41, 43, 61), "the wall on the floor is unchanged")
     }
+
+    /** Cells of [name] with nothing under them: neither more of it nor anything that carries it. */
+    private fun hanging(lab: Lab, name: String): Int {
+        val m = lab.id(name)
+        var n = 0
+        for (y in 0 until lab.height - 1) for (x in 0 until lab.width) {
+            if (lab.world.material(x, y) != m) continue
+            val below = lab.world.material(x, y + 1)
+            if (below == MaterialTable.AIR || lab.materials.soft[below]) n++
+        }
+        return n
+    }
+
+    /** The 4-connected pieces of [name]. */
+    private fun pieces(lab: Lab, name: String): List<Set<Pair<Int, Int>>> {
+        val left = shape(lab, name).toMutableSet()
+        val out = ArrayList<Set<Pair<Int, Int>>>()
+        while (left.isNotEmpty()) {
+            val piece = HashSet<Pair<Int, Int>>()
+            val stack = ArrayDeque(listOf(left.first()))
+            while (stack.isNotEmpty()) {
+                val c = stack.removeLast()
+                if (!left.remove(c)) continue
+                piece += c
+                val (x, y) = c
+                stack += listOf(x - 1 to y, x + 1 to y, x to y - 1, x to y + 1)
+            }
+            out += piece
+        }
+        return out
+    }
+
+    /** True if every column of [name] reaches down onto something: the lowest cell of the shape rests. */
+    private fun lies(lab: Lab, name: String): Boolean {
+        val cells = shape(lab, name)
+        if (cells.isEmpty()) return false
+        return cells.any { (x, y) -> (x to y + 1) !in cells && lab.world.material(x, y + 1) != MaterialTable.AIR && !lab.materials.soft[lab.world.material(x, y + 1)] }
+    }
+
+    @Test
+    fun `a block painted in the air lies on the ground after a few steps`() {
+        // Leitfaden V3, 4a.1.1: painted with the brush while the world runs, as in the sandbox
+        for (name in listOf("metal", "glass", "ice", "brick", "stone", "wood")) {
+            val m = Lab.materials.id(name)
+            val session = Session(Lab.materials, 64, 64, 5L) { w ->
+                val rock = Lab.materials.id("rock")
+                for (y in 62..63) for (x in 0..63) w.set(x, y, rock)
+                for (y in 0..61) for (x in listOf(0, 1, 62, 63)) w.set(x, y, rock)
+            }
+            session.press(30, 12, m, 3)
+            session.drag(36, 12)
+            session.release()
+            repeat(45) { session.tick() }
+            var lowest = 0
+            var count = 0
+            for (y in 0 until 64) for (x in 0 until 64) if (session.world.material(x, y) == m) { lowest = maxOf(lowest, y); count++ }
+            assertTrue(count > 30, "$name painted: $count")
+            assertEquals(61, lowest, "$name lies on the floor after 45 steps")
+        }
+    }
+
+    @Test
+    fun `a block resting on a corner tips over the edge and comes down`() {
+        val lab = Lab()
+        // a post of dead wood on the floor; a block of metal put on it with only its corner
+        lab.rect("deadwood", 30, 40, 31, 61)
+        lab.rect("metal", 31, 34, 40, 39)
+        lab.seconds(2f)
+        assertEquals(0, hanging(lab, "metal"), "nothing of the block hangs in the air")
+        assertTrue(shape(lab, "metal").maxOf { it.second } == 61, "the block slid off and lies on the floor")
+        assertEquals(44, lab.count("deadwood"), "the post still stands")
+
+        // a block whose weight is over the post stays on it
+        val held = Lab()
+        held.rect("deadwood", 30, 40, 33, 61)
+        held.rect("metal", 28, 36, 35, 39)
+        held.seconds(2f)
+        assertEquals(39, shape(held, "metal").maxOf { it.second }, "balanced on the post")
+    }
+
+    @Test
+    fun `leaves carry nothing, a block in a tree crown falls through it`() {
+        val lab = Lab(64, 80)
+        lab.rect("earth", 2, 66, 61, 77)
+        lab.world.plantTree(31, 65, tree = true)
+        lab.seconds(1f)
+        val leaves = lab.count("leaves")
+        assertTrue(leaves > 20, "a crown: $leaves leaves")
+        // metal painted into the crown beside the trunk and onto the top of it
+        val metal = lab.id("metal")
+        var top = 80
+        var left = 64
+        for (y in 0 until 80) for (x in 0 until 64) if (lab.at(x, y) == "leaves") { top = minOf(top, y); left = minOf(left, x) }
+        lab.world.paint(metal, left + 2, top + 4, 1)
+        lab.world.paint(metal, 31, top - 4, 1)
+        val before = shape(lab, "metal").maxOf { it.second }
+        lab.seconds(3f)
+        lab.picture("crown_metal")
+        for (piece in pieces(lab, "metal")) {
+            val under = piece.map { (x, y) -> x to y + 1 }.filter { it !in piece }.map { lab.at(it.first, it.second) }.filter { it != "air" }
+            assertTrue(under.any { it != "leaves" && it != "vine" }, "a piece of metal rests on $under")
+        }
+        assertTrue(shape(lab, "metal").maxOf { it.second } > before + 3, "the metal came down")
+        assertTrue(lab.count("leaves") < leaves, "it tore leaves off on the way")
+    }
+
+    @Test
+    fun `built material and plants are separate structures`() {
+        val lab = Lab(64, 80)
+        lab.rect("earth", 2, 66, 61, 77)
+        // a dead trunk standing on the earth, and a plank laid against it that touches nothing else
+        lab.rect("deadwood", 30, 50, 31, 65)
+        lab.rect("wood", 32, 52, 40, 52)
+        lab.seconds(3f)
+        assertEquals(65, shape(lab, "wood").maxOf { it.second }, "the plank fell to the ground")
+        assertEquals((30..31).flatMap { x -> (50..65).map { x to it } }.toSet(), shape(lab, "deadwood"), "the trunk still stands")
+    }
 }

@@ -107,6 +107,9 @@ class Session(
     private var bx = 0
     private var by = 0
 
+    /** Where the last animal of this stroke was put down (x in the high, y in the low half), or [NO_ANIMAL]. */
+    private var lastAnimal = NO_ANIMAL
+
     val canUndo get() = undoStack.isNotEmpty()
     val isPressed get() = down
 
@@ -153,6 +156,7 @@ class Session(
         down = true
         bx = x
         by = y
+        lastAnimal = NO_ANIMAL
         dab(x, y)
     }
 
@@ -205,6 +209,22 @@ class Session(
                 ShapeKind.FRAME -> w.paintRect(tool, x0, y0, x1, y1, true, size + 1, stock[tool])
             }
             stock[tool] -= n
+            return
+        }
+        if (tool >= 0 && materials.animal[tool]) {
+            // animals one by one, well apart: along the line or the frame, spread over the rectangle
+            lastAnimal = NO_ANIMAL
+            when (kind) {
+                ShapeKind.LINE -> Shapes.line(x0, y0, x1, y1) { x, y -> animal(x, y) }
+                ShapeKind.FRAME -> for ((a, b) in listOf(x0 to y0, x1 to y0, x1 to y1, x0 to y1, x0 to y0).zipWithNext()) {
+                    Shapes.line(a.first, a.second, b.first, b.second) { x, y -> animal(x, y) }
+                }
+                ShapeKind.RECT -> {
+                    for (y in minOf(y0, y1)..maxOf(y0, y1) step ANIMAL_SPACING) for (x in minOf(x0, x1)..maxOf(x0, x1) step ANIMAL_SPACING) {
+                        w.placeAnimal(tool, x, y)
+                    }
+                }
+            }
             return
         }
         when (kind) {
@@ -441,8 +461,19 @@ class Session(
                 if (tool >= 0 && canBuild(tool)) stock[tool] -= world.paint(tool, x, y, radius, fillFor(tool), stock[tool])
             }
             tool == ERASER -> world.erase(x, y, radius)
+            materials.animal[tool] -> animal(x, y)
             else -> world.paint(tool, x, y, radius, fillFor(tool))
         }
+    }
+
+    /** Animals are put down one at a time, not painted: a tap gives one, a stroke one every [ANIMAL_SPACING] cells. */
+    private fun animal(x: Int, y: Int) {
+        if (lastAnimal != NO_ANIMAL) {
+            val dx = x - (lastAnimal shr 16)
+            val dy = y - (lastAnimal and 0xFFFF)
+            if (dx * dx + dy * dy < ANIMAL_SPACING * ANIMAL_SPACING) return
+        }
+        if (world.placeAnimal(tool, x, y)) lastAnimal = (x shl 16) or (y and 0xFFFF)
     }
 
     /** Loose material is poured scattered, solid material is drawn as a closed shape; a one-cell brush is exact. */
@@ -487,6 +518,9 @@ class Session(
         /** Share of the difference to the surroundings a carried thing loses per step (half in about 20 seconds). */
         private const val CARRY_COOLING = 0.0006f
 
+        /** A stroke puts down an animal every so many cells, no closer. */
+        const val ANIMAL_SPACING = 12
+        private const val NO_ANIMAL = -1
 
         /**
          * Plays [log] into a fresh session until the world has run [steps] steps. Inputs take effect before

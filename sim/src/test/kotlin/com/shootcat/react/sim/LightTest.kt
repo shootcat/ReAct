@@ -81,4 +81,31 @@ class LightTest {
         val flames = fire.lightAfterAStep(31, 46)
         assertTrue(flames > 0.3f, "fire: $flames")
     }
+
+    @Test
+    fun `an unlit cave is drawn dim, never as a black hole`() {
+        // Leitfaden V3, 4a.1.4: the cave wall behind and water in the dark show, muted
+        val lab = Lab()
+        lab.cave()
+        lab.rect("water", 2, 54, 61, 61)
+        lab.world.step()
+        val pixels = IntArray(lab.world.size)
+        val renderer = Renderer(lab.world, Backdrop.of(lab.world))
+        renderer.render(pixels, 1, running = true)
+        fun luma(c: Int) = 0.3f * ((c shr 16) and 255) + 0.59f * ((c shr 8) and 255) + 0.11f * (c and 255)
+        val air = luma(pixels[lab.world.index(30, 40)])
+        val water = luma(pixels[lab.world.index(30, 58)])
+        val rock = luma(pixels[lab.world.index(30, 19)])
+        assertTrue(air >= 18f, "the cave wall shows: $air")
+        assertTrue(water >= 12f, "the water shows: $water")
+        assertTrue(rock >= 30f, "the rock shows: $rock")
+        // and it is still clearly darker than daylight
+        val lit = Lab()
+        lit.rect("water", 2, 54, 61, 61)
+        lit.world.step()
+        val litPixels = IntArray(lit.world.size)
+        Renderer(lit.world, Backdrop.of(lab.world)).render(litPixels, 1, running = true)
+        assertTrue(luma(litPixels[lit.world.index(30, 58)]) > water * 2f, "water in daylight is much brighter")
+        Pictures.write(lab.world, Backdrop.of(lab.world), "cave_dim", scale = 4)
+    }
 }

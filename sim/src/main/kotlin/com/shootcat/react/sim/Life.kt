@@ -385,11 +385,12 @@ internal class Life(private val world: World) {
 
     /**
      * Fish swim to and fro in fresh water ([Flag.MARK]: heading right), now and then up or down. Out of the
-     * water they flop down and suffocate after a few seconds; [World.life] counts the steps.
+     * water each one flops about on its own, falls, slides off a heap, and suffocates after a few seconds;
+     * [World.life] counts the steps. What is left of it rots away (its material's lifetime).
      */
     private fun fish(x: Int, y: Int, i: Int, m: Int) {
         val home = mt.livesIn[m]
-        if (!near(x, y, i, home, m)) {
+        if (!near(x, y, i, home)) {
             val l = life[i] + 1
             if (l > SUFFOCATE) {
                 world.note(Seen.DIE_DRY, m)
@@ -397,7 +398,7 @@ internal class Life(private val world: World) {
                 return
             }
             life[i] = l.toShort()
-            world.fall(x, y, i, m)
+            if (!world.fall(x, y, i, m)) flop(x, y, i, home, FLOP)
             return
         }
         life[i] = 0
@@ -409,6 +410,33 @@ internal class Life(private val world: World) {
         if (go(x, y, i, dx, dy, home) || (dy != 0 && go(x, y, i, dx, 0, home))) return
         // blocked: turn round
         flags[i] = (flags[i].toInt() xor Flag.MARK).toByte()
+    }
+
+    /**
+     * An animal out of its element that lies on something: with [chance] per step it moves one cell to a
+     * side, down the slope of a heap if it can, along the ground, or in a little hop up; into its element
+     * if that is beside it. Animals never stack into a firm heap.
+     */
+    private fun flop(x: Int, y: Int, i: Int, home: Int, chance: Float) {
+        if (!world.chance(chance)) return
+        val d = if (world.coin()) 1 else -1
+        // into its element, down off the heap, along the ground, a hop up: the first that has room
+        for (way in 0 until 4) for (dx in intArrayOf(d, -d)) {
+            val nx = x + dx
+            if (nx < 0 || nx >= w) continue
+            val side = i + dx
+            val q = mat[side].toInt()
+            val to = when (way) {
+                0 -> if (q == home) side else -1
+                1 -> if (y < h - 1 && free(q) && free(mat[side + w].toInt())) side + w else -1
+                2 -> if (free(q)) side else -1
+                else -> if (y > 0 && free(mat[side - w].toInt()) && free(mat[i - w].toInt())) side - w else -1
+            }
+            if (to >= 0) {
+                world.swap(i, to, x, y, to % w, to / w)
+                return
+            }
+        }
     }
 
     private fun go(x: Int, y: Int, i: Int, dx: Int, dy: Int, into: Int): Boolean {
@@ -443,7 +471,7 @@ internal class Life(private val world: World) {
      */
     private fun worm(x: Int, y: Int, i: Int, m: Int) {
         val home = mt.livesIn[m]
-        if (!near(x, y, i, home, m)) {
+        if (!near(x, y, i, home)) {
             val l = life[i] + 1
             if (l > DRY_OUT) {
                 world.note(Seen.DIE_DRY, m)
@@ -451,7 +479,7 @@ internal class Life(private val world: World) {
                 return
             }
             life[i] = l.toShort()
-            world.fall(x, y, i, m)
+            if (!world.fall(x, y, i, m)) flop(x, y, i, home, CRAWL)
             return
         }
         life[i] = 0
@@ -532,12 +560,10 @@ internal class Life(private val world: World) {
 
     // ------------------------------------------------------------------ helpers
 
-    /** A neighbour (4) is [home] or one of its own kind. */
-    private fun near(x: Int, y: Int, i: Int, home: Int, m: Int): Boolean {
-        fun ok(q: Int) = q == home || q == m
-        return (y > 0 && ok(mat[i - w].toInt())) || (y < h - 1 && ok(mat[i + w].toInt())) ||
-            (x > 0 && ok(mat[i - 1].toInt())) || (x < w - 1 && ok(mat[i + 1].toInt()))
-    }
+    /** A neighbour (4) is [home]: water for a fish, earth for a worm. Others of its kind do not count. */
+    private fun near(x: Int, y: Int, i: Int, home: Int): Boolean =
+        (y > 0 && mat[i - w].toInt() == home) || (y < h - 1 && mat[i + w].toInt() == home) ||
+            (x > 0 && mat[i - 1].toInt() == home) || (x < w - 1 && mat[i + 1].toInt() == home)
 
     private fun touches(x: Int, y: Int, i: Int, q: Int): Boolean =
         (y > 0 && mat[i - w].toInt() == q) || (y < h - 1 && mat[i + w].toInt() == q) ||
@@ -599,6 +625,8 @@ internal class Life(private val world: World) {
         const val SPREAD_DEATH = 0.5f
 
         const val SUFFOCATE = 240
+        const val FLOP = 0.2f
+        const val CRAWL = 0.01f
         const val TURN = 0.02f
         const val DARK = 0.45f
         const val INTO_LIGHT = 0.1f

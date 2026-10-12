@@ -68,6 +68,7 @@ object Terrain {
         val mt = world.materials
         val rock = mt.id("rock")
         val stone = mt.id("stone")
+        val basalt = mt.id("basalt")
         val ore = mt.idOrNull("ore") ?: -1
         val sand = mt.id("sand")
         val earth = mt.id("earth")
@@ -122,7 +123,7 @@ object Terrain {
             world.set(x, y, water)
         }
 
-        // a cave in the deep rock on the right, with lava gathered at its bottom behind a crust of stone
+        // a cave in the deep rock on the right, with lava gathered at its bottom behind a crust of basalt
         val cx = 150f * sx
         val cy = 300f * sy
         for (y in 0 until h) for (x in 0 until w) {
@@ -133,7 +134,7 @@ object Terrain {
             if (r < 1f) {
                 world.set(x, y, if (y > cy + 5f * sy) lava else MaterialTable.AIR)
             } else if (r < 1.25f && y > cy + 2f * sy && world.material(x, y) == rock) {
-                world.set(x, y, stone, 1000f)
+                world.set(x, y, basalt, 1000f)
             } else if (r < 2.2f && world.material(x, y) == rock) {
                 // the rock around the lava is hot as well, so the lava stays liquid for a while
                 world.setTemperature(x, y, 1050f - (r - 1f) * 700f)
