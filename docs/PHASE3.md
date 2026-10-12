@@ -10,7 +10,9 @@ Commits:
 - `0430d76` App: Levelauswahl, Levelbildschirm, Medaille, Fortschritt;
 - `811340b` Level 3: Erzadern im Tuff. Die Zeile „doppelte Prüfung der Hand entfernt“ in dieser Commit-Nachricht stimmt nicht; berichtigt in `7a069b7`.
 - `50e4f83` Levelbildschirm: ganzes Level im Bild, Querformat-Spalte;
-- `7a069b7` App-Test: Eimer lange genug halten.
+- `7a069b7` App-Test: Eimer lange genug halten (falsche Vermutung, siehe Build);
+- `2d65a39` dieser Bericht;
+- `41900df` App-Test: Eimer auf die Mitte des Erdpfropfs, Gold verlangt.
 
 ## Grundlage: Format, Ziele, Bewertung
 
@@ -258,23 +260,24 @@ Gemessen auf diesem Rechner (JVM). Er ist etwa 2,5-mal langsamer als das Galaxy 
 
 ## Build
 
-**Build:** [`beta-87`](https://github.com/shootcat/ReAct/releases/tag/beta-87). CI grün.
+**Build:** [`beta-90`](https://github.com/shootcat/ReAct/releases/tag/beta-90). CI grün. Im App-Test ist Level 1 mit einem Eimer in 0:33 und 1 Griff mit **Gold** gelöst; die Auswahl zeigt danach „1 von 3 gelöst · 1 Gold“.
 
 - **Vorher:** beta-86 war ebenfalls grün. Die Screenshots zeigten zwei Mängel:
   - Im Hochformat zeigte ein Level zu Beginn nur die Mitte der Welt.
   - In der Spalte im Querformat waren Levelname und Medaillengrenzen abgeschnitten.
   
-  Beides ist in beta-87 behoben.
-- **Geprüfte Screenshots (beta-87):**
+  Beides ist seit beta-87 behoben.
+- **Geprüfte Screenshots (beta-87 und beta-90):**
   - `29_levelauswahl`: drei Level mit Bild, Gebiet, Ziel, Werkzeug;
   - `30_level1`, `32_level2`: ganzes Level im Bild, Ziel mit Grenzen, Zielbereich gestrichelt, nur Eimer und Hand bzw. nur Eimer;
-  - `33_auswahl_mit_medaille`: Level 1 als gelöst markiert;
+  - `31_level1_medaille`: „Geschafft“, Gold, Zeit 0:33, 1 Griff (beta-90);
+  - `33_auswahl_mit_medaille`: Level 1 mit Goldmedaille und bestem Ergebnis (beta-90);
   - `34_level3_quer_nicht_erreichbar`: Querformat, „Da kommst du nicht hin“, Levelname zweizeilig, Grenzen umbrochen.
 - **App-Test Level 1:** In beta-86 bis beta-88 war Level 1 erst nach 5:40 bis 5:45 ohne Medaille gelöst.
   - Meine erste Vermutung war falsch: Der Finger lag nicht zu kurz (`7a069b7` hielt ihn 1,2 s, ohne Wirkung).
   - Tatsächlich traf der Eimer kein Erdreich. Nach etwa 1,5 s ist Wasser aus dem Becken in den linken Rand des Pfropfs gesickert, genau auf Zelle 48/45. Der leere Eimer nimmt, was unter dem Finger liegt: 40 Zellen Wasser. Der Teich füllt sich dann nur langsam über die Ufermulde.
   - Gegenprobe in der Simulation, Griff nach 1 bis 3 s: auf 48/45 ab 1,5 s Wasser und kein Erfolg; auf 50/45, 51/45 und 52/46 immer Erde und Gold (31 bis 43 s, 1 Griff).
-  - Der App-Test tippt jetzt auf die Mitte des Pfropfs (52/46) und verlangt Gold. Der Lösungstest greift bei 1 s und bleibt bei 48/45.
+  - Der App-Test tippt jetzt auf die Mitte des Pfropfs (52/46) und verlangt Gold. In beta-90: Gold in 0:33. Der Lösungstest greift bei 1 s und bleibt bei 48/45.
   - Für Spieler gilt: Wer zögert und den Rand des Pfropfs antippt, schöpft Wasser. Das ist die Regel des Eimers, kein Fehler.
 
 ## Zur Freigabe
