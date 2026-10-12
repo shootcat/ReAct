@@ -77,7 +77,7 @@ Im Level reichen Eimer und Hand nur an das, was zum Himmel offen ist: an Luft, G
 
 Die Bilder der Lösungswege liegen unter `docs/phase3/`, die Malskripte unter `tools/levels/`.
 
-In der App führt **Level** im Startbildschirm zur Auswahl. Sie zeigt jedes Level als Bild, mit Gebiet, Niveau, Ziel, Werkzeugen und der besten Medaille mit Zeit und Handgriffen. Alle Level sind offen. Im Level gibt es nur seine Werkzeuge. Über der Welt stehen das Ziel mit Fortschrittsbalken, die Zeit, die Handgriffe und die drei Medaillengrenzen; eine Grenze, die schon überschritten ist, wird blass. Der Zielbereich ist gestrichelt auf der Welt eingezeichnet. Rückgängig nimmt Zeit und Handgriffe mit zurück, „Neu beginnen“ startet das Level frisch. Ist das Ziel zwei Sekunden lang erfüllt, erscheint die Medaille mit „Nochmal“, „Nächstes“ und „Ansehen“. Das beste Ergebnis jedes Levels wird gespeichert.
+In der App führt **Level** im Startbildschirm zur Auswahl. Sie zeigt jedes Level als Bild, mit Gebiet, Niveau, Ziel, Werkzeugen und der besten Medaille mit Zeit und Handgriffen. Alle Level sind offen. Ein Level beginnt mit der ganzen Welt im Bild, und es gibt nur seine Werkzeuge. Über der Welt stehen das Ziel mit Fortschrittsbalken, die Zeit, die Handgriffe und die drei Medaillengrenzen; eine Grenze, die schon überschritten ist, wird blass. Der Zielbereich ist gestrichelt auf der Welt eingezeichnet. Rückgängig nimmt Zeit und Handgriffe mit zurück, „Neu beginnen“ startet das Level frisch. Ist das Ziel zwei Sekunden lang erfüllt, erscheint die Medaille mit „Nochmal“, „Nächstes“ und „Ansehen“. Das beste Ergebnis jedes Levels wird gespeichert.
 
 ## Simulation (`sim/`)
 
@@ -206,6 +206,8 @@ app/                        Android-App (Kotlin, Jetpack Compose)
   data/                     Einstellungen, Fortschritt (Entdeckungen, beste Medaille je Level)
 docs/PHASE1.md              Bericht zu Phase 1: Zusammenfassung, Abweichungen, Messwerte
 docs/PHASE2.md              Bericht zu Phase 1b und 2 (bis 2d): Zusammenfassung, Abweichungen, Messwerte
+docs/PHASE3.md              Bericht zu Phase 3: Level, Abweichungen, Messwerte, offene Fragen zur Freigabe
+docs/phase3/                Bilder der Lösungswege je Level
 docs/ELEMENTE.md            Vorschläge, die noch nicht umgesetzt sind (Schwarzpulver)
 docs/v2/                    Unterlagen der Raster-Version (Leitfaden V2)
 ```
