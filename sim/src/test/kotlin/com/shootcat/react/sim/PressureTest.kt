@@ -108,6 +108,35 @@ class PressureTest {
     }
 
     @Test
+    fun `a spring gives water while it lies open, under water or buried it rests`() {
+        // in a rock face the water runs off, the spring stays open
+        val open = Lab()
+        open.rect("rock", 2, 20, 20, 61)
+        open.rect("spring", 20, 30, 20, 45)
+        open.seconds(10f)
+        assertTrue(open.count("water") > 30, "water from the spring: ${open.count("water")}")
+
+        val buried = Lab()
+        buried.rect("rock", 2, 50, 61, 61)
+        buried.rect("spring", 28, 50, 35, 51)
+        buried.rect("earth", 2, 40, 61, 49)
+        buried.seconds(5f)
+        assertEquals(0, buried.count("water"), "under earth")
+
+        // in a basin the water covers the spring, and then it rests: a pool is fed only as far as its springs lie open
+        val basin = Lab()
+        basin.rect("rock", 2, 50, 61, 61)
+        basin.rect("rock", 24, 40, 25, 49)
+        basin.rect("rock", 38, 40, 39, 49)
+        basin.rect("spring", 26, 49, 37, 49)
+        basin.seconds(10f)
+        val covered = basin.count("water")
+        assertTrue(covered in 12..40, "a layer over the spring: $covered")
+        basin.seconds(10f)
+        assertEquals(covered, basin.count("water"), "covered by water, the spring rests")
+    }
+
+    @Test
     fun `an explosion throws sand and water away, breaks glass, kindles wood and sets snow sliding`() {
         val lab = Lab()
         lab.rect("sand", 24, 52, 39, 61)

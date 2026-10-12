@@ -1,0 +1,27 @@
+{
+  "id": "trockener_teich",
+  "name": "Trockener Teich",
+  "area": "Wald",
+  "tier": "leicht",
+  "seed": 101,
+  "tools": {"bucket": true, "bucket_size": 40, "hand": true},
+  "trees": [
+    {"x": 14, "y": 17},
+    {"x": 217, "y": 75, "tree": false}
+  ],
+  "goals": [
+    {
+      "type": "fill",
+      "text": "Fülle den Teich mit Wasser",
+      "area": [[150, 98], [196, 98], [196, 111], [150, 111]],
+      "material": "water",
+      "share": 0.8,
+      "hold": 2
+    }
+  ],
+  "rating": {
+    "gold": {"seconds": 60, "actions": 4},
+    "silver": {"seconds": 150, "actions": 10},
+    "bronze": {"seconds": 300, "actions": 40}
+  }
+}

@@ -60,6 +60,16 @@
       "color": "#57514b", "color_variance": 0.22, "speckle_color": "#24201d", "speckle": 0.35, "cost": 0
     },
     {
+      "id": "spring", "name": "Quelle", "kind": "static", "density": 2700, "anchored": true,
+      "flammable": false,
+      "wet_blocks_burning": false, "absorbs": 0,
+      "conductivity": 0.35, "heat_capacity": 2.0, "hardness": 1.0, "erodes_in_water": false,
+      "emits": "water", "emit_rate": 1.0,
+      "dissolves_in": null, "dissolved_product": null,
+      "bucketable": false, "grabbable": false, "emits_light": 0, "blocks_light": true,
+      "color": "#4b6470", "color_variance": 0.16, "speckle_color": "#8cc4e6", "speckle": 0.3, "cost": 0
+    },
+    {
       "id": "stone", "name": "Stein", "kind": "solid", "density": 2600, "anchored": false,
       "flammable": false,
       "wet_blocks_burning": false, "absorbs": 0,
@@ -286,7 +296,7 @@
     },
     {
       "id": "ember", "name": "Glut", "kind": "powder", "density": 450, "anchored": false,
-      "flammable": true, "ignite_temp": 350, "burn_time": 30, "burn_temp": 700, "burn_heat": 22, "smoke": 0.02, "spawn_burning": true,
+      "flammable": true, "ignite_temp": 350, "burn_time": 240, "burn_temp": 700, "burn_heat": 22, "smoke": 0.02, "spawn_burning": true,
       "burn_product": "ash", "residue": 0.5, "quench_product": "charcoal", "wet_blocks_burning": true, "absorbs": 0,
       "conductivity": 0.06, "heat_capacity": 1.0, "hardness": 0.2, "erodes_in_water": false,
       "dissolves_in": null, "dissolved_product": null,

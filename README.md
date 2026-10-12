@@ -45,8 +45,8 @@ Alle Builds sind mit demselben Schlüssel signiert und installieren sich als Upd
 3. **Malen und Schütten** mit einem Finger. Material landet nur dort, wo Luft ist, nie in Fels oder anderem Material. Ein liegen gelassener Finger schüttet weiter. Lose Stoffe fallen gestreut, feste Stoffe werden als geschlossene Form gezeichnet. Fünf Pinselgrößen, die kleinste setzt genau ein Partikel.
    - **Bauwerkzeuge** (Pinselform in der Ecke): Pinsel, Linie, Rechteck und Rahmen. Beim Ziehen zeigt eine halbtransparente Vorschau, was entsteht; Loslassen baut es. Das geht auch in der Pause.
    - **Werkzeug:**
-     - Eimer: schöpft eine Sorte loses oder flüssiges Material, gießt es mit seiner Temperatur wieder aus.
-     - Hand: trägt lose Objekte, nicht zu schwer, nicht zu heiß, nicht in Fels verankert.
+     - Eimer: schöpft eine Sorte loses oder flüssiges Material, gießt es mit seiner Temperatur wieder aus, auch in Rauch oder Dampf, nicht in Feuer.
+     - Hand: trägt lose Objekte, nicht zu schwer, nicht zu heiß, nicht in Fels verankert; legt sie in Luft, Rauch oder Dampf ab.
      - „Zu Brettern“ / „Ins Lager“: ein Stamm ergibt 3 Bretter pro Zelle.
    - **Modus „nur Beschaffen“** (Menü): keine unendliche Leiste mehr, nur Eimer, Hand und das Lager. Gebaut wird mit dem, was beschafft wurde.
 4. **Zwei Finger** zoomen (heraus bis zur ganzen Welt, hinein bis sechsfach) und verschieben. Kommt der zweite Finger in den ersten 70 ms, entsteht kein Klecks.
@@ -128,7 +128,7 @@ Die Einheiten stehen in der Datei.
 | Stein | fest (Struktur) | steht, wenn er Fels berührt, sonst fällt er als Ganzes; schmilzt bei 1150 °C zu Lava |
 | Geröll | Pulver | schwer, rutscht kaum, schmilzt bei 1150 °C zu Lava |
 | Sand | Pulver | rieselt flach, sinkt in Wasser, saugt etwas Wasser auf, wird bei 1000 °C zu Glas |
-| Erde | Pulver | hält steile Hänge, nass rutscht sie, wird weggespült |
+| Erde | Pulver | hält steile Hänge, nass rutscht sie, wird weggespült; ein Pfropf, dünn wie ein Korn, gibt dem Wasser nach |
 | Wasser | flüssig | fließt, kocht bei 100 °C (mit Verdampfungswärme), löscht |
 | Holz | fest (Struktur) | zündet bei 280 °C an der Luft, brennt mit Flammen über Glut, gelöscht zu Holzkohle, abgebrannt zu etwas Asche; als Floß bleibt es auf dem Wasser |
 | Feuer | Gas | brennende Flamme, steigt, heizt stark, braucht Luft |
@@ -143,6 +143,8 @@ Die Einheiten stehen in der Datei.
 | Schnee | Pulver | isoliert, schmilzt langsam, wird unter Last zu Eis, rutscht am Hang als Lawine ab, wenn er warm oder erschüttert wird |
 | Grubengas | Gas | leichter als Luft, sammelt sich unter Decken, kaum sichtbar, zündet als ganze Wolke an Feuer oder Glut |
 | Gasspalte | Gelände | gibt in Minen ab und zu Grubengas ab |
+| Quelle | Gelände | gibt Wasser ab, solange sie frei liegt; unter Wasser oder Erde ruht sie |
+| Glut | entsteht | glimmt auf Asche minutenlang weiter und zündet, was darauf liegt; Wasser löscht sie zu Holzkohle |
 | Asche, Holzkohle | entstehen | schwimmen; Holzkohle glüht lange ohne Flamme |
 | Gras | Erde mit Gras | wächst im Licht auf feuchte Erde daneben, hält Erde zusammen, brennt gut, stirbt an Salz und Hitze zu Erde |
 | Moos | Leben | wächst in dunklen, feuchten Höhlen an Wänden und Decken |
@@ -169,6 +171,14 @@ sim/                        Partikelsimulation, reines Kotlin (ohne Android)
   Terrain.kt                Wiese mit Teich (Startlandschaft), Rauschen nur aus Ganzzahl-Hashes
   Templates.kt              Weltgrößen und die übrigen Vorlagen: Leeres Feld, Insel, Küste, Berg, Vulkan, Höhlen
   Benchmark.kt              Schritte pro Sekunde: leere, voll aktive und belebte Welt, größte Welt
+level/                      Level (Phase 3), reines Kotlin auf sim/
+  Png.kt                    PNG-Leser ohne Android und AWT
+  LevelSpec.kt, Level.kt    level.json, Boden aus terrain.png (Farbe = Material), Anker aus anchor.png
+  Goals.kt                  Ziele: Material im Bereich, Bereich füllen, Temperatur, Entzünden, Löschen, Licht, Wachstum, Schützen
+  Play.kt                   ein laufendes Level: Werkzeuge, Ziele, Handgriffe, Zeit, Medaille
+  Actions.kt                Aktionslisten für die Lösungstests
+  resources/levels/         index.json und ein Ordner je Level
+tools/levels/               Python-Skripte, die den Boden der Level malen (PIL)
 app/                        Android-App (Kotlin, Jetpack Compose)
   ui/sandbox/               Spielplatz: Weltansicht, Gesten, Leiste, Tempo, Messung
   ui/title/                 Startbildschirm mit kleiner echter Simulation
@@ -186,6 +196,7 @@ docs/v2/                    Unterlagen der Raster-Version (Leitfaden V2)
 
 ```bash
 ./gradlew :sim:test                   # Verhalten, Determinismus, Materialdaten, Leistung; Bilder in sim/build/pictures
+./gradlew :level:test                 # Levelformat, Ziele, Bewertung, alle Lösungswege der Level; Bilder in level/build/pictures
 ./gradlew :app:testDebugUnitTest      # App-Smoke-Test mit Robolectric, Screenshots in app/build/screenshots
 ./gradlew assembleDebug               # APK -> app/build/outputs/apk/debug/
 ```

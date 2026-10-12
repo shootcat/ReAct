@@ -135,6 +135,33 @@ class SupplyTest {
     }
 
     @Test
+    fun `the bucket pours and the hand puts down into smoke and steam, not into fire`() {
+        val s = session { _, _ -> }
+        s.fill("water", 2, 56, 20, 61)
+        s.fill("trunk", 24, 59, 29, 61)
+        s.fill("rock", 34, 30, 61, 31)
+        // a cave roof with smoke gathered under it
+        s.fill("smoke", 34, 32, 61, 45)
+        s.tap(10, 58, Session.SCOOP, 3)
+        val water = s.bucketAmount
+        assertTrue(water > 10)
+        s.tap(45, 36, Session.POUR, 3)
+        assertTrue(s.bucketAmount < water, "poured into the smoke: ${s.bucketAmount} of $water left")
+        s.tap(26, 60, Session.HAND)
+        assertNotNull(s.held, s.notice)
+        s.tap(55, 34, Session.HAND)
+        assertNull(s.held, "put down in the smoke: ${s.notice}")
+
+        val hot = session { _, _ -> }
+        hot.fill("trunk", 24, 59, 29, 61)
+        hot.fill("fire", 34, 40, 61, 61)
+        hot.tap(26, 60, Session.HAND)
+        hot.tap(48, 50, Session.HAND)
+        assertNotNull(hot.held, "not into the flames")
+        assertEquals("Kein Platz zum Ablegen", hot.notice)
+    }
+
+    @Test
     fun `a log in the hand gives planks, and in procuring the store is what can be built`() {
         val s = session { _, _ -> }
         s.fill("trunk", 10, 60, 19, 61)

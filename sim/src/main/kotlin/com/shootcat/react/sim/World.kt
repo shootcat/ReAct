@@ -1114,6 +1114,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         if (fall(x, y, i, m)) return
         if ((flags[i].toInt() and Flag.VEL_MASK) != 0) setVelocity(i, 0)
         if (y >= height - 1) return
+        if (materials.erodes[m] && breach(x, y, i, m)) return
         if (materials.avalanche[m]) {
             // snow that has taken up some melting heat comes loose
             if (flags[i].toInt() and Flag.MARK == 0 && life[i] > AVALANCHE_WARM) loosen(i, x, y)
@@ -1129,6 +1130,30 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         val d = if (coin()) 1 else -1
         if (slide(x, y, i, m, d)) return
         slide(x, y, i, m, -d)
+    }
+
+    /**
+     * A grain with water on one side and open air on the other is a wall one grain thin: the water pushes it
+     * out of the way now and then (4.4). So a plug worn thin from the outside gives way at its last grain
+     * where the ground falls away behind it, and the water runs through.
+     */
+    private fun breach(x: Int, y: Int, i: Int, m: Int): Boolean {
+        if (x == 0 || x == width - 1) return false
+        val l = mat[i - 1].toInt()
+        val r = mat[i + 1].toInt()
+        val d = when {
+            r == AIR && materials.kind[l] == Kind.LIQUID && materials.wets[l] -> 1
+            l == AIR && materials.kind[r] == Kind.LIQUID && materials.wets[r] -> -1
+            else -> return false
+        }
+        if (!chance(ERODE * (1f - materials.hardness[m]))) {
+            // the water keeps pressing: stay awake
+            wake(x, y)
+            return false
+        }
+        note(Seen.ERODE, m)
+        swap(i, i + d, x, y, x + d, y)
+        return true
     }
 
     /** Diagonally down, but not through a gap between two diagonal neighbours. */
@@ -1272,11 +1297,11 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         val d = if (coin()) 1 else -1
         if (y < height - 1) {
             if (slide(x, y, i, m, d)) {
-                if (mt.wets[m]) erode(x + d, y + 1, d)
+                if (mt.wets[m]) erode(x, y, d)
                 return
             }
             if (slide(x, y, i, m, -d)) {
-                if (mt.wets[m]) erode(x - d, y + 1, -d)
+                if (mt.wets[m]) erode(x, y, -d)
                 return
             }
         }
@@ -1316,7 +1341,11 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         }
         val tx = x + dir * k
         swap(i, i + dir * k, x, y, tx, y)
-        if (materials.wets[m]) erode(tx, y, dir)
+        // the water drags the grain it leaves along: at a step or the edge of a cut the bed is worn back
+        if (materials.wets[m]) {
+            erode(x, y, dir)
+            erode(tx, y, dir)
+        }
         return true
     }
 
@@ -2085,7 +2114,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         private const val CHAR_CHANCE = 0.006f
         private const val SINK_CHANCE = 0.55f
         private const val DISSOLVE = 0.03f
-        private const val ERODE = 0.05f
+        private const val ERODE = 0.08f
         private const val DRY_TEMP = 100f
         private const val DRY_CHANCE = 0.04f
         private const val DRY_COOLING = 15f

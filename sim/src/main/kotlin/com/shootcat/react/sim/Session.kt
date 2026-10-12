@@ -315,6 +315,9 @@ class Session(
             (materials.kind[m] == Kind.POWDER || materials.kind[m] == Kind.LIQUID)
     }
 
+    /** Air or another gas (smoke, steam): what is poured or put down takes its place. */
+    private fun free(i: Int): Boolean = materials.kind[world.mat[i].toInt()] == Kind.GAS && materials.spawnBurning[world.mat[i].toInt()].not()
+
     /** The bucket pours out into the air around (x, y), at the temperature its content has. */
     private fun pour(cx: Int, cy: Int) {
         if (bucketAmount == 0) return
@@ -327,7 +330,7 @@ class Session(
                 val x = cx + dx
                 val y = cy + dy
                 if (dx * dx + dy * dy > r2 || !w.inside(x, y)) continue
-                if (w.mat[w.index(x, y)].toInt() != MaterialTable.AIR) continue
+                if (!free(w.index(x, y))) continue
                 if (fill < 1f && !w.chance(fill)) continue
                 w.set(x, y, bucketMaterial, bucketTemp)
                 bucketAmount--
@@ -381,7 +384,7 @@ class Session(
         for (k in 0 until h.size) {
             val px = x + h.dx[k]
             val py = y + h.dy[k]
-            if (!w.inside(px, py) || w.mat[w.index(px, py)].toInt() != MaterialTable.AIR) return tell("Kein Platz zum Ablegen")
+            if (!w.inside(px, py) || !free(w.index(px, py))) return tell("Kein Platz zum Ablegen")
         }
         for (k in 0 until h.size) {
             val px = x + h.dx[k]

@@ -229,6 +229,28 @@ class BehaviorTest {
     }
 
     @Test
+    fun `the last grain between water and a drop gives way, two grains hold`() {
+        fun lip(width: Int): Lab {
+            val lab = Lab(96, 64)
+            // a pool behind a rock wall with a window at its foot, stopped with sand; behind the window a
+            // ledge as long as the wall is thick, then a drop
+            lab.rect("rock", 2, 51, 40 + width, 61)
+            lab.rect("rock", 41 + width, 57, 93, 61)
+            lab.rect("rock", 40, 20, 40 + width - 1, 49)
+            lab.rect("sand", 40, 50, 40 + width - 1, 50)
+            lab.rect("water", 2, 30, 39, 50)
+            lab.seconds(20f)
+            return lab
+        }
+        val thin = lip(1)
+        assertEquals(0, thin.countIn("sand", 40, 50, 40, 50), "the grain was pushed out")
+        assertTrue(thin.countIn("water", 42, 0, 93, 61) > 200, "and the pool ran out: ${thin.countIn("water", 42, 0, 93, 61)}")
+        val thick = lip(2)
+        assertEquals(2, thick.countIn("sand", 40, 50, 41, 50), "two grains stay")
+        assertEquals(0, thick.countIn("water", 43, 0, 93, 61), "and hold the water")
+    }
+
+    @Test
     fun `smoke rises and gathers under an overhang`() {
         val lab = Lab()
         lab.rect("rock", 10, 20, 53, 23)
