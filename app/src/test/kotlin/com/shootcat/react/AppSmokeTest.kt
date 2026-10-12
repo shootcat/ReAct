@@ -312,9 +312,11 @@ class AppSmokeTest {
         compose.onNodeWithTag("level_hud").assertExists()
         shot("30_level1")
         // the level begins with all of it on screen; one bucket out of the earth in the window of the rock
-        // wall, the finger held a moment as in the test of the level (brush 3, the bucket is the first tool)
+        // wall (brush 3, the bucket is the first tool). The bucket takes only the layer that lies open, one
+        // layer per step, so the finger stays down for well over the 20 steps of the test of the level: on
+        // the CI machine this world runs at about 40 steps a second next to the drawing of the screen.
         compose.onNodeWithTag("world").performTouchInput { down(levelCell(48, 45, 220, 140)) }
-        run(400)
+        run(1200)
         compose.onNodeWithTag("world").performTouchInput { up() }
         run(300)
         compose.onNodeWithTag("speed_Schnell").performClick()
