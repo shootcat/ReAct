@@ -1,0 +1,84 @@
+package com.shootcat.react.level
+
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
+/**
+ * A level as written in its `level.json` (Leitfaden V3, 5.1). The ground is a painted PNG next to it, every
+ * colour one material (the material's own colour from materials.json), and a mask of the same size marks the
+ * anchored ground (white): loose ground that stays where it is and cannot be taken.
+ *
+ * Points and areas are in cells of the level, (0, 0) top left.
+ */
+@Serializable
+data class LevelSpec(
+    val id: String,
+    val name: String,
+    /** The region the level lies in (Wald, Vulkan, Mine). */
+    val area: String,
+    /** How hard it is meant to be: leicht, Kernniveau, Obergrenze. */
+    val tier: String,
+    val seed: Long,
+    /** Temperature of the open air; the materials' default if not given. */
+    val ambient: Float? = null,
+    val terrain: String = "terrain.png",
+    val anchor: String = "anchor.png",
+    val tools: Tools,
+    /** Building material in store at the start, cells per material (mostly nothing). */
+    val stock: Map<String, Int> = emptyMap(),
+    /** Places hotter or colder than their material's own temperature (a warm rock around a magma chamber). */
+    val heat: List<Heat> = emptyList(),
+    /** Trees (or bushes, [Tree.tree] false) grown at the start, standing on the ground below (x, y). */
+    val trees: List<Tree> = emptyList(),
+    val goals: List<GoalSpec>,
+    val rating: Rating,
+)
+
+/** What the player may use (Leitfaden V3, 4.3). */
+@Serializable
+data class Tools(
+    val bucket: Boolean = false,
+    /** How many cells the bucket holds. */
+    @SerialName("bucket_size") val bucketSize: Int = 0,
+    val hand: Boolean = false,
+    /** Building from the store with line, rectangle, frame and brush. */
+    val build: Boolean = false,
+)
+
+@Serializable
+data class Heat(val area: List<List<Int>>, val temp: Float)
+
+@Serializable
+data class Tree(val x: Int, val y: Int, val tree: Boolean = true)
+
+/**
+ * One goal (Leitfaden V3, 5.2). [type] is one of material, fill, temperature, ignite, extinguish, light, grow,
+ * protect. A goal counts once its state has held for [hold] seconds.
+ */
+@Serializable
+data class GoalSpec(
+    val type: String,
+    /** What the player is told: what, never how. */
+    val text: String,
+    val area: List<List<Int>>,
+    val material: String? = null,
+    val materials: List<String> = emptyList(),
+    /** Cells needed (material, ignite, grow, protect). */
+    val amount: Int = 0,
+    /** Share of the area (fill). */
+    val share: Float = 0f,
+    /** Average temperature at least (temperature). */
+    val min: Float? = null,
+    /** Average temperature at most (temperature). */
+    val max: Float? = null,
+    /** Average light at least (light). */
+    val light: Float = 0f,
+    val hold: Float = 2f,
+)
+
+/** Gold, silver and bronze: the most seconds and the most actions for each (Leitfaden V3, 5.1.3). */
+@Serializable
+data class Rating(val gold: Limit, val silver: Limit, val bronze: Limit)
+
+@Serializable
+data class Limit(val seconds: Int, val actions: Int)

@@ -751,7 +751,8 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         }
 
         when (mt.kind[m]) {
-            Kind.POWDER -> movePowder(x, y, i, m)
+            // loose ground the level has anchored stays where it is (Leitfaden V3, 5.1)
+            Kind.POWDER -> if (f and Flag.ANCHORED == 0) movePowder(x, y, i, m)
             Kind.LIQUID -> moveLiquid(x, y, i, m)
             Kind.GAS -> moveGas(x, y, i, m)
             Kind.LIFE -> if (mt.animal[m]) living.animal(x, y, i, m)
@@ -1205,6 +1206,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
 
     /** Snow at [i] comes loose and starts to slide. */
     private fun loosen(i: Int, x: Int, y: Int) {
+        if (flags[i].toInt() and Flag.ANCHORED != 0) return
         flags[i] = (flags[i].toInt() or Flag.MARK).toByte()
         wake(x, y)
     }
@@ -1347,7 +1349,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         if (by >= height) return
         val b = by * width + x
         val g = mat[b].toInt()
-        if (!materials.erodes[g]) return
+        if (!materials.erodes[g] || flags[b].toInt() and Flag.ANCHORED != 0) return
         if (!chance(ERODE * (1f - materials.hardness[g]))) return
         if (rooted(x, by, b)) return
         val nx = x + d
@@ -1585,7 +1587,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             val dy = y - cy
             if (dx * dx + dy * dy > r2) continue
             val k = kindOf[mat[y * w + x].toInt()]
-            if (k != Kind.POWDER && k != Kind.LIQUID) continue
+            if (k != Kind.POWDER && k != Kind.LIQUID || flags[y * w + x].toInt() and Flag.ANCHORED != 0) continue
             if (n == blast.size) blast = blast.copyOf(n * 2)
             blast[n++] = ((r2 - dx * dx - dy * dy) shl 20) or (y * w + x).coerceAtMost((1 shl 20) - 1)
         }

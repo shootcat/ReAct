@@ -72,6 +72,7 @@ kotlin {
 
 dependencies {
     implementation(project(":sim"))
+    implementation(project(":level"))
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)

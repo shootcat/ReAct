@@ -85,6 +85,21 @@ class Session(
 
     private fun supplies() = Supplies(supply, stock.copyOf(), bucketMaterial, bucketAmount, bucketTemp, held)
 
+    /** What the player has at the start and after a reset: unlimited supply in the sandbox. */
+    private var initial = Supplies(Supply.UNLIMITED, IntArray(materials.count), MaterialTable.AIR, 0, materials.ambient, null)
+
+    /**
+     * Sets what the player starts with, before anything happens: procuring with a store of [stock] (cells
+     * per material), as a level does (Leitfaden V3, 5.1). A reset returns to it. Not an action.
+     */
+    fun begin(supply: Supply, stock: IntArray = IntArray(materials.count)) {
+        initial = Supplies(supply, stock.copyOf(), MaterialTable.AIR, 0, materials.ambient, null)
+        restoreSupplies(initial)
+    }
+
+    /** Called after every step, on the thread that steps (a level checks its goals here). */
+    var onStep: ((Session) -> Unit)? = null
+
     private fun restoreSupplies(s: Supplies) {
         supply = s.supply
         s.stock.copyInto(stock)
@@ -239,6 +254,7 @@ class Session(
         if (down) dab(bx, by)
         cool()
         world.step()
+        onStep?.invoke(this)
     }
 
     // ------------------------------------------------------------------ procuring (4.3)
@@ -435,7 +451,7 @@ class Session(
         pushUndo(saveLog = true)
         log.clear()
         world.restore(start)
-        restoreSupplies(Supplies(Supply.UNLIMITED, IntArray(materials.count), MaterialTable.AIR, 0, materials.ambient, null))
+        restoreSupplies(initial)
     }
 
     /** Everything turned to air: an empty sandbox (undoable). */
@@ -523,8 +539,8 @@ class Session(
         private const val NO_ANIMAL = -1
 
         /**
-         * Plays [log] into a fresh session until the world has run [steps] steps. Inputs take effect before
-         * the step they were recorded at, in recorded order.
+         * Plays [log] into a fresh session (prepared by [setup]) until the world has run [steps] steps. Inputs
+         * take effect before the step they were recorded at, in recorded order.
          */
         fun replay(
             materials: MaterialTable,
@@ -534,8 +550,9 @@ class Session(
             build: (World) -> Unit,
             log: List<Input>,
             steps: Int,
+            setup: (Session) -> Unit = {},
         ): Session {
-            val s = Session(materials, width, height, seed, build)
+            val s = Session(materials, width, height, seed, build).also(setup)
             var k = 0
             while (s.world.step < steps) {
                 while (k < log.size && log[k].step <= s.world.step) {

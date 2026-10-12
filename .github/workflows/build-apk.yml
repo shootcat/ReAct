@@ -27,8 +27,8 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Simulation tests, UI smoke test and APK
-        run: ./gradlew :sim:test :app:testDebugUnitTest assembleDebug --stacktrace
+      - name: Simulation and level tests, UI smoke test and APK
+        run: ./gradlew :sim:test :level:test :app:testDebugUnitTest assembleDebug --stacktrace
 
       - name: Name APK and write release notes
         run: |
@@ -56,6 +56,7 @@ jobs:
             REACT-beta.apk
             app/build/screenshots/*.png
             sim/build/pictures/*.png
+            level/build/pictures/*.png
             sim/build/benchmark.md
 
       - uses: actions/upload-artifact@v4
@@ -64,6 +65,7 @@ jobs:
           name: test-reports-${{ github.run_number }}
           path: |
             sim/build/reports/tests/
+            level/build/reports/tests/
             app/build/reports/tests/
 
       - name: Publish release with APK
