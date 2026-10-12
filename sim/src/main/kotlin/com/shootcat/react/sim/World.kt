@@ -184,9 +184,13 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     private val owner = IntArray(size)
     private var structuresDirty = true
     private val loose = ArrayList<IntArray>()
-    private val looseDensity = ArrayList<Float>()
+    private var looseDensity = FloatArray(64)
     /** Loose structures held by roots: plants with leaves or vines do not tip over. */
-    private val looseRooted = ArrayList<Boolean>()
+    private var looseRooted = BooleanArray(64)
+    /** The cells of the standing structures of the last search, and whether [owner] may hold anything else (after an undo). */
+    private var standing = IntArray(1024)
+    private var standingCount = 0
+    private var ownerUnknown = true
     /** Loose structures to leave alone until the next search: a falling block has torn part of them off. */
     private var skip = BooleanArray(64)
     /** For each structure number: its place in [loose], or -1 if it stands. */
@@ -1707,15 +1711,21 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
      */
     private fun findStructures() {
         structuresDirty = false
-        owner.fill(0)
+        // forget the last search: only the cells it gave an owner to (they may have moved with their structure)
+        if (ownerUnknown) {
+            owner.fill(0)
+            ownerUnknown = false
+        } else {
+            for (k in 0 until standingCount) owner[standing[k]] = 0
+            for (cells in loose) for (c in cells) owner[c] = 0
+        }
+        standingCount = 0
         loose.clear()
-        looseDensity.clear()
-        looseRooted.clear()
         val w = width
         var id = 0
         for (i in 0 until size) {
             val m0 = mat[i].toInt()
-            if (owner[i] != 0 || kindOf[m0] != Kind.SOLID) continue
+            if (kindOf[m0] != Kind.SOLID || owner[i] != 0) continue
             id++
             looseOf[id] = -1
             val plant = plantOf[m0]
@@ -1743,15 +1753,25 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
                 if (c >= w) visit(c - w, id, plant)
                 if (c < size - w) visit(c + w, id, plant)
             }
-            if (!fillAnchored || falling) {
+            if (fillAnchored && !falling) {
+                // a standing structure: remember its cells, to forget their owner at the next search
+                if (standingCount + count > standing.size) standing = standing.copyOf(maxOf(standing.size * 2, standingCount + count))
+                fillCells.copyInto(standing, standingCount, 0, count)
+                standingCount += count
+            } else {
                 val cells = fillCells.copyOf(count)
                 // bottom cells first, so each falls into the place the one below has just left
                 cells.sort()
                 cells.reverse()
-                looseOf[id] = loose.size
+                val li = loose.size
+                if (li == looseDensity.size) {
+                    looseDensity = looseDensity.copyOf(li * 2)
+                    looseRooted = looseRooted.copyOf(li * 2)
+                }
+                looseOf[id] = li
                 loose += cells
-                looseDensity += mass / count
-                looseRooted += rooted
+                looseDensity[li] = mass / count
+                looseRooted[li] = rooted
             }
         }
         if (skip.size < loose.size) skip = BooleanArray(loose.size * 2) else skip.fill(false)
@@ -1950,7 +1970,11 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             return
         }
         val li = looseOf[id]
-        if (li < 0) return
+        if (li < 0) {
+            if (standingCount == standing.size) standing = standing.copyOf(standingCount * 2)
+            standing[standingCount++] = j
+            return
+        }
         // the cells of a loose structure stay ordered bottom first, the way it falls
         val cells = loose[li]
         val n = cells.size
@@ -2009,6 +2033,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         step = s.step
         structuresDirty = true
         gasDirty = true
+        ownerUnknown = true
     }
 
     /** A fingerprint of the complete state, for determinism tests. */
