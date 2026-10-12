@@ -130,6 +130,17 @@ data class MaterialSpec(
     /** Pressed into this under a load of [compactLoad] (density / 1000 summed over the cells above). */
     @SerialName("compact_product") val compactProduct: String? = null,
     @SerialName("compact_load") val compactLoad: Float = 0f,
+    /** The pressure (times that of the air) a wall of it withstands; without it by kind, rock never breaks. */
+    val strength: Float? = null,
+    /** What it becomes when pressure or a blast breaks it (glass: shards, stone: rubble); without it the cell is pushed away whole. */
+    @SerialName("break_product") val breakProduct: String? = null,
+    /** How much gas one cell holds, as cells of air: steam is water spread out very thin. */
+    val expansion: Float = 1f,
+    /** A gas that goes off all at once when it meets fire, embers or its ignition heat (firedamp). */
+    val explosive: Boolean = false,
+    /** Gives off this gas now and then (a crack in the rock of a mine gives off firedamp). */
+    val emits: String? = null,
+    @SerialName("emit_rate") val emitRate: Float = 0f,
     val absorbs: Float = 0f,
     /** A liquid that soaks into absorbent material and makes it wet. */
     val wets: Boolean = false,
@@ -306,6 +317,20 @@ class MaterialTable(val specs: List<MaterialSpec>, val ambient: Float) {
     val avalanche = BooleanArray(count) { specs[it].avalanche }
     val compactProduct = IntArray(count) { ref(specs[it].compactProduct, -1) }
     val compactLoad = FloatArray(count) { specs[it].compactLoad }
+    val strength = FloatArray(count) {
+        specs[it].strength ?: when (kind[it]) {
+            Kind.STATIC -> Float.POSITIVE_INFINITY
+            Kind.SOLID -> SOLID_STRENGTH
+            Kind.POWDER, Kind.LIQUID -> LOOSE_STRENGTH
+            Kind.LIFE -> 1f
+            else -> 0f
+        }
+    }
+    val breakProduct = IntArray(count) { ref(specs[it].breakProduct, -1) }
+    val expansion = FloatArray(count) { specs[it].expansion }
+    val explosive = BooleanArray(count) { specs[it].explosive }
+    val emits = IntArray(count) { ref(specs[it].emits, -1) }
+    val emitRate = FloatArray(count) { specs[it].emitRate }
 
     /** Solid parts of plants (trunk, leaves, vine, dead wood): they form structures of their own, apart from built ones. */
     val plant = BooleanArray(count) { kind[it] == Kind.SOLID && ((organism[it] != Organism.NONE && !animal[it]) || roots[it]) }
@@ -370,6 +395,7 @@ class MaterialTable(val specs: List<MaterialSpec>, val ambient: Float) {
             listOfNotNull(
                 s.burnProduct, s.quenchProduct, s.meltProduct, s.boilProduct, s.boilResidue, s.freezeProduct, s.decayProduct,
                 s.dissolvedProduct, s.dissolvesIn, s.deathProduct, s.growsOn, s.livesIn, s.splitInto, s.shockProduct, s.compactProduct,
+                s.breakProduct, s.emits,
             )
                 .forEach { require(it in index) { "${s.id} refers to unknown material '$it'" } }
             if (s.flammable) require(s.igniteTemp != null && s.burnTime != null) { "${s.id} burns but has no ignite_temp or burn_time" }
@@ -385,6 +411,10 @@ class MaterialTable(val specs: List<MaterialSpec>, val ambient: Float) {
 
         /** At most this share of the way to the common temperature per step and pair (1 would be all the way). */
         const val MAX_EXCHANGE = 0.9f
+
+        /** Strength of walls without their own: built solids, and loose or liquid material that a blast pushes aside. */
+        const val SOLID_STRENGTH = 5f
+        const val LOOSE_STRENGTH = 1.5f
 
         /** How much better heat passes upwards out of a hotter gas than by plain conduction. */
         const val CONVECTION = 3f

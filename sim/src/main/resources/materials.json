@@ -13,6 +13,7 @@
       "lifetime": "Rauch verfliegt nach oben aus der Welt; im geschlossenen Raum hält er sich lange, so erstickt dort das Feuer",
       "salt_melt_temp": "Schmelzpunkt, solange Salziges (Salz, Salzwasser) daneben liegt: Salz lässt Eis und Schnee ohne Wärme schmelzen",
       "structure": "shock_product, shock_rate: spröde Stoffe springen, wenn ein abschreckender Nachbar (quenches: Wasser, Eis, Schnee) ihnen mehr als shock_rate Grad pro Schritt entzieht; permeable: Wahrscheinlichkeit pro Schritt, dass Wasser durch die Körnung hindurchfließt; avalanche: rutscht am Hang ab, wenn erwärmt oder erschüttert; compact_product, compact_load: wird unter so viel Last (Summe Dichte/1000 der Zellen darüber) dazu verdichtet",
+      "pressure": "strength: Druck, dem eine Wand standhält (Vielfaches des Luftdrucks; ohne Angabe fest 5, Pulver und Flüssigkeit 1.5, Fels nie), break_product: was beim Bersten daraus wird; expansion: Gasmenge einer Zelle (Dampf ist stark ausgedehntes Wasser); explosive: entzündet sich bei ignite_temp, an Feuer oder Glut schlagartig; emits, emit_rate: tritt aus (Wahrscheinlichkeit pro Zufallstick)",
       "pattern": "Darstellung fester Stoffe: planks, brick, masonry, sheen, pores (Basalt); speckle_color und speckle für Einschlüsse (Erz)",
       "light": "emits_light und light_pass 0 bis 1: eigenes Licht; Anteil des Lichts, den eine Zelle durchlässt (ohne Angabe 0 bei blocks_light, sonst 1)",
       "store": "split_into, split_yield: was ein gegriffenes Objekt im Lager ergibt (ein Stamm 3 Bretter je Zelle)",
@@ -49,11 +50,22 @@
       "color": "#55504b", "color_variance": 0.16, "speckle_color": "#e0a04c", "speckle": 0.2, "cost": 0
     },
     {
+      "id": "gas_vent", "name": "Gasspalte", "kind": "static", "density": 2700, "anchored": true,
+      "flammable": false,
+      "wet_blocks_burning": false, "absorbs": 0,
+      "conductivity": 0.35, "heat_capacity": 2.0, "hardness": 1.0, "erodes_in_water": false,
+      "emits": "firedamp", "emit_rate": 0.4,
+      "dissolves_in": null, "dissolved_product": null,
+      "bucketable": false, "grabbable": false, "emits_light": 0, "blocks_light": true,
+      "color": "#57514b", "color_variance": 0.22, "speckle_color": "#24201d", "speckle": 0.35, "cost": 0
+    },
+    {
       "id": "stone", "name": "Stein", "kind": "solid", "density": 2600, "anchored": false,
       "flammable": false,
       "wet_blocks_burning": false, "absorbs": 0,
       "melt_temp": 1150, "melt_product": "lava",
       "conductivity": 0.3, "heat_capacity": 2.0, "hardness": 0.9, "erodes_in_water": false,
+      "strength": 9, "break_product": "rubble",
       "dissolves_in": null, "dissolved_product": null,
       "bucketable": false, "grabbable": true, "emits_light": 0, "blocks_light": true,
       "color": "#8c8781", "color_variance": 0.12, "pattern": "masonry", "cost": 2
@@ -64,6 +76,7 @@
       "wet_blocks_burning": false, "absorbs": 0,
       "melt_temp": 1150, "melt_product": "lava",
       "conductivity": 0.3, "heat_capacity": 2.0, "hardness": 0.9, "erodes_in_water": false,
+      "strength": 9, "break_product": "rubble",
       "dissolves_in": null, "dissolved_product": null,
       "bucketable": false, "grabbable": true, "emits_light": 0, "blocks_light": true,
       "color": "#46423f", "color_variance": 0.22, "pattern": "pores", "cost": 2
@@ -128,6 +141,7 @@
       "wet_blocks_burning": false, "absorbs": 0.015,
       "melt_temp": 800, "melt_product": "brick",
       "conductivity": 0.15, "heat_capacity": 1.6, "hardness": 0.5, "erodes_in_water": true,
+      "strength": 3,
       "dissolves_in": null, "dissolved_product": null,
       "friction": 1.0, "wet_friction": 0.3,
       "bucketable": true, "grabbable": false, "emits_light": 0, "blocks_light": true,
@@ -188,6 +202,7 @@
       "latent_heat": 160,
       "conductivity": 0.4, "heat_capacity": 2.0, "hardness": 0.6, "erodes_in_water": false,
       "quenches": true,
+      "strength": 4, "break_product": "snow",
       "dissolves_in": null, "dissolved_product": null,
       "temp": -10,
       "bucketable": false, "grabbable": true, "emits_light": 0, "blocks_light": false, "light_pass": 0.95,
@@ -198,6 +213,7 @@
       "flammable": true, "ignite_temp": 280, "burn_time": 4.5, "burn_temp": 750, "burn_heat": 45, "flame": 0.9, "smoke": 0.01,
       "burn_product": "ash", "residue": 0.2, "quench_product": "charcoal", "wet_blocks_burning": true, "absorbs": 0.002,
       "conductivity": 0.08, "heat_capacity": 1.2, "hardness": 0.5, "erodes_in_water": false,
+      "strength": 5,
       "dissolves_in": null, "dissolved_product": null,
       "bucketable": false, "grabbable": true, "emits_light": 0, "blocks_light": true,
       "color": "#8a5a2c", "color_variance": 0.12, "pattern": "planks", "cost": 2
@@ -208,6 +224,7 @@
       "wet_blocks_burning": false, "absorbs": 0,
       "melt_temp": 1500, "melt_product": "lava",
       "conductivity": 0.12, "heat_capacity": 1.7, "hardness": 0.85, "erodes_in_water": false,
+      "strength": 6, "break_product": "rubble",
       "dissolves_in": null, "dissolved_product": null,
       "bucketable": false, "grabbable": true, "emits_light": 0, "blocks_light": true,
       "color": "#a3492f", "color_variance": 0.1, "pattern": "brick", "cost": 2
@@ -218,6 +235,7 @@
       "wet_blocks_burning": false, "absorbs": 0,
       "conductivity": 0.2, "heat_capacity": 1.9, "hardness": 0.7, "erodes_in_water": false,
       "shock_product": "glass_shards", "shock_rate": 20,
+      "strength": 2, "break_product": "glass_shards",
       "dissolves_in": null, "dissolved_product": null,
       "bucketable": false, "grabbable": true, "emits_light": 0, "blocks_light": false, "light_pass": 0.99,
       "color": "#bfe3ea", "color_variance": 0.04, "opacity": 0.4, "cost": 3
@@ -240,6 +258,7 @@
       "wet_blocks_burning": false, "absorbs": 0,
       "melt_temp": 1080, "melt_product": "molten_metal",
       "conductivity": 1.0, "heat_capacity": 3.5, "hardness": 0.95, "erodes_in_water": false,
+      "strength": 14,
       "dissolves_in": null, "dissolved_product": null,
       "bucketable": false, "grabbable": true, "emits_light": 0, "blocks_light": true,
       "color": "#8e99a5", "color_variance": 0.05, "pattern": "sheen", "cost": 4
@@ -311,10 +330,21 @@
       "wet_blocks_burning": false, "absorbs": 0,
       "freeze_temp": 90, "freeze_product": "water",
       "conductivity": 0.05, "heat_capacity": 0.4, "hardness": 0, "erodes_in_water": false,
+      "expansion": 6,
       "dissolves_in": null, "dissolved_product": null,
       "temp": 130,
       "bucketable": false, "grabbable": false, "emits_light": 0, "blocks_light": false, "light_pass": 0.93,
       "color": "#dde6ee", "color_variance": 0.05, "opacity": 0.55, "cost": 1
+    },
+    {
+      "id": "firedamp", "name": "Grubengas", "kind": "gas", "density": 0.7, "anchored": false,
+      "flammable": false, "ignite_temp": 580,
+      "wet_blocks_burning": false, "absorbs": 0,
+      "conductivity": 0.03, "heat_capacity": 0.05, "hardness": 0, "erodes_in_water": false,
+      "explosive": true,
+      "dissolves_in": null, "dissolved_product": null,
+      "bucketable": false, "grabbable": false, "emits_light": 0, "blocks_light": false, "light_pass": 1.0,
+      "color": "#e8f2b8", "color_variance": 0.05, "opacity": 0.08, "cost": 1
     },
     {
       "id": "lava", "name": "Lava", "kind": "liquid", "density": 2600, "anchored": false,

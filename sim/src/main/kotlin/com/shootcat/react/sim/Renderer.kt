@@ -22,6 +22,7 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
     private val fish = mt.idOrNull("fish") ?: -1
     private val bird = mt.idOrNull("bird") ?: -1
     private val firefly = mt.idOrNull("firefly") ?: -1
+    private val firedamp = mt.idOrNull("firedamp") ?: -1
 
     /**
      * Light for drawing (2b). While the world runs, the field the simulation works out every few steps is
@@ -240,6 +241,12 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
                 smoke -> {
                     val fade = (life[i] / 90f).coerceIn(0f, 1f)
                     out[i] = mix(scale(c, s), bg, 1f - mt.opacity[m] * fade)
+                    continue
+                }
+                firedamp -> {
+                    // hardly to be seen: the air over it shimmers a little
+                    val shimmer = 0.04f + 0.1f * wave((x * 5 + (i / w) * 3 + frame * 2) and 63)
+                    out[i] = mix(scale(bg, 1.06f), bg, 1f - shimmer)
                     continue
                 }
                 firefly -> {

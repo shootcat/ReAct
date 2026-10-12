@@ -34,7 +34,8 @@ object Event {
     const val SOLIDIFY = 5
     const val MELT = 6
     const val SOAK = 7
-    const val COUNT = 8
+    const val EXPLODE = 8
+    const val COUNT = 9
 }
 
 /**
@@ -74,12 +75,15 @@ object Seen {
     const val PERMEATE = 29
     const val COMPACT = 30
     const val AVALANCHE = 31
-    const val COUNT = 32
+    const val BURST = 32
+    const val EXPLODE = 33
+    const val COUNT = 34
 
     val NAMES = listOf(
         "ignite", "burn_out", "douse", "suffocate", "char", "melt", "salt_melt", "boil", "residue", "set", "condense",
         "dissolve", "soak", "erode", "seep", "grow", "die_heat", "die_salt", "die_dry", "flee", "dig", "fall",
         "hold_heat", "glow", "float", "conduct", "shine", "wet_no_fire", "crack", "permeate", "compact", "avalanche",
+        "burst", "explode",
     )
 
     fun parse(name: String): Int = NAMES.indexOf(name).also { require(it >= 0) { "unknown observation '$name'" } }
@@ -183,6 +187,26 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     private var fillCells = IntArray(256)
     private var fillTop = 0
     private var fillAnchored = false
+
+    // pressure (4a.4): which gas region each cell of gas belongs to, and the cells of the closed ones
+    private val region = IntArray(size)
+    private var gasDirty = true
+    private var closedCells = IntArray(256)
+    private var closedStart = IntArray(17)
+    private var closedCount = 0
+
+    /** The pressure in the closed gas region around each cell found at the last check, for display and tests (1: the air outside). */
+    fun pressureAt(x: Int, y: Int): Float {
+        val r = region[y * width + x]
+        if (r >= 0) return 1f
+        val k = -r - 1
+        return if (k < closedCount) closedPressure[k] else 1f
+    }
+    private var closedPressure = FloatArray(17)
+
+    /** Time spent on pressure so far, for the benchmark. */
+    var pressureNanos = 0L
+        private set
 
     /** How many structures are not anchored (they fall, or lie on something that holds them). */
     val looseStructures: Int get() = loose.size
@@ -443,12 +467,19 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         var n = 0
         for (b in awake) if (b) n++
         awakeChunks = n
+        // gas can only have moved where something happens
+        if (n > 0) gasDirty = true
         if (step % LIGHT_EVERY == 0) light.compute()
         heat()
         if (n > 0) update()
         living.randomTicks()
         if (structuresDirty) findStructures()
         dropLoose()
+        if (step % PRESSURE_EVERY == 0) {
+            val t0 = System.nanoTime()
+            pressure()
+            pressureNanos += System.nanoTime() - t0
+        }
         step++
     }
 
@@ -661,6 +692,12 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         if (mt.shockProduct[m] >= 0 && temp[i] > SHOCK_FROM && shocked(x, y, i, m)) {
             note(Seen.CRACK, m)
             change(x, y, i, mt.shockProduct[m])
+            return
+        }
+
+        // firedamp goes off at fire, embers or its ignition heat (4a.4)
+        if (mt.explosive[m] && ignites(x, y, i, m)) {
+            detonate(x, y, i, m)
             return
         }
 
@@ -885,6 +922,8 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         val bt = mt.boilTemp[m]
         val lat = mt.latent[m]
         if (lat > 0) {
+            // next to something glowing hot (lava) it flashes into steam at once, taking the heat from it
+            if (life[i] < lat) flash(x, y, i, m, lat)
             val excess = (temp[i] - bt).toInt()
             if (excess > 0) {
                 temp[i] -= excess
@@ -955,6 +994,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
 
     internal fun spawn(x: Int, y: Int, i: Int, m: Int, t: Float) {
         if (kindOf[m] == Kind.SOLID || kindOf[mat[i].toInt()] == Kind.SOLID) structuresDirty = true
+        if ((kindOf[m] == Kind.GAS) != (kindOf[mat[i].toInt()] == Kind.GAS)) gasDirty = true
         mat[i] = m.toByte()
         temp[i] = t
         life[i] = initLife(m).toShort()
@@ -981,6 +1021,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     /** The cell turns into [product] and keeps its temperature. */
     internal fun change(x: Int, y: Int, i: Int, product: Int) {
         if (kindOf[product] == Kind.SOLID || kindOf[mat[i].toInt()] == Kind.SOLID) structuresDirty = true
+        if ((kindOf[product] == Kind.GAS) != (kindOf[mat[i].toInt()] == Kind.GAS)) gasDirty = true
         mat[i] = product.toByte()
         life[i] = initLife(product).toShort()
         variant[i] = next().toByte()
@@ -1366,6 +1407,284 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     private fun rises(m: Int, q: Int): Boolean =
         q != m && kindOf[q] == Kind.GAS && densityOf[q] > densityOf[m]
 
+    // ------------------------------------------------------------------ pressure and explosions (4a.4)
+
+    /**
+     * Every [PRESSURE_EVERY] steps: finds the gas regions (4-connected cells of air, steam, smoke, firedamp)
+     * anew if gas has appeared or gone somewhere, and works out the pressure in each closed one, a region
+     * that does not reach the open sky at the top. Pressure is the gas it holds (steam counts many times, as
+     * water spread out thin) times its absolute temperature, per cell, against the air outside. Where it
+     * is higher than the weakest wall around can bear, that wall bursts.
+     */
+    private fun pressure() {
+        if (gasDirty) findGasRegions()
+        val air = materials.ambient + KELVIN
+        val ex = materials.expansion
+        for (k in 0 until closedCount) {
+            val a = closedStart[k]
+            val b = closedStart[k + 1]
+            var gas = 0f
+            for (c in a until b) {
+                val j = closedCells[c]
+                gas += ex[mat[j].toInt()] * (temp[j] + KELVIN) / air
+            }
+            val n = b - a
+            val excess = gas - n
+            closedPressure[k] = gas / n
+            if (excess < MIN_EXCESS) continue
+            if (burst(a, b, gas / n, excess)) {
+                // the region is open now; the others are looked at next time
+                gasDirty = true
+                return
+            }
+        }
+    }
+
+    private fun findGasRegions() {
+        gasDirty = false
+        val w = width
+        region.fill(0)
+        closedCount = 0
+        var used = 0
+        var id = 0
+        for (i in 0 until size) {
+            if (region[i] != 0 || kindOf[mat[i].toInt()] != Kind.GAS) continue
+            id++
+            var open = false
+            fillTop = 0
+            fillStack[fillTop++] = i
+            region[i] = id
+            var count = 0
+            while (fillTop > 0) {
+                val c = fillStack[--fillTop]
+                if (count == fillCells.size) fillCells = fillCells.copyOf(count * 2)
+                fillCells[count++] = c
+                if (c < w) open = true
+                val x = c % w
+                if (x > 0) gasVisit(c - 1, id)
+                if (x < w - 1) gasVisit(c + 1, id)
+                if (c >= w) gasVisit(c - w, id)
+                if (c < size - w) gasVisit(c + w, id)
+            }
+            if (open) continue
+            // a closed region: keep its cells, and mark them with its (negative) number
+            if (closedCount + 1 >= closedStart.size) {
+                closedStart = closedStart.copyOf(closedStart.size * 2)
+                closedPressure = closedPressure.copyOf(closedStart.size)
+            }
+            if (used + count > closedCells.size) closedCells = closedCells.copyOf(maxOf(closedCells.size * 2, used + count))
+            closedStart[closedCount] = used
+            for (c in 0 until count) {
+                closedCells[used++] = fillCells[c]
+                region[fillCells[c]] = -closedCount - 1
+            }
+            closedPressure[closedCount] = 1f
+            closedCount++
+            closedStart[closedCount] = used
+        }
+    }
+
+    private fun gasVisit(n: Int, id: Int) {
+        if (region[n] == 0 && kindOf[mat[n].toInt()] == Kind.GAS) {
+            region[n] = id
+            fillStack[fillTop++] = n
+        }
+    }
+
+    /**
+     * The closed region (cells a until b of [closedCells]) has [pressure]: if that is more than the weakest
+     * wall around it can bear, the wall bursts (glass first, then clay, ice, wood, brick, stone, metal; rock
+     * never) and the pent-up gas blasts out through the gap.
+     */
+    private fun burst(a: Int, b: Int, pressure: Float, excess: Float): Boolean {
+        val w = width
+        val st = materials.strength
+        var weakest = -1
+        var least = Float.POSITIVE_INFINITY
+        for (c in a until b) {
+            val j = closedCells[c]
+            val x = j % w
+            for (n in intArrayOf(if (x > 0) j - 1 else -1, if (x < w - 1) j + 1 else -1, j - w, j + w)) {
+                if (n < 0 || n >= size) continue
+                val q = mat[n].toInt()
+                if (kindOf[q] == Kind.GAS) continue
+                val s = if (flags[n].toInt() and Flag.ANCHORED != 0) Float.POSITIVE_INFINITY else st[q]
+                if (s < least) {
+                    least = s
+                    weakest = n
+                }
+            }
+        }
+        if (weakest < 0 || pressure <= least) return false
+        val q = mat[weakest].toInt()
+        note(Seen.BURST, q)
+        for (c in a until b) {
+            val g = mat[closedCells[c]].toInt()
+            if (g != AIR) note(Seen.BURST, g)
+        }
+        val wx = weakest % w
+        val wy = weakest / w
+        if (materials.breakProduct[q] >= 0) change(wx, wy, weakest, materials.breakProduct[q])
+        // as strong as the pressure was, as far-reaching as the gas that rushes out
+        explode(wx, wy, pressure, (2f + kotlin.math.sqrt(excess) * BURST_REACH).toInt())
+        return true
+    }
+
+    /**
+     * An explosion at (cx, cy) (4a.4): a pressure wave of [force] (in the units of wall strength) at the
+     * centre, fading out to [reach] cells. It breaks what is weaker than the force where it is, sets what
+     * burns alight, shakes snow loose and throws loose and liquid material away from it.
+     */
+    fun explode(cx: Int, cy: Int, force: Float, reach: Int) {
+        if (force <= 0f || reach <= 0) return
+        val w = width
+        val r = minOf(MAX_BLAST, reach)
+        val r2 = r * r
+        events[Event.EXPLODE]++
+        val mt = materials
+        // the wave: break, kindle, shake
+        for (y in maxOf(0, cy - r)..minOf(height - 1, cy + r)) for (x in maxOf(0, cx - r)..minOf(w - 1, cx + r)) {
+            val dx = x - cx
+            val dy = y - cy
+            val d2 = dx * dx + dy * dy
+            if (d2 > r2) continue
+            val i = y * w + x
+            val q = mat[i].toInt()
+            val here = force * (1f - kotlin.math.sqrt(d2.toFloat()) / (r + 1))
+            if (q != AIR && flags[i].toInt() and Flag.ANCHORED == 0 && mt.breakProduct[q] >= 0 && here > mt.strength[q]) {
+                note(Seen.EXPLODE, q)
+                change(x, y, i, mt.breakProduct[q])
+            }
+            val m = mat[i].toInt()
+            if (mt.flammable[m] && flags[i].toInt() and Flag.BURNING == 0 && here > KINDLE && temp[i] < mt.igniteTemp[m] + 20f) {
+                temp[i] = mt.igniteTemp[m] + 20f
+            }
+            if (mt.avalanche[m] && flags[i].toInt() and Flag.MARK == 0) loosen(i, x, y)
+            wakeHeat(x, y)
+        }
+        // the throw: loose and liquid material flies outwards, the outermost first
+        var n = 0
+        for (y in maxOf(0, cy - r)..minOf(height - 1, cy + r)) for (x in maxOf(0, cx - r)..minOf(w - 1, cx + r)) {
+            val dx = x - cx
+            val dy = y - cy
+            if (dx * dx + dy * dy > r2) continue
+            val k = kindOf[mat[y * w + x].toInt()]
+            if (k != Kind.POWDER && k != Kind.LIQUID) continue
+            if (n == blast.size) blast = blast.copyOf(n * 2)
+            blast[n++] = ((r2 - dx * dx - dy * dy) shl 20) or (y * w + x).coerceAtMost((1 shl 20) - 1)
+        }
+        // nearest last: sort by distance from the centre, far first
+        java.util.Arrays.sort(blast, 0, n)
+        for (k in 0 until n) {
+            val i = blast[k] and ((1 shl 20) - 1)
+            if (i >= size) continue
+            val x = i % w
+            val y = i / w
+            val dx = (x - cx).toFloat()
+            val dy = (y - cy).toFloat()
+            val d = kotlin.math.sqrt(dx * dx + dy * dy).coerceAtLeast(0.5f)
+            val push = ((r - d) * THROW * minOf(1f, force / FULL_THROW)).toInt()
+            if (push <= 0) continue
+            var tx = x
+            var ty = y
+            for (s in 1..push) {
+                val nx = x + (dx / d * s).toInt()
+                val ny = y + (dy / d * s - s * 0.3f).toInt()
+                if (nx < 0 || nx >= w || ny < 0 || ny >= height) break
+                val j = ny * w + nx
+                if (j != i && !open(j)) break
+                tx = nx
+                ty = ny
+            }
+            if (tx != x || ty != y) {
+                val j = ty * w + tx
+                swap(i, j, x, y, tx, ty)
+                setVelocity(j, minOf(7, push / 2))
+            }
+        }
+        structuresDirty = true
+        gasDirty = true
+    }
+
+    private var blast = IntArray(1024)
+
+    /** Firedamp at [i] meets fire, embers, something burning or its ignition heat. */
+    private fun ignites(x: Int, y: Int, i: Int, m: Int): Boolean {
+        val it = materials.igniteTemp[m]
+        if (temp[i] >= it) return true
+        val w = width
+        fun hot(j: Int): Boolean {
+            val q = mat[j].toInt()
+            return q == fireId || flags[j].toInt() and Flag.BURNING != 0 || temp[j] >= it
+        }
+        return (x > 0 && hot(i - 1)) || (x < w - 1 && hot(i + 1)) || (y > 0 && hot(i - w)) || (y < height - 1 && hot(i + w))
+    }
+
+    /** The whole cloud of firedamp around [i] goes off at once: a flash of fire and an explosion as strong as the cloud is big. */
+    private fun detonate(x: Int, y: Int, i: Int, m: Int) {
+        val w = width
+        fillTop = 0
+        var count = 0
+        var sx = 0L
+        var sy = 0L
+        fillStack[fillTop++] = i
+        stamp[i] = mark
+        mat[i] = fireId.toByte()
+        while (fillTop > 0) {
+            val c = fillStack[--fillTop]
+            count++
+            val cx = c % w
+            val cy = c / w
+            sx += cx
+            sy += cy
+            change(cx, cy, c, fireId)
+            temp[c] = FLASH_HEAT
+            for (dy in -1..1) for (dx in -1..1) {
+                val nx = cx + dx
+                val ny = cy + dy
+                if (nx < 0 || nx >= w || ny < 0 || ny >= height) continue
+                val j = ny * w + nx
+                if (mat[j].toInt() == m) {
+                    mat[j] = fireId.toByte()
+                    fillStack[fillTop++] = j
+                }
+            }
+        }
+        note(Seen.EXPLODE, m)
+        val root = kotlin.math.sqrt(count.toFloat())
+        explode((sx / count).toInt(), (sy / count).toInt(), CLOUD_FORCE + root, (2f + root * CLOUD_REACH).toInt())
+    }
+
+    /** Water next to something glowing hot takes its whole boiling heat from it at once (a steam explosion where it is shut in). */
+    private fun flash(x: Int, y: Int, i: Int, m: Int, lat: Int) {
+        val w = width
+        var j = -1
+        if (y < height - 1 && temp[i + w] >= FLASH_TEMP) j = i + w
+        else if (x > 0 && temp[i - 1] >= FLASH_TEMP) j = i - 1
+        else if (x < w - 1 && temp[i + 1] >= FLASH_TEMP) j = i + 1
+        else if (y > 0 && temp[i - w] >= FLASH_TEMP) j = i - w
+        if (j < 0) return
+        val need = lat - life[i] + maxOf(0f, materials.boilTemp[m] - temp[i])
+        val cap = materials.heatCapacity
+        temp[j] -= need * cap[m] / cap[mat[j].toInt()]
+        temp[i] = materials.boilTemp[m] + 2f
+        life[i] = lat.toShort()
+        wakeHeat(j % w, j / w)
+    }
+
+    /** A crack in the rock gives off a little gas into the air beside it (a random tick). */
+    internal fun emitFrom(x: Int, y: Int, i: Int, m: Int) {
+        if (!chance(materials.emitRate[m])) return
+        val w = width
+        val d = if (coin()) 1 else -1
+        for (j in intArrayOf(if (y > 0) i - w else -1, if (x + d in 0 until w) i + d else -1, if (x - d in 0 until w) i - d else -1, if (y < height - 1) i + w else -1)) {
+            if (j >= 0 && mat[j].toInt() == AIR) {
+                spawn(j % w, j / w, j, materials.emits[m], temp[i])
+                return
+            }
+        }
+    }
+
     // ------------------------------------------------------------------ structures (3.1)
 
     /**
@@ -1677,6 +1996,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         rng = s.rng
         step = s.step
         structuresDirty = true
+        gasDirty = true
     }
 
     /** A fingerprint of the complete state, for determinism tests. */
@@ -1749,6 +2069,28 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         /** The load on snow is summed up to this many cells above it; chance per random tick to be pressed into ice. */
         private const val COMPACT_REACH = 24
         private const val COMPACT_CHANCE = 0.08f
+
+        /** Pressure is checked every so many steps; absolute zero for the gas law. */
+        const val PRESSURE_EVERY = 10
+        private const val KELVIN = 273f
+
+        /** Gas beyond what the region would hold as plain air (in cells of air) before anything can burst: small hot pockets in a heap do nothing. */
+        private const val MIN_EXCESS = 12f
+
+        /** Reach of a burst per square root of the pent-up gas; force and reach of firedamp going off, on top of the square root of the cloud's cells. */
+        private const val BURST_REACH = 0.6f
+        private const val CLOUD_FORCE = 4f
+        private const val CLOUD_REACH = 1.2f
+
+        /** The widest blast; the force that kindles; how far loose material flies per cell of reach left, in full from [FULL_THROW] on. */
+        private const val MAX_BLAST = 22
+        private const val KINDLE = 2f
+        private const val THROW = 0.8f
+        private const val FULL_THROW = 8f
+
+        /** Water next to anything this hot boils at once; firedamp burns this hot. */
+        private const val FLASH_TEMP = 600f
+        private const val FLASH_HEAT = 1200f
 
         /** How far around the finger an animal looks for where it lives (or for air). */
         const val ANIMAL_REACH = 3

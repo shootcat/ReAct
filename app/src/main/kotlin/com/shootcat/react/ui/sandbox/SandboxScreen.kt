@@ -105,7 +105,7 @@ private const val STORE = "Lager"
 private val CATEGORIES = listOf(
     TOOLS to emptyList(),
     "Lose" to listOf("sand", "earth", "gravel", "clay", "salt", "snow", "rubble", "ore_rubble", "glass_shards", "charcoal", "ash"),
-    "Flüssig" to listOf("water", "saltwater", "lava", "molten_metal", "steam", "smoke"),
+    "Flüssig" to listOf("water", "saltwater", "lava", "molten_metal", "steam", "smoke", "firedamp"),
     "Bauen" to listOf("wood", "brick", "stone", "basalt", "glass", "metal", "ice"),
     "Hitze" to listOf("fire", "ember", "lava"),
     "Leben" to listOf("seed", "grass", "moss", "vine", "fish", "firefly", "worm", "bird"),
