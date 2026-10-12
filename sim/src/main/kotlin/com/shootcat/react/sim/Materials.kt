@@ -138,6 +138,8 @@ data class MaterialSpec(
     val expansion: Float = 1f,
     /** A gas that goes off all at once when it meets fire, embers or its ignition heat (firedamp). */
     val explosive: Boolean = false,
+    /** Keeps its own temperature: the heat of the deep below the world (magma under a volcano). */
+    @SerialName("holds_temp") val holdsTemp: Boolean = false,
     /** Gives off this gas now and then (a crack in the rock of a mine gives off firedamp). */
     val emits: String? = null,
     @SerialName("emit_rate") val emitRate: Float = 0f,
@@ -329,6 +331,7 @@ class MaterialTable(val specs: List<MaterialSpec>, val ambient: Float) {
     val breakProduct = IntArray(count) { ref(specs[it].breakProduct, -1) }
     val expansion = FloatArray(count) { specs[it].expansion }
     val explosive = BooleanArray(count) { specs[it].explosive }
+    val holdsTemp = BooleanArray(count) { specs[it].holdsTemp }
     val emits = IntArray(count) { ref(specs[it].emits, -1) }
     val emitRate = FloatArray(count) { specs[it].emitRate }
 

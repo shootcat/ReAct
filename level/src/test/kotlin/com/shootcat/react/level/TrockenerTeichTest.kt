@@ -58,7 +58,7 @@ class TrockenerTeichTest {
 
     @Test
     fun `digging - one bucket out of the earth in the window, the pool runs out over the ledge, gold`() {
-        val (_, r) = solve("graben", "wait 60\nscoop 48 45 4 20")
+        val (_, r) = solve("graben", "wait 60\nscoop 48 45 3 20")
         val result = assertNotNull(r)
         assertEquals(Medal.GOLD, result.medal)
         assertEquals(1, result.actions)
@@ -66,7 +66,7 @@ class TrockenerTeichTest {
 
     @Test
     fun `washing - three buckets of water poured onto the earth in the window wash it out, silver`() {
-        val (_, r) = solve("anspuelen", "wait 60\n" + "scoop 30 58 4 20\npour 52 40 2 30\n".repeat(3))
+        val (_, r) = solve("anspuelen", "wait 60\n" + "scoop 30 58 6 20\npour 52 40 1 30\n".repeat(3))
         val result = assertNotNull(r)
         assertEquals(Medal.SILVER, result.medal)
         assertEquals(6, result.actions)
@@ -74,7 +74,7 @@ class TrockenerTeichTest {
 
     @Test
     fun `channel - earth from the hill fills the hollow on the bank, its springs run over into the pond, silver`() {
-        val (_, r) = solve("rinne", "wait 60\nscoop 7 16 3 20\npour 202 86 2 30")
+        val (_, r) = solve("rinne", "wait 60\nscoop 7 16 3 20\npour 202 86 1 30")
         val result = assertNotNull(r)
         assertEquals(Medal.SILVER, result.medal)
         assertEquals(2, result.actions)
@@ -82,7 +82,7 @@ class TrockenerTeichTest {
 
     @Test
     fun `carrying - the bucket from the pool to the pond, sixteen times, bronze`() {
-        val (_, r) = solve("tragen", "wait 30\n" + "scoop 30 58 4 20\npour 172 95 4 30\n".repeat(16))
+        val (_, r) = solve("tragen", "wait 30\n" + "scoop 30 58 6 20\npour 172 95 3 30\n".repeat(16))
         val result = assertNotNull(r)
         assertEquals(Medal.BRONZE, result.medal)
         assertTrue(result.actions > 20, "${result.actions} actions")
@@ -98,7 +98,7 @@ class TrockenerTeichTest {
 
     @Test
     fun `water on the embers puts them out, then the branch does not catch`() {
-        val (play, r) = solve("glut_geloescht", "wait 60\nscoop 30 58 4 20\npour 77 69 2 30\nwait 120\nhand 91 72\nhand 77 68", limit = 60)
+        val (play, r) = solve("glut_geloescht", "wait 60\nscoop 30 58 6 20\npour 77 69 1 30\nwait 120\nhand 91 72\nhand 77 68", limit = 60)
         assertNull(r)
         assertEquals(0, count(play, "ember", 74, 67, 82, 71), "no embers left")
         assertTrue(count(play, "charcoal", 74, 67, 82, 71) > 0, "only charcoal")

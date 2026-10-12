@@ -1,0 +1,18 @@
+{
+  "id": "signalfeuer",
+  "name": "Signalfeuer",
+  "area": "Vulkan",
+  "tier": "Kernniveau",
+  "seed": 202,
+  "ambient": -0.5,
+  "tools": {"bucket": true, "bucket_size": 30, "hand": false},
+  "heat": [ {"area": [[120, 4], [170, 4], [170, 40], [120, 40]], "temp": -0.5} ],
+  "goals": [
+    {"type": "ignite", "text": "Entzünde den Holzstoß auf dem Gipfel", "area": [[133, 10], [159, 10], [159, 24], [133, 24]], "amount": 10, "hold": 2}
+  ],
+  "rating": {
+    "gold": {"seconds": 90, "actions": 8},
+    "silver": {"seconds": 180, "actions": 14},
+    "bronze": {"seconds": 300, "actions": 30}
+  }
+}

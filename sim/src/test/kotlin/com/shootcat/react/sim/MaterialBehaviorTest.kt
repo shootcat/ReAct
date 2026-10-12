@@ -139,6 +139,23 @@ class MaterialBehaviorTest {
     }
 
     @Test
+    fun `magma keeps its heat, lava over it stays liquid, without it the lava sets`() {
+        fun lake(magma: Boolean): Lab {
+            val lab = Lab()
+            lab.rect("rock", 2, 40, 61, 61)
+            lab.rect("lava", 20, 40, 43, 47, 1250f)
+            if (magma) lab.rect("magma", 20, 48, 43, 51)
+            lab.seconds(60f)
+            return lab
+        }
+        val fed = lake(magma = true)
+        assertTrue(fed.count("lava") > 150, "over magma the lake stays liquid: ${fed.count("lava")} of 192")
+        assertEquals(1250f, fed.temp(30, 50), "the magma has not cooled")
+        val cut = lake(magma = false)
+        assertTrue(cut.count("lava") < 20, "without it the lake sets: ${cut.count("lava")} left")
+    }
+
+    @Test
     fun `metal carries heat much further than stone`() {
         fun far(name: String): Float {
             val lab = Lab()

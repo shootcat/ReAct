@@ -144,6 +144,7 @@ Die Einheiten stehen in der Datei.
 | Grubengas | Gas | leichter als Luft, sammelt sich unter Decken, kaum sichtbar, zündet als ganze Wolke an Feuer oder Glut |
 | Gasspalte | Gelände | gibt in Minen ab und zu Grubengas ab |
 | Quelle | Gelände | gibt Wasser ab, solange sie frei liegt; unter Wasser oder Erde ruht sie |
+| Magma | Gelände | die Hitze aus der Tiefe: hält ihre 1250 °C, Lava darüber bleibt flüssig |
 | Glut | entsteht | glimmt auf Asche minutenlang weiter und zündet, was darauf liegt; Wasser löscht sie zu Holzkohle |
 | Asche, Holzkohle | entstehen | schwimmen; Holzkohle glüht lange ohne Flamme |
 | Gras | Erde mit Gras | wächst im Licht auf feuchte Erde daneben, hält Erde zusammen, brennt gut, stirbt an Salz und Hitze zu Erde |

@@ -13,7 +13,7 @@
       "lifetime": "Rauch verfliegt nach oben aus der Welt; im geschlossenen Raum hält er sich lange, so erstickt dort das Feuer",
       "salt_melt_temp": "Schmelzpunkt, solange Salziges (Salz, Salzwasser) daneben liegt: Salz lässt Eis und Schnee ohne Wärme schmelzen",
       "structure": "shock_product, shock_rate: spröde Stoffe springen, wenn ein abschreckender Nachbar (quenches: Wasser, Eis, Schnee) ihnen mehr als shock_rate Grad pro Schritt entzieht; permeable: Wahrscheinlichkeit pro Schritt, dass Wasser durch die Körnung hindurchfließt; avalanche: rutscht am Hang ab, wenn erwärmt oder erschüttert; compact_product, compact_load: wird unter so viel Last (Summe Dichte/1000 der Zellen darüber) dazu verdichtet",
-      "pressure": "strength: Druck, dem eine Wand standhält (Vielfaches des Luftdrucks; ohne Angabe fest 5, Pulver und Flüssigkeit 2.5, am Boden eines Hohlraums gar nicht, Fels nie), break_product: was beim Bersten daraus wird; expansion: Gasmenge einer Zelle (Dampf ist stark ausgedehntes Wasser); explosive: entzündet sich bei ignite_temp, an Feuer oder Glut schlagartig; emits, emit_rate: tritt aus (Wahrscheinlichkeit pro Zufallstick)",
+      "pressure": "strength: Druck, dem eine Wand standhält (Vielfaches des Luftdrucks; ohne Angabe fest 5, Pulver und Flüssigkeit 2.5, am Boden eines Hohlraums gar nicht, Fels nie), break_product: was beim Bersten daraus wird; expansion: Gasmenge einer Zelle (Dampf ist stark ausgedehntes Wasser); explosive: entzündet sich bei ignite_temp, an Feuer oder Glut schlagartig; emits, emit_rate: tritt aus (Wahrscheinlichkeit pro Zufallstick); holds_temp: Gelände, das seine Temperatur (temp) hält, die Hitze aus der Tiefe unter der Welt",
       "pattern": "Darstellung fester Stoffe: planks, brick, masonry, sheen, pores (Basalt); speckle_color und speckle für Einschlüsse (Erz)",
       "light": "emits_light und light_pass 0 bis 1: eigenes Licht; Anteil des Lichts, den eine Zelle durchlässt (ohne Angabe 0 bei blocks_light, sonst 1)",
       "store": "split_into, split_yield: was ein gegriffenes Objekt im Lager ergibt (ein Stamm 3 Bretter je Zelle)",
@@ -68,6 +68,16 @@
       "dissolves_in": null, "dissolved_product": null,
       "bucketable": false, "grabbable": false, "emits_light": 0, "blocks_light": true,
       "color": "#4b6470", "color_variance": 0.16, "speckle_color": "#8cc4e6", "speckle": 0.3, "cost": 0
+    },
+    {
+      "id": "magma", "name": "Magma", "kind": "static", "density": 2800, "anchored": true,
+      "flammable": false,
+      "wet_blocks_burning": false, "absorbs": 0,
+      "conductivity": 0.35, "heat_capacity": 2.0, "hardness": 1.0, "erodes_in_water": false,
+      "dissolves_in": null, "dissolved_product": null,
+      "temp": 1250, "holds_temp": true,
+      "bucketable": false, "grabbable": false, "emits_light": 0.7, "blocks_light": true,
+      "color": "#9c3416", "color_variance": 0.18, "speckle_color": "#ffb04a", "speckle": 0.3, "cost": 0
     },
     {
       "id": "stone", "name": "Stein", "kind": "solid", "density": 2600, "anchored": false,

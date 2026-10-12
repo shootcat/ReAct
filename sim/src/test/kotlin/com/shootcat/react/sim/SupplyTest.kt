@@ -93,6 +93,16 @@ class SupplyTest {
     }
 
     @Test
+    fun `what the bucket holds comes to the temperature of the air of this world`() {
+        val s = session { w, _ -> w.setAmbient(-10f) }
+        s.fill("sand", 2, 56, 20, 61, 0f)
+        s.tap(10, 58, Session.SCOOP, 3)
+        assertTrue(s.bucketAmount > 10)
+        s.run(240f)
+        assertTrue(s.bucketTemp < -5f, "on a frosty mountain the sand in the bucket freezes: ${s.bucketTemp}")
+    }
+
+    @Test
     fun `the hand picks up a loose object and puts it down elsewhere, where it falls`() {
         val s = session { _, _ -> }
         s.fill("trunk", 10, 59, 25, 61)

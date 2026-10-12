@@ -6,6 +6,7 @@ Hier liegen die Skripte, die die Bilder der Level gemalt haben. Sie brauchen Pyt
 
 ```bash
 python3 tools/levels/trockener_teich.py               # Level 1
+python3 tools/levels/signalfeuer.py                   # Level 2
 python3 tools/levels/trockener_teich.py 40 30 100 80  # dazu ein Ausschnitt als Text
 ```
 

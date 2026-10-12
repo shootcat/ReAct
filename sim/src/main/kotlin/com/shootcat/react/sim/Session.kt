@@ -415,7 +415,7 @@ class Session(
 
     /** The bucket and what the hand holds come slowly to the temperature of the surroundings. */
     private fun cool() {
-        val a = materials.ambient
+        val a = world.ambient
         if (bucketAmount > 0) bucketTemp += (a - bucketTemp) * CARRY_COOLING
         val h = held ?: return
         // the object itself never changes: a cooled copy takes its place

@@ -10,6 +10,7 @@ import com.shootcat.react.sim.Session
  * ```
  * wait 120                  # let 120 steps pass
  * scoop 120 80 3 20         # the bucket at (120, 80), radius 3, the finger held down for 20 steps
+ *                           # (the radii of the app's brush: 0, 1, 3, 6, 10)
  * pour 60 40 3 20
  * hand 50 60                # pick up there, or put down what the hand holds
  * store                     # what the hand holds goes into the store

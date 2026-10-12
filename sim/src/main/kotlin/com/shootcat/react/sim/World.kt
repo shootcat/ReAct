@@ -509,6 +509,8 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         val pb = materials.pairB
         val ra = materials.riseA
         val rb = materials.riseB
+        val holds = materials.holdsTemp
+        val spawn = materials.spawnTemp
         val n = materials.count
         for (cy in 0 until chunksY) {
             for (cx in 0 until chunksX) {
@@ -593,6 +595,10 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
                             } else {
                                 tp[i] = ambient
                             }
+                        } else if (holds[ma]) {
+                            // fed from the deep: what it gave off is made up at once
+                            if (tp[i] != spawn[ma]) hot = true
+                            tp[i] = spawn[ma]
                         }
                         i++
                     }
