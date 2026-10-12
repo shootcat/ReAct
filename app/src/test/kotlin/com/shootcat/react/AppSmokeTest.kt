@@ -311,7 +311,7 @@ class AppSmokeTest {
     /** A tab of the bar; if it is missing, the failure shows everything on the screen. */
     private fun category(name: String): SemanticsNodeInteraction {
         if (compose.onAllNodesWithTag("category_$name").fetchSemanticsNodes().isEmpty()) {
-            throw AssertionError("Reiter $name fehlt. Auf dem Bildschirm:\n" + compose.onAllNodes(isRoot()).printToString())
+            throw AssertionError("Reiter $name fehlt. Auf dem Bildschirm:\n" + compose.onAllNodes(isRoot()).printToString(Int.MAX_VALUE))
         }
         return compose.onNodeWithTag("category_$name")
     }
