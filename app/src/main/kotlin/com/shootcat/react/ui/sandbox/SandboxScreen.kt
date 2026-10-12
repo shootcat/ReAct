@@ -81,6 +81,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.shootcat.react.audio.SoundManager
 import com.shootcat.react.data.Settings
+import com.shootcat.react.level.Play
+import com.shootcat.react.level.Result
+import com.shootcat.react.level.Tools
 import com.shootcat.react.sim.Benchmark
 import com.shootcat.react.sim.Discoveries
 import com.shootcat.react.sim.Event
@@ -131,6 +134,9 @@ enum class BuildMode { BRUSH, LINE, RECT, FRAME }
 /**
  * The free sandbox (Leitfaden V3, Phase 1 and 4.7): the world drawn as scaled-up pixels, painting with one
  * finger, zoom and pan with two, pause / normal / fast, undo per stroke, reset, and the bar of materials.
+ *
+ * With a [level] the same screen plays that level (Phase 3): only its tools, its goals over the world, the
+ * time and the actions, and the medal at the end.
  */
 @Composable
 fun SandboxScreen(
@@ -148,6 +154,7 @@ fun SandboxScreen(
     onDiscovered: (List<Discoveries.Entry>) -> Unit,
     onNewWorld: (Template, WorldSize) -> Unit,
     onBack: () -> Unit,
+    level: LevelMode? = null,
 ) {
     var speed by remember(runner) { mutableStateOf(runner.speed) }
     var newWorld by remember { mutableStateOf(false) }
@@ -189,6 +196,37 @@ fun SandboxScreen(
         }
     }
 
+    /** The end of the level, once it comes: the result (solved) or the goal that was not kept (lost). */
+    var solved by remember { mutableStateOf<Result?>(null) }
+    var lost by remember { mutableStateOf<String?>(null) }
+    if (level != null) {
+        LaunchedEffect(level.play) {
+            var seen: Any? = null
+            while (true) {
+                delay(120)
+                val play = level.play
+                when (play.state) {
+                    Play.State.WON -> {
+                        val r = play.result
+                        if (r != null && r !== seen) {
+                            seen = r
+                            level.onSolved(r)
+                            sound.play("success", 0.8f)
+                            solved = r
+                        }
+                    }
+                    Play.State.LOST -> if (seen !== Play.State.LOST) {
+                        seen = Play.State.LOST
+                        lost = play.goals.firstOrNull { it.guards && !it.met(play.session.world) }?.text
+                            ?: play.goals.firstOrNull { it.guards }?.text ?: ""
+                        sound.play("crumble", 0.8f)
+                    }
+                    Play.State.PLAYING -> if (seen === Play.State.LOST) seen = null
+                }
+            }
+        }
+    }
+
     fun measure() {
         menu = false
         measuring = true
@@ -209,8 +247,13 @@ fun SandboxScreen(
         }
     }
 
-    // procuring: only the tools and what is in store (Leitfaden V3, 4.3)
-    val categories = if (stats.supply == Session.Supply.PROCURE) listOf(TOOLS to emptyList(), STORE to emptyList()) else CATEGORIES
+    // procuring: only the tools and what is in store (Leitfaden V3, 4.3); a level: only its tools
+    val tools = level?.play?.tools
+    val categories = when {
+        tools != null -> if (tools.build) listOf(TOOLS to emptyList(), STORE to emptyList()) else listOf(TOOLS to emptyList())
+        stats.supply == Session.Supply.PROCURE -> listOf(TOOLS to emptyList(), STORE to emptyList())
+        else -> CATEGORIES
+    }
     var chosen by rememberSaveable {
         mutableStateOf(if (tool <= Session.SCOOP) TOOLS else CATEGORIES.firstOrNull { (_, ids) -> ids.any { materials.idOrNull(it) == tool } }?.first ?: "Lose")
     }
@@ -219,7 +262,58 @@ fun SandboxScreen(
     fun fold(on: Boolean) = onSettings(settings.copy(barFolded = on))
 
     @Composable
+    fun levelHeader(level: LevelMode, modifier: Modifier) {
+        val spec = level.play.level.spec
+        TopBar(
+            title = spec.name,
+            overline = "${spec.area} · ${spec.tier}",
+            onBack = onBack,
+            modifier = modifier,
+        ) {
+            RoundIconButton(Glyph.UNDO, "Rückgängig", { runner.post { it.undo() } }, size = 44.dp, enabled = stats.canUndo)
+            RoundIconButton(Glyph.RESET, "Neu beginnen", level.onRestart, size = 44.dp)
+            Box {
+                RoundIconButton(Glyph.GEAR, "Menü", { menu = true }, size = 44.dp)
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, containerColor = Palette.surfaceHigh) {
+                    DropdownMenuItem(
+                        text = { Text("Entdeckungsbuch", color = Palette.text) },
+                        onClick = {
+                            menu = false
+                            onOpenBook()
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(if (settings.performance) "Leistungsanzeige aus" else "Leistungsanzeige an", color = Palette.text) },
+                        onClick = {
+                            menu = false
+                            onSettings(settings.copy(performance = !settings.performance))
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Einstellungen", color = Palette.text) },
+                        onClick = {
+                            menu = false
+                            onOpenSettings()
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Zur Levelauswahl", color = Palette.text) },
+                        onClick = {
+                            menu = false
+                            onBack()
+                        },
+                    )
+                }
+            }
+        }
+    }
+
+    @Composable
     fun header(modifier: Modifier) {
+        if (level != null) {
+            levelHeader(level, modifier)
+            return
+        }
         TopBar(
             title = "Spielplatz",
             overline = if (stats.supply == Session.Supply.PROCURE) "Nur Beschaffen · Eimer ${stats.bucketAmount}/${stats.bucketSize}" else "Kosten ${stats.cost} · Vorrat ∞",
@@ -282,11 +376,13 @@ fun SandboxScreen(
         }
     }
 
+    /** The world; with [hud] the goal of the level lies over it (landscape with the column folded away). */
     @Composable
-    fun world(modifier: Modifier) {
+    fun world(modifier: Modifier, hud: Boolean = false) {
         Box(modifier) {
             val radius = if (settings.brush in BRUSHES) settings.brush else 3
-            WorldView(runner, tool, radius, mode, materials, sound, stats.held, Modifier.fillMaxSize())
+            WorldView(runner, tool, radius, mode, materials, sound, stats.held, Modifier.fillMaxSize(), level?.play?.level?.spec?.goals?.map { it.area } ?: emptyList())
+            if (level != null && hud) LevelHud(level.play, stats, Modifier.align(Alignment.TopStart).padding(8.dp).width(300.dp))
             if (settings.performance) PerformanceOverlay(stats, Modifier.align(Alignment.TopStart).padding(8.dp))
             notice?.let { NoticeBanner(it, Modifier.align(Alignment.TopCenter).padding(top = 40.dp, start = 16.dp, end = 16.dp)) }
             // speed and the shape of the brush, small, in a corner of the world (4a.5)
@@ -308,7 +404,7 @@ fun SandboxScreen(
     @Composable
     fun bar() {
         when (categories[category].first) {
-            TOOLS -> ToolBar(materials, stats, tool, onTool) { runner.post { it.store() } }
+            TOOLS -> ToolBar(materials, stats, tool, onTool, tools) { runner.post { it.store() } }
             STORE -> StoreBar(materials, stats, tool, onTool)
             else -> MaterialBar(materials, categories[category].second, tool, onTool)
         }
@@ -318,13 +414,14 @@ fun SandboxScreen(
         if (maxWidth > maxHeight) {
             // landscape: the world as large as it gets, the controls in a column beside it
             Row(Modifier.fillMaxSize()) {
-                world(Modifier.weight(1f).fillMaxHeight())
+                world(Modifier.weight(1f).fillMaxHeight(), hud = folded)
                 Column(Modifier.width(if (folded) 64.dp else SIDE_PANEL).fillMaxHeight().background(Palette.background)) {
                     if (folded) {
                         FoldButton(folded = true, vertical = true, onClick = { fold(false) }, modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp))
                         CurrentTool(materials, tool, stats, Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp))
                     } else {
                         header(Modifier.padding(horizontal = 4.dp))
+                        if (level != null) LevelHud(level.play, stats, Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp))
                         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                             CategoryTabs(categories.map { it.first }, category, Modifier.weight(1f)) { chosen = categories[it].first }
                             FoldButton(folded = false, vertical = true, onClick = { fold(true) })
@@ -342,6 +439,7 @@ fun SandboxScreen(
             // portrait: the bar below the world, two rows at most when unfolded (4a.5)
             Column(Modifier.fillMaxSize()) {
                 header(Modifier.padding(horizontal = 8.dp))
+                if (level != null) LevelHud(level.play, stats, Modifier.fillMaxWidth().padding(horizontal = 8.dp).padding(bottom = 4.dp))
                 world(Modifier.weight(1f).fillMaxWidth())
                 Row(
                     Modifier.fillMaxWidth().padding(start = 12.dp, end = 8.dp, top = 4.dp),
@@ -358,6 +456,21 @@ fun SandboxScreen(
                 if (!folded) bar() else Spacer(Modifier.height(6.dp))
             }
         }
+    }
+
+    if (level != null && (solved != null || lost != null)) {
+        LevelEndDialog(
+            result = solved,
+            lostGoal = lost,
+            hasNext = level.hasNext,
+            onLook = {
+                solved = null
+                lost = null
+            },
+            onRestart = level.onRestart,
+            onNext = level.onNext,
+            onLevels = level.onLevels,
+        )
     }
 
     if (newWorld) {
@@ -419,6 +532,7 @@ private fun WorldView(
     sound: SoundManager,
     held: Session.Held?,
     modifier: Modifier,
+    goalAreas: List<List<List<Int>>> = emptyList(),
 ) {
     val w = runner.width
     val h = runner.height
@@ -673,6 +787,7 @@ private fun WorldView(
         drawImage(hazeImage, dstOffset = dstOffset, dstSize = dstSize, filterQuality = FilterQuality.Low)
         drawImage(flameImage, dstOffset = dstOffset, dstSize = dstSize, filterQuality = FilterQuality.Low)
         drawImage(lightImage, dstOffset = dstOffset, dstSize = dstSize, filterQuality = FilterQuality.Low)
+        if (goalAreas.isNotEmpty()) drawGoalAreas(goalAreas, o, s)
         preview?.let { (a, b) -> drawPreview(a, b, mode, radius, tool, materials, o, s) }
         val h = held
         handAt?.let { (x, y) -> if (h != null) drawHeld(h, x, y, materials, o, s) }
@@ -706,7 +821,7 @@ private fun NoticeBanner(text: String, modifier: Modifier) {
 
 /** Bucket and hand (Leitfaden V3, 4.3), with what they hold; and the button that puts a held object into store. */
 @Composable
-private fun ToolBar(materials: MaterialTable, stats: SimRunner.Stats, tool: Int, onTool: (Int) -> Unit, onStore: () -> Unit) {
+private fun ToolBar(materials: MaterialTable, stats: SimRunner.Stats, tool: Int, onTool: (Int) -> Unit, tools: Tools?, onStore: () -> Unit) {
     CompositionLocalProvider(LocalOverscrollFactory provides null) {
         Row(
             Modifier
@@ -718,14 +833,19 @@ private fun ToolBar(materials: MaterialTable, stats: SimRunner.Stats, tool: Int,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.Top,
         ) {
-            val bucket = if (stats.bucketAmount > 0) "${materials.spec(stats.bucketMaterial).name} ${stats.bucketAmount}" else "leer"
-            MaterialChip("Schöpfen", bucket, tool == Session.SCOOP, { onTool(Session.SCOOP) }) { BucketIcon(stats, materials, false) }
-            MaterialChip("Gießen", "${stats.bucketAmount}/${stats.bucketSize}", tool == Session.POUR, { onTool(Session.POUR) }) { BucketIcon(stats, materials, true) }
-            val held = stats.held
-            MaterialChip("Hand", if (held != null) "${materials.spec(held.main).name} ${held.size}" else "leer", tool == Session.HAND, { onTool(Session.HAND) }) {
-                HandIcon(if (held != null) Color(materials.color[held.main]) else null)
+            // a level gives only its own tools (Leitfaden V3, 5.1)
+            if (tools == null || tools.bucket) {
+                val bucket = if (stats.bucketAmount > 0) "${materials.spec(stats.bucketMaterial).name} ${stats.bucketAmount}" else "leer"
+                MaterialChip("Schöpfen", bucket, tool == Session.SCOOP, { onTool(Session.SCOOP) }) { BucketIcon(stats, materials, false) }
+                MaterialChip("Gießen", "${stats.bucketAmount}/${stats.bucketSize}", tool == Session.POUR, { onTool(Session.POUR) }) { BucketIcon(stats, materials, true) }
             }
-            if (held != null) {
+            val held = stats.held
+            if (tools == null || tools.hand) {
+                MaterialChip("Hand", if (held != null) "${materials.spec(held.main).name} ${held.size}" else "leer", tool == Session.HAND, { onTool(Session.HAND) }) {
+                    HandIcon(if (held != null) Color(materials.color[held.main]) else null)
+                }
+            }
+            if (held != null && (tools == null || tools.build)) {
                 val splits = materials.splitInto[held.main] != held.main
                 MaterialChip(if (splits) "Zu Brettern" else "Ins Lager", "aus der Hand", false, onStore) {
                     Swatch(materials.color[materials.splitInto[held.main]], 0.1f, held.main)

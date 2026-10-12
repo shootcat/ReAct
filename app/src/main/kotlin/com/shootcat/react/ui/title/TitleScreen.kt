@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
@@ -67,6 +68,7 @@ private const val TAU = (2 * PI).toFloat()
 fun TitleScreen(
     materials: MaterialTable,
     onPlay: () -> Unit,
+    onLevels: () -> Unit,
     onSettings: () -> Unit,
 ) {
     val transition = rememberInfiniteTransition(label = "title")
@@ -93,7 +95,7 @@ fun TitleScreen(
                     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                         Title()
                         Spacer(Modifier.height(24.dp))
-                        Buttons(onPlay, onSettings)
+                        Buttons(onPlay, onLevels, onSettings)
                     }
                 }
             } else {
@@ -106,7 +108,7 @@ fun TitleScreen(
                     Spacer(Modifier.height(20.dp))
                     Title()
                     Spacer(Modifier.weight(1.2f))
-                    Buttons(onPlay, onSettings)
+                    Buttons(onPlay, onLevels, onSettings)
                 }
             }
         }
@@ -128,8 +130,10 @@ private fun Title() {
 }
 
 @Composable
-private fun ColumnScope.Buttons(onPlay: () -> Unit, onSettings: () -> Unit) {
-    PillButton(Glyph.PLAY, "Spielplatz", onPlay, Modifier.fillMaxWidth(0.72f), primary = true)
+private fun ColumnScope.Buttons(onPlay: () -> Unit, onLevels: () -> Unit, onSettings: () -> Unit) {
+    PillButton(Glyph.MAP, "Level", onLevels, Modifier.fillMaxWidth(0.72f).testTag("levels"), primary = true)
+    Spacer(Modifier.height(12.dp))
+    PillButton(Glyph.PLAY, "Spielplatz", onPlay, Modifier.fillMaxWidth(0.72f))
     Spacer(Modifier.height(24.dp))
     RoundIconButton(Glyph.GEAR, "Einstellungen", onSettings, size = 56.dp)
     Spacer(Modifier.height(32.dp))

@@ -297,6 +297,82 @@ class AppSmokeTest {
     }
 
     /**
+     * The levels (Phase 3): the list, the first level solved with a single bucket out of the earth in the
+     * window (the pool runs out over the ledge into the pond), the medal, on to the second level, and back to
+     * the list with the medal on the first.
+     */
+    @Test
+    fun levelSolvedWithMedal(): Unit = ActivityScenario.launch(MainActivity::class.java).use {
+        compose.waitForIdle()
+        compose.onNodeWithTag("levels").performClick()
+        run(500)
+        shot("29_levelauswahl")
+        compose.onNodeWithTag("level_trockener_teich").performClick()
+        run(1500)
+        compose.onNodeWithTag("level_hud").assertExists()
+        shot("30_level1")
+        // the whole level on screen: zoomed out as far as it goes
+        compose.onNodeWithTag("world").performTouchInput { pinch(center, 0.2f) }
+        run(500)
+        // one bucket out of the earth in the window of the rock wall (brush 3, the bucket is the first tool)
+        compose.onNodeWithTag("world").performTouchInput {
+            down(levelCell(48, 45, 220, 140))
+            up()
+        }
+        run(300)
+        compose.onNodeWithTag("speed_Schnell").performClick()
+        var waited = 0
+        while (compose.onAllNodesWithTag("level_end").fetchSemanticsNodes().isEmpty() && waited < 120_000) {
+            run(500)
+            waited += 500
+        }
+        if (compose.onAllNodesWithTag("level_end").fetchSemanticsNodes().isEmpty()) {
+            shot("31_level1_nicht_geloest")
+            throw AssertionError("Level 1 nicht gelöst. Auf dem Bildschirm:\n" + compose.onAllNodes(isRoot()).printToString(Int.MAX_VALUE))
+        }
+        shot("31_level1_medaille", compose.onNodeWithTag("level_end"))
+        File("build/screenshots/level1_medaille.txt").writeText(
+            compose.onNodeWithTag("medal").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)?.joinToString { it.text } ?: "",
+        )
+        compose.onNodeWithTag("level_next").performClick()
+        run(1500)
+        shot("32_level2")
+        compose.onNodeWithTag("back").performClick()
+        run(500)
+        compose.onNodeWithTag("level_list").assertExists()
+        shot("33_auswahl_mit_medaille")
+    }
+
+    /** A level in landscape: the goal beside the world; the bucket cannot reach the deep chamber behind the ice. */
+    @Test
+    @Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xxhdpi")
+    fun levelInLandscapeOutOfReach(): Unit = ActivityScenario.launch(MainActivity::class.java).use {
+        compose.waitForIdle()
+        compose.onNodeWithTag("levels").performClick()
+        run(500)
+        compose.onNodeWithTag("level_tiefe_schmelze").performScrollTo().performClick()
+        run(1500)
+        compose.onNodeWithTag("world").performTouchInput {
+            down(levelCell(100, 136, 190, 160))
+            up()
+        }
+        run(700)
+        compose.onNodeWithTag("notice").assertExists()
+        shot("34_level3_quer_nicht_erreichbar")
+    }
+
+    /**
+     * The screen position of cell (x, y) of a level of [w] × [h] cells, with the whole level on screen
+     * (zoomed out as far as it goes, or small enough to fit): centred, as large as the view allows.
+     */
+    private fun TouchInjectionScope.levelCell(x: Int, y: Int, w: Int, h: Int): Offset {
+        val s = minOf(width / w.toFloat(), height / h.toFloat())
+        val ox = (width - w * s) / 2f
+        val oy = (height - h * s) / 2f
+        return Offset(ox + (x + 0.5f) * s, oy + (y + 0.5f) * s)
+    }
+
+    /**
      * The folded bar and the landscape of a new world are kept for the next start; a test that changes them
      * puts them back, so the next test begins with the meadow and the open bar whatever ran before it.
      */

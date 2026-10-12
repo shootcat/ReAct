@@ -77,6 +77,8 @@ Im Level reichen Eimer und Hand nur an das, was zum Himmel offen ist: an Luft, G
 
 Die Bilder der Lösungswege liegen unter `docs/phase3/`, die Malskripte unter `tools/levels/`.
 
+In der App führt **Level** im Startbildschirm zur Auswahl. Sie zeigt jedes Level als Bild, mit Gebiet, Niveau, Ziel, Werkzeugen und der besten Medaille mit Zeit und Handgriffen. Alle Level sind offen. Im Level gibt es nur seine Werkzeuge. Über der Welt stehen das Ziel mit Fortschrittsbalken, die Zeit, die Handgriffe und die drei Medaillengrenzen; eine Grenze, die schon überschritten ist, wird blass. Der Zielbereich ist gestrichelt auf der Welt eingezeichnet. Rückgängig nimmt Zeit und Handgriffe mit zurück, „Neu beginnen“ startet das Level frisch. Ist das Ziel zwei Sekunden lang erfüllt, erscheint die Medaille mit „Nochmal“, „Nächstes“ und „Ansehen“. Das beste Ergebnis jedes Levels wird gespeichert.
+
 ## Simulation (`sim/`)
 
 Das Modul ist reines Kotlin ohne Android. Es läuft identisch in den Tests auf dem Rechner und in der App.
@@ -195,12 +197,13 @@ level/                      Level (Phase 3), reines Kotlin auf sim/
   resources/levels/         index.json und ein Ordner je Level
 tools/levels/               Python-Skripte, die den Boden der Level malen (PIL)
 app/                        Android-App (Kotlin, Jetpack Compose)
-  ui/sandbox/               Spielplatz: Weltansicht, Gesten, Leiste, Tempo, Messung
+  ui/sandbox/               Spielplatz: Weltansicht, Gesten, Leiste, Tempo, Messung; LevelHud.kt: Ziel, Zeit, Griffe, Medaille
+  ui/level/                 Levelauswahl
   ui/title/                 Startbildschirm mit kleiner echter Simulation
   ui/book/                  Entdeckungsbuch
   ui/settings/              Einstellungen
   audio/SoundManager.kt     Effekte (SoundPool) und Musik (MediaPlayer)
-  data/                     Einstellungen, Fortschritt
+  data/                     Einstellungen, Fortschritt (Entdeckungen, beste Medaille je Level)
 docs/PHASE1.md              Bericht zu Phase 1: Zusammenfassung, Abweichungen, Messwerte
 docs/PHASE2.md              Bericht zu Phase 1b und 2 (bis 2d): Zusammenfassung, Abweichungen, Messwerte
 docs/ELEMENTE.md            Vorschläge, die noch nicht umgesetzt sind (Schwarzpulver)
