@@ -118,6 +118,18 @@ data class MaterialSpec(
     @SerialName("heat_capacity") val heatCapacity: Float,
     val hardness: Float = 0f,
     @SerialName("erodes_in_water") val erodesInWater: Boolean = false,
+    /** A brittle material cracks into this when a quenching neighbour cools it by more than [shockRate] degrees in one step. */
+    @SerialName("shock_product") val shockProduct: String? = null,
+    @SerialName("shock_rate") val shockRate: Float = 0f,
+    /** Cools so suddenly that brittle material cracks (water, ice, snow). */
+    val quenches: Boolean = false,
+    /** Chance per step that water flows through a grain of it (gravel); 0: it holds water back. */
+    val permeable: Float = 0f,
+    /** Slides off a slope as an avalanche when warmed or shaken (snow). */
+    val avalanche: Boolean = false,
+    /** Pressed into this under a load of [compactLoad] (density / 1000 summed over the cells above). */
+    @SerialName("compact_product") val compactProduct: String? = null,
+    @SerialName("compact_load") val compactLoad: Float = 0f,
     val absorbs: Float = 0f,
     /** A liquid that soaks into absorbent material and makes it wet. */
     val wets: Boolean = false,
@@ -287,6 +299,13 @@ class MaterialTable(val specs: List<MaterialSpec>, val ambient: Float) {
     val diesInSalt = BooleanArray(count) { specs[it].diesInSalt }
     val deathProduct = IntArray(count) { ref(specs[it].deathProduct, AIR) }
     val roots = BooleanArray(count) { specs[it].roots }
+    val shockProduct = IntArray(count) { ref(specs[it].shockProduct, -1) }
+    val shockRate = FloatArray(count) { specs[it].shockRate }
+    val quenches = BooleanArray(count) { specs[it].quenches }
+    val permeable = FloatArray(count) { specs[it].permeable }
+    val avalanche = BooleanArray(count) { specs[it].avalanche }
+    val compactProduct = IntArray(count) { ref(specs[it].compactProduct, -1) }
+    val compactLoad = FloatArray(count) { specs[it].compactLoad }
 
     /** Solid parts of plants (trunk, leaves, vine, dead wood): they form structures of their own, apart from built ones. */
     val plant = BooleanArray(count) { kind[it] == Kind.SOLID && ((organism[it] != Organism.NONE && !animal[it]) || roots[it]) }
@@ -312,7 +331,7 @@ class MaterialTable(val specs: List<MaterialSpec>, val ambient: Float) {
     val inert = BooleanArray(count) {
         (kind[it] == Kind.STATIC || kind[it] == Kind.SOLID) && !flammable[it] && organism[it] == Organism.NONE &&
             meltTemp[it] == Float.MAX_VALUE && boilTemp[it] == Float.MAX_VALUE && freezeTemp[it] == -Float.MAX_VALUE &&
-            lifetimeSteps[it] == 0 && dissolvesIn[it] < 0
+            lifetimeSteps[it] == 0 && dissolvesIn[it] < 0 && shockProduct[it] < 0
     }
 
     /**
@@ -350,7 +369,7 @@ class MaterialTable(val specs: List<MaterialSpec>, val ambient: Float) {
         for (s in specs) {
             listOfNotNull(
                 s.burnProduct, s.quenchProduct, s.meltProduct, s.boilProduct, s.boilResidue, s.freezeProduct, s.decayProduct,
-                s.dissolvedProduct, s.dissolvesIn, s.deathProduct, s.growsOn, s.livesIn, s.splitInto,
+                s.dissolvedProduct, s.dissolvesIn, s.deathProduct, s.growsOn, s.livesIn, s.splitInto, s.shockProduct, s.compactProduct,
             )
                 .forEach { require(it in index) { "${s.id} refers to unknown material '$it'" } }
             if (s.flammable) require(s.igniteTemp != null && s.burnTime != null) { "${s.id} burns but has no ignite_temp or burn_time" }

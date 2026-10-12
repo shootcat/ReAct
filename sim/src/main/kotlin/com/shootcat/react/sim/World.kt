@@ -70,12 +70,16 @@ object Seen {
     const val CONDUCT = 25
     const val SHINE = 26
     const val WET_NO_FIRE = 27
-    const val COUNT = 28
+    const val CRACK = 28
+    const val PERMEATE = 29
+    const val COMPACT = 30
+    const val AVALANCHE = 31
+    const val COUNT = 32
 
     val NAMES = listOf(
         "ignite", "burn_out", "douse", "suffocate", "char", "melt", "salt_melt", "boil", "residue", "set", "condense",
         "dissolve", "soak", "erode", "seep", "grow", "die_heat", "die_salt", "die_dry", "flee", "dig", "fall",
-        "hold_heat", "glow", "float", "conduct", "shine", "wet_no_fire",
+        "hold_heat", "glow", "float", "conduct", "shine", "wet_no_fire", "crack", "permeate", "compact", "avalanche",
     )
 
     fun parse(name: String): Int = NAMES.indexOf(name).also { require(it >= 0) { "unknown observation '$name'" } }
@@ -153,6 +157,10 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     private val smokeId = materials.idOrNull("smoke") ?: AIR
     private val steamId = materials.idOrNull("steam") ?: AIR
     private val deadPlantId = materials.idOrNull("dead_plant") ?: AIR
+    private val waterId = materials.idOrNull("water") ?: AIR
+
+    /** How readily ground takes in fresh water: absorbent soil soaks it up, permeable gravel lets it into its pores. */
+    private val takesWater = FloatArray(materials.count) { maxOf(materials.absorbs[it], materials.permeable[it]) }
     private val plantOf = materials.plant
     private val softOf = materials.soft
 
@@ -649,6 +657,13 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         // salt dissolves in water and turns it salty
         if (mt.dissolvesIn[m] >= 0 && dissolve(x, y, i, m)) return
 
+        // brittle material cracks when water, ice or snow cools it suddenly (4a.2)
+        if (mt.shockProduct[m] >= 0 && temp[i] > SHOCK_FROM && shocked(x, y, i, m)) {
+            note(Seen.CRACK, m)
+            change(x, y, i, mt.shockProduct[m])
+            return
+        }
+
         // phase changes, all at temperature thresholds; salt next to ice or snow lowers its melting point
         val t = temp[i]
         val byHeat = t >= mt.meltTemp[m]
@@ -670,8 +685,9 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             wakeHeat(x, y)
         }
 
-        // wet soil loosened by worms lets the water seep on down
+        // wet soil loosened by worms lets the water seep on down; water runs through gravel
         if (f and SEEPING == SEEPING && mt.kind[m] == Kind.POWDER && mt.absorbs[m] > 0f) seep(x, y, i)
+        if (f and Flag.WET != 0 && mt.permeable[m] > 0f && flags[i].toInt() and Flag.WET != 0) percolate(x, y, i, m)
 
         // smoke thins out
         if (mt.lifetimeSteps[m] > 0) {
@@ -1043,6 +1059,14 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         if (fall(x, y, i, m)) return
         if ((flags[i].toInt() and Flag.VEL_MASK) != 0) setVelocity(i, 0)
         if (y >= height - 1) return
+        if (materials.avalanche[m]) {
+            // snow that has taken up some melting heat comes loose
+            if (flags[i].toInt() and Flag.MARK == 0 && life[i] > AVALANCHE_WARM) loosen(i, x, y)
+            if (flags[i].toInt() and Flag.MARK != 0) {
+                avalanche(x, y, i, m)
+                return
+            }
+        }
         val fr = if (flags[i].toInt() and Flag.WET != 0) materials.wetFriction[m] else materials.friction[m]
         if (chance(fr)) return
         // roots hold the soil, wet or dry; turf holds itself
@@ -1061,6 +1085,127 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         if (!yields(m, mat[j].toInt())) return false
         swap(i, j, x, y, nx, y + 1)
         return true
+    }
+
+    /** A quenching neighbour (water, ice, snow) takes more heat out of cell [i] in one step than it can bear. */
+    private fun shocked(x: Int, y: Int, i: Int, m: Int): Boolean {
+        val w = width
+        val n = materials.count
+        val t = temp[i]
+        val limit = materials.shockRate[m]
+        val q = materials.quenches
+        val pa = materials.pairA
+        fun quench(j: Int): Boolean {
+            val o = mat[j].toInt()
+            return q[o] && pa[m * n + o] * (t - temp[j]) > limit
+        }
+        return (x > 0 && quench(i - 1)) || (x < w - 1 && quench(i + 1)) || (y > 0 && quench(i - w)) || (y < height - 1 && quench(i + w))
+    }
+
+    /**
+     * Water in the pores of permeable grains (gravel, glass shards; [Flag.WET] holds one cell of water) runs
+     * on (4a.3): out into the open below or beside, else on into dry grains below or beside. So water seeps
+     * through a bed of gravel into a cave below it, or through a dam to its foot on the other side. Sand,
+     * earth and mud are not permeable: they stay on top, so gravel filters.
+     */
+    private fun percolate(x: Int, y: Int, i: Int, m: Int) {
+        val w = width
+        val pm = materials.permeable
+        val d = if (coin()) 1 else -1
+        var to = -1
+        var out = false
+        val down = if (y < height - 1) i + w else -1
+        val a = if (x + d in 0 until w) i + d else -1
+        val b = if (x - d in 0 until w) i - d else -1
+        for (j in intArrayOf(down, a, b)) if (j >= 0 && open(j)) {
+            to = j
+            out = true
+            break
+        }
+        if (to < 0) for (j in intArrayOf(down, a, b)) {
+            if (j >= 0 && pm[mat[j].toInt()] > 0f && flags[j].toInt() and Flag.WET == 0) {
+                to = j
+                break
+            }
+        }
+        if (to < 0) return
+        wake(x, y)
+        if (!chance(pm[m])) return
+        flags[i] = (flags[i].toInt() and Flag.WET.inv()).toByte()
+        val tx = to % w
+        val ty = to / w
+        if (out) {
+            spawn(tx, ty, to, waterId, temp[i])
+            note(Seen.PERMEATE, m)
+        } else {
+            flags[to] = (flags[to].toInt() or Flag.WET).toByte()
+            wake(tx, ty)
+        }
+    }
+
+    /** Air or another gas: room for water that has come through. */
+    private fun open(j: Int): Boolean {
+        val q = mat[j].toInt()
+        return q == AIR || kindOf[q] == Kind.GAS
+    }
+
+    /** Snow at [i] comes loose and starts to slide. */
+    private fun loosen(i: Int, x: Int, y: Int) {
+        flags[i] = (flags[i].toInt() or Flag.MARK).toByte()
+        wake(x, y)
+    }
+
+    /**
+     * Loose snow on a slope slides down it like a thick liquid and takes the snow around it along (4a.3). On
+     * level ground it comes to rest again.
+     */
+    private fun avalanche(x: Int, y: Int, i: Int, m: Int) {
+        wake(x, y)
+        val w = width
+        if (chance(AVALANCHE_SPREAD)) {
+            // the snow above and beside it, uphill too, is torn along
+            val j = when (below(5)) {
+                0 -> if (y > 0) i - w else -1
+                1 -> if (x > 0) i - 1 else -1
+                2 -> if (x < w - 1) i + 1 else -1
+                3 -> if (y > 0 && x > 0) i - w - 1 else -1
+                else -> if (y > 0 && x < w - 1) i - w + 1 else -1
+            }
+            if (j >= 0 && mat[j].toInt() == m && flags[j].toInt() and Flag.MARK == 0) loosen(j, j % w, j / w)
+        }
+        val d = if (coin()) 1 else -1
+        if (slide(x, y, i, m, d) || slide(x, y, i, m, -d) || flow(x, y, i, m, d) || flow(x, y, i, m, -d)) {
+            note(Seen.AVALANCHE, m)
+            return
+        }
+        if (chance(AVALANCHE_SETTLE)) flags[i] = (flags[i].toInt() and Flag.MARK.inv()).toByte()
+    }
+
+    /** Shakes the ground around (x, y): snow within [r] cells comes loose (a landing block, an explosion). */
+    fun shake(cx: Int, cy: Int, r: Int) {
+        val av = materials.avalanche
+        for (y in maxOf(0, cy - r)..minOf(height - 1, cy + r)) for (x in maxOf(0, cx - r)..minOf(width - 1, cx + r)) {
+            val i = y * width + x
+            if (av[mat[i].toInt()] && flags[i].toInt() and Flag.MARK == 0) loosen(i, x, y)
+        }
+    }
+
+    /** Snow under a heavy load is pressed into ice, now and then (a random tick, 4a.3). */
+    internal fun compact(x: Int, y: Int, i: Int, m: Int) {
+        val w = width
+        var load = 0f
+        var j = i - w
+        var k = 0
+        while (j >= 0 && k < COMPACT_REACH) {
+            val q = mat[j].toInt()
+            if (q == AIR || kindOf[q] == Kind.GAS) break
+            load += densityOf[q] / 1000f
+            j -= w
+            k++
+        }
+        if (load < materials.compactLoad[m] || !chance(COMPACT_CHANCE)) return
+        note(Seen.COMPACT, m)
+        change(x, y, i, materials.compactProduct[m])
     }
 
     private fun moveLiquid(x: Int, y: Int, i: Int, m: Int) {
@@ -1156,15 +1301,15 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         val c = b + d
         val q = mat[c].toInt()
         if (q == AIR || materials.kind[q] == Kind.LIQUID) {
-            flags[b] = (flags[b].toInt() or Flag.WET).toByte()
+            if (materials.permeable[g] == 0f) flags[b] = (flags[b].toInt() or Flag.WET).toByte()
             note(Seen.ERODE, g)
             swap(b, c, x, by, nx, by)
         }
     }
 
-    /** Absorbent ground next to water soaks some of it up and becomes wet. */
+    /** Absorbent ground next to water soaks some of it up and becomes wet; water runs into the pores of gravel. */
     private fun soak(x: Int, y: Int, i: Int): Boolean {
-        val ab = materials.absorbs
+        val ab = if (mat[i].toInt() == waterId) takesWater else materials.absorbs
         val w = width
         var j = -1
         var jx = x
@@ -1322,12 +1467,24 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
                 // landed: from now on it may catch hold of anchored ground it touches
                 for (c in cells) flags[c] = (flags[c].toInt() and (Flag.FALLING or Flag.VEL_MASK).inv()).toByte()
                 moved = true
+                if (speed >= SHAKE_SPEED) landed(cells)
             } else if (!looseRooted[s] && tip(cells, looseDensity[s], plant)) {
                 moved = true
             }
         }
         // what moved may now touch other structures or anchored ground
         if (moved) structuresDirty = true
+    }
+
+    /** A block that hit the ground hard shakes it where it landed. */
+    private fun landed(cells: IntArray) {
+        val w = width
+        var k = 0
+        for (c in cells) {
+            val b = c + w
+            if (b < size && owner[b] == owner[c]) continue
+            if (k++ % SHAKE_RADIUS == 0) shake(c % w, c / w + 1, SHAKE_RADIUS)
+        }
     }
 
     /**
@@ -1576,6 +1733,22 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
 
         /** Light is worked out anew every this many steps. */
         const val LIGHT_EVERY = 8
+
+        /** Brittle material colder than this does not crack (4a.2). */
+        private const val SHOCK_FROM = 60f
+
+        /** Melting heat snow takes up before it comes loose on a slope; how often sliding snow takes a neighbour along; how soon it settles. */
+        private const val AVALANCHE_WARM = 60
+        private const val AVALANCHE_SPREAD = 0.6f
+        private const val AVALANCHE_SETTLE = 0.04f
+
+        /** A landing block shakes the ground this far when it falls at least [SHAKE_SPEED]. */
+        private const val SHAKE_RADIUS = 3
+        private const val SHAKE_SPEED = 2
+
+        /** The load on snow is summed up to this many cells above it; chance per random tick to be pressed into ice. */
+        private const val COMPACT_REACH = 24
+        private const val COMPACT_CHANCE = 0.08f
 
         /** How far around the finger an animal looks for where it lives (or for air). */
         const val ANIMAL_REACH = 3

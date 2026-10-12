@@ -42,6 +42,7 @@ class MaterialPicturesTest {
             "deadwood", "dead_plant", "fish", "firefly", "worm", "bird",
             // basalt beside stone and brick: set lava must not look like either (4a.1.3)
             "basalt", "stone", "brick", "dead_fish", "steam", "smoke",
+            "glass_shards", "glass", "gravel", "snow", "ice", "clay",
         )
         val cols = 6
         val cell = 14

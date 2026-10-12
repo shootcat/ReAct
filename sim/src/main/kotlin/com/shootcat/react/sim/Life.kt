@@ -56,10 +56,12 @@ internal class Life(private val world: World) {
         val size = world.size
         val org = mt.organism
         val animal = mt.animal
+        val compact = mt.compactProduct
         repeat(size shr TICK_SHIFT) {
             val i = world.below(size)
             val m = mat[i].toInt()
             if (org[m] != Organism.NONE && !animal[m]) tick(i % w, i / w, i, m)
+            else if (compact[m] >= 0) world.compact(i % w, i / w, i, m)
         }
     }
 
