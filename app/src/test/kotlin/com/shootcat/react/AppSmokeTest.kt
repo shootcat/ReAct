@@ -264,6 +264,7 @@ class AppSmokeTest {
         run(800)
         compose.onNodeWithTag("current_tool").assertExists()
         shot("22_leiste_eingeklappt_quer")
+        restoreDefaults()
     }
 
     /** Portrait (4a.5): the snowy mountain and the caves, the bar folded to one slim row and out again. */
@@ -291,6 +292,23 @@ class AppSmokeTest {
         // the corner: speed and the shape of the brush; the menu is a window of its own
         brushMenu()
         shot("28_pinselform", compose.onNodeWithTag("mode_Pinsel"))
+        compose.onNodeWithTag("mode_Pinsel").performClick()
+        restoreDefaults()
+    }
+
+    /**
+     * The folded bar and the landscape of a new world are kept for the next start; a test that changes them
+     * puts them back, so the next test begins with the meadow and the open bar whatever ran before it.
+     */
+    private fun restoreDefaults() {
+        if (compose.onAllNodesWithTag("unfold").fetchSemanticsNodes().isNotEmpty()) compose.onNodeWithTag("unfold").performClick()
+        compose.onNodeWithContentDescription("Menü").performClick()
+        compose.onNodeWithText("Neue Welt …").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("template_MEADOW").performScrollTo().performClick()
+        compose.onNodeWithTag("size_MEDIUM").performScrollTo().performClick()
+        compose.onNodeWithTag("create_world").performClick()
+        run(300)
     }
 
     /**
