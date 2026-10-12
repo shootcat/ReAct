@@ -13,6 +13,7 @@ import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -20,6 +21,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.printToString
 import android.content.Context
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
@@ -70,7 +72,7 @@ class AppSmokeTest {
         shot("02_spielplatz")
 
         // fire on the log pile and on the bridge
-        compose.onNodeWithTag("category_Hitze").performScrollTo().performClick()
+        category("Hitze").performScrollTo().performClick()
         compose.onNodeWithTag("material_Feuer").performClick()
         paint(36, 112, holdMillis = 400)
         paint(100, 150, holdMillis = 400)
@@ -81,7 +83,7 @@ class AppSmokeTest {
         compose.onNodeWithTag("speed_Pause").performClick()
         compose.onNodeWithTag("material_Lava").performScrollTo().performClick()
         paint(115, 125, holdMillis = 200)
-        compose.onNodeWithTag("category_Flüssig").performScrollTo().performClick()
+        category("Flüssig").performScrollTo().performClick()
         compose.onNodeWithTag("material_Wasser").performScrollTo().performClick()
         stroke(20, 70, 60, 70)
         run(300)
@@ -91,7 +93,7 @@ class AppSmokeTest {
         shot("05_lava_trifft_wasser")
 
         // a stroke taken back
-        compose.onNodeWithTag("category_Lose").performScrollTo().performClick()
+        category("Lose").performScrollTo().performClick()
         compose.onNodeWithTag("material_Sand").performScrollTo().performClick()
         stroke(140, 40, 190, 40)
         run(500)
@@ -100,7 +102,7 @@ class AppSmokeTest {
 
         // building in the pause: a brick frame and a wooden plank across it, with the preview while dragging
         compose.onNodeWithTag("speed_Pause").performClick()
-        compose.onNodeWithTag("category_Bauen").performScrollTo().performClick()
+        category("Bauen").performScrollTo().performClick()
         compose.onNodeWithTag("material_Ziegel").performScrollTo().performClick()
         brushMenu()
         compose.onNodeWithTag("mode_Rahmen").performClick()
@@ -158,7 +160,7 @@ class AppSmokeTest {
         compose.onNodeWithText("Spielplatz").performClick()
         run(2000)
         shot("12_leben")
-        compose.onNodeWithTag("category_Leben").performScrollTo().performClick()
+        category("Leben").performScrollTo().performClick()
         compose.onNodeWithTag("material_Samen").performScrollTo().performClick()
         brushMenu()
         compose.onNodeWithContentDescription("Pinsel 1").performClick()
@@ -184,7 +186,7 @@ class AppSmokeTest {
         compose.onNodeWithContentDescription("Menü").performClick()
         compose.onNodeWithText("Modus: nur Beschaffen").performClick()
         run(500)
-        compose.onNodeWithTag("category_Werkzeug").performScrollTo().performClick()
+        category("Werkzeug").performScrollTo().performClick()
         compose.onNodeWithTag("material_Hand").performClick()
         // the fallen log on the dune
         compose.onNodeWithTag("world").performTouchInput {
@@ -195,7 +197,7 @@ class AppSmokeTest {
         shot("14_hand")
         compose.onNodeWithTag("material_Zu Brettern").performClick()
         run(500)
-        compose.onNodeWithTag("category_Lager").performScrollTo().performClick()
+        category("Lager").performScrollTo().performClick()
         compose.onNodeWithTag("material_Holz").performClick()
         brushMenu()
         compose.onNodeWithTag("mode_Linie").performClick()
@@ -205,7 +207,7 @@ class AppSmokeTest {
         // the bucket: water from the pond onto the hill
         brushMenu()
         compose.onNodeWithTag("mode_Pinsel").performClick()
-        compose.onNodeWithTag("category_Werkzeug").performScrollTo().performClick()
+        category("Werkzeug").performScrollTo().performClick()
         compose.onNodeWithTag("material_Schöpfen").performClick()
         paint(100, 172, holdMillis = 400)
         compose.onNodeWithTag("material_Gießen").performClick()
@@ -304,6 +306,14 @@ class AppSmokeTest {
         val s = height / world.height.toFloat()
         val ox = (width - world.width * s) / 2f
         return Offset(ox + (cx + 0.5f) * s, (cy + 0.5f) * s)
+    }
+
+    /** A tab of the bar; if it is missing, the failure shows everything on the screen. */
+    private fun category(name: String): SemanticsNodeInteraction {
+        if (compose.onAllNodesWithTag("category_$name").fetchSemanticsNodes().isEmpty()) {
+            throw AssertionError("Reiter $name fehlt. Auf dem Bildschirm:\n" + compose.onAllNodes(isRoot()).printToString())
+        }
+        return compose.onNodeWithTag("category_$name")
     }
 
     /** Opens the shapes and sizes of the brush in the corner of the world. */
