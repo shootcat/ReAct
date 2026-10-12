@@ -385,3 +385,127 @@ Der Container wurde zwischendurch neu gestartet, der Rechner ist ein anderer. De
 
 **Hier stoppe ich und warte auf die Freigabe** (Leitfaden V3, 4.3 und 8).
 
+
+## Phase 2d: Fehler, neue Materialrollen, Druck, Welt und Bedienung
+
+### Zusammenfassung
+
+**4a.1 Fehler**
+
+1. **Schwebende Strukturen.** Ursache gefunden: Ein frei gemalter Block fiel durchaus, blieb aber in zwei Fällen hängen. Erstens wurde er Teil eines Baums, sobald er Laub oder eine Ranke berührte, und der Baum (auf seinen Wurzeln stehend) trug ihn. Zweitens blieb eine Struktur liegen, die nur mit einer Ecke auf etwas auflag. Behoben mit drei Regeln:
+   - Pflanzen und gebautes Material bilden nie eine gemeinsame Struktur (auch die Hand greift sie getrennt).
+   - Laub und Ranken tragen nichts Schweres: Ein fallender Block reißt sie ab, sie fallen als welkes Laub.
+   - Liegt der Schwerpunkt einer losen Struktur neben ihrer Auflage, kippt sie über die Kante. Ohne Drehung (die kommt mit echter Körperphysik) rutscht sie schräg oder seitlich ab. Bäume mit Laub halten ihre Wurzeln.
+
+   Tests: „Block in der Luft malen, nach wenigen Schritten liegt er“ für Metall, Glas, Eis, Ziegel, Stein und Holz, über die Pinselbedienung wie in der App, dazu Ecke, Baumkrone und Brett am Stamm.
+2. **Tiere werden gesetzt, nicht gemalt.**
+   - Ein Tippen setzt ein Tier, ein Strich alle 12 Zellen eines; Linie, Rechteck und Rahmen verteilen Tiere ebenso einzeln.
+   - Ein Tier sucht sich im Umkreis von 3 Zellen seinen Lebensraum: der Fisch Wasser, der Wurm Erde.
+   - Fische an Land zappeln einzeln: Sie fallen, rutschen vom Haufen, hüpfen. Nach 4 Sekunden ersticken sie, der tote Fisch verrottet in etwa 40 Sekunden.
+   - Ursache des „festen Haufens“ war, dass ein Fisch neben einem anderen Fisch als „im Wasser“ galt.
+3. **Basalt.** Neues Material: dunkel, mit Gasporen aus ein bis drei Zellen, unregelmäßig. Erkaltete Lava wird zu Basalt, die Kruste der Lavahöhle ist Basalt. Er gehört zu Stein (schmilzt zu Lava, zerbricht zu Geröll).
+4. **Mindesthelligkeit.** Unbeleuchtete Höhlen zeigen die Höhlenwand gedämpft:
+   - Grundhelligkeit 0,25 statt 0,05;
+   - der Hintergrund bekommt mindestens 70 % seiner Helligkeit;
+   - die Höhlenwand des Hintergrunds ist etwas heller.
+
+   Test: Höhlenwand, Wasser und Fels im Dunkeln sind sichtbar, aber deutlich dunkler als bei Tag.
+
+**4a.2 Glas, Thermoschock.** Als Eigenschaften statt als Paarregel:
+- Glas ist spröde (`shock_product`: Glasscherben, `shock_rate` 20). Wasser, Salzwasser, Eis und Schnee schrecken ab (`quenches`).
+- Nimmt ein abschreckender Nachbar dem Glas in einem Schritt mehr als 20 Grad ab, springt es. Das passiert ab etwa 150 °C.
+- Langsames Abkühlen an der Luft lässt Glas ganz.
+- Glasscherben sind ein durchlässiges Pulver und schmelzen bei 1000 °C wieder zu Glas.
+
+**4a.3 Kies und Schnee**
+- **Kies (und Glasscherben) sind durchlässig.** Wasser läuft in die Poren (das Nass-Flag hält eine Zelle Wasser). Von dort geht es an trockene Körner weiter oder tritt ins Freie aus, nach unten zuerst. So sickert Wasser durch Kiesdämme bis an ihren Fuß und durch ein Kiesbett in eine Höhle darunter. Sand bleibt auf dem Kies liegen, Wasser geht verloren nicht.
+- **Lehm ist wasserdicht.** Er wird an der Oberfläche nass und weich, lässt aber nichts durch; Sand und Erde ebenso (nur Wurmgänge lassen sickern, wie bisher).
+- **Schnee isoliert** (Wärmeleitung 0,004 statt 0,08). Ein Block unter Schnee erwärmt sich in 5 Sekunden um weniger als ein Drittel dessen, was er unter Geröll gewinnt. Schnee schmilzt in warmer Luft nur langsam und ist so eine kleine, stetige Wasserquelle.
+- **Schnee wird unter Last zu Eis**, als Zufallsticks: ab einer Last von 3 (Dichte/1000 der Zellen darüber, etwa ein Stein oder zehn Zellen Schnee).
+- **Lawine.** Schnee, der warm wird (ein Teil seiner Schmelzwärme aufgenommen) oder erschüttert wird, kommt los. Erschütterung heißt: ein Block landet schnell in der Nähe, oder eine Explosion. Loser Schnee fließt wie eine zähe Flüssigkeit hangabwärts und reißt Schnee darüber und daneben mit; auf ebenem Grund kommt er zur Ruhe.
+
+**4a.4 Druck und Explosionen**
+1. **Druck pro Gasbereich.** Zusammenhängende Gaszellen (Luft, Dampf, Rauch, Grubengas) ohne Verbindung zum offenen Himmel sind ein geschlossener Bereich. Die Bereiche werden alle 10 Schritte neu gesucht, und nur, wenn in der Welt etwas in Bewegung ist. Der Druck ist Gasmenge mal absolute Temperatur je Zelle, bezogen auf die Luft draußen. Dampf zählt sechsfach: Er ist stark ausgedehntes Wasser.
+2. **Festigkeit** ist eine Materialeigenschaft:
+
+   | Glas | Lehm | Eis | Holz | Ziegel | Stein, Basalt | Metall | Fels |
+   |---|---|---|---|---|---|---|---|
+   | 2 | 3 | 4 | 5 | 6 | 9 | 14 | nie |
+
+   Pulver und Flüssigkeit, die einen Ausgang verstopfen, halten 2,5. Eine Pfütze oder ein Haufen am Boden ist keine Wand. Übersteigt der Druck die schwächste Wand, birst sie: Glas zu Scherben, Ziegel und Stein zu Geröll, Eis zu Schnee.
+3. **Explosion:** eine Druckwelle mit einer Kraft und einer Reichweite.
+   - Sie zerbricht, was schwächer ist als die Kraft an seiner Stelle.
+   - Sie setzt Brennbares in Brand und löst Schnee.
+   - Sie schleudert Pulver und Flüssigkeit von der Mitte weg.
+   - Beim Bersten ist die Kraft der Druck selbst, die Reichweite folgt der Menge des ausströmenden Gases. Bei Grubengas folgen beide der Größe der Wolke.
+4. **Dampfexplosion.** Wasser neben etwas über 600 °C (Lava) verdampft schlagartig und nimmt die Verdampfungswärme der Lava ab. In einem geschlossenen Raum steigt der Druck, die schwächste Wand birst. Im Freien zieht der Dampf einfach ab.
+5. **Grubengas** ist leichter als Luft und sammelt sich unter Decken. Zu sehen ist es kaum, die Luft darüber flimmert leicht. Es zündet an Feuer, Glut oder ab 580 °C als ganze Wolke: ein Feuerblitz und eine Explosion. Die **Gasspalte** ist Levelgelände wie Fels und gibt ab und zu Grubengas ab.
+6. **Schwarzpulver** ist nicht umgesetzt, der Vorschlag steht in `docs/ELEMENTE.md`. Es wäre ein Rezept aus drei Stoffen, von denen zwei sonst keine Rolle hätten. Der Vorschlag: Salpeter als Eigenschaft („lässt Brennbares ohne Luft brennen“).
+
+Neu im Entdeckungsbuch: 8 Einträge mit Szenen (62 statt 54):
+- Glas springt beim Abschrecken; Glas gibt unter Druck als Erstes nach;
+- Kies und Glasscherben lassen Wasser durch;
+- Schnee wird unter Last zu Eis; Schnee rutscht am Hang ab;
+- Dampf baut in geschlossenen Räumen Druck auf;
+- Grubengas zündet explosionsartig.
+
+**4a.5 Welt und Bedienung**
+1. **Breite Welt.** Größen: Klein 320 × 240, Mittel 480 × 300 (Standard), Groß 600 × 340.
+   - Die Ansicht füllt die Höhe; die Welt ist im Hochformat zwei bis drei Bildschirmbreiten breit.
+   - Zwei Finger verschieben und zoomen, hinaus bis zur ganzen Welt.
+   - Gezeichnet wird nur der sichtbare Ausschnitt mit 24 Zellen Rand; ein Test prüft, dass er pixelgleich zum Gesamtbild ist.
+2. **Hoch- und Querformat.** Die Drehsperre ist entfernt.
+   - Im Querformat steht die Bedienung als Spalte neben der Welt: Kopfzeile, Kategorien, Materialien als umbrechendes Raster.
+   - Der Titelbildschirm hat ein eigenes Querformat.
+3. **Vorlagen** über „Neue Welt …“ im Menü; Vorlage und Größe werden gemerkt. Jede Welt hat ihre eigene Umgebungstemperatur.
+   - **Wiese mit Teich**: die bisherige Startwelt, unverzerrt in der Mitte, mit Hügeln und Bäumen links und Dünen rechts.
+   - **Leeres Feld**.
+   - **Insel**: Felsenhügel mit Erde, Bäumen und Stränden im Salzwasser.
+   - **Küste**: Hügel mit Bäumen, Steilküste mit kleiner Höhle, Strand, Meer.
+   - **Berg mit Schnee**: kalte Luft (−6 °C), zwei Gipfel, Schneekappe, gefrorener Teich im Tal, Geröll am Fuß.
+   - **Vulkan**: Basaltkegel, Krater mit Lava, Schlot, heiße Magmakammer, Meer.
+   - **Höhlensystem**: Gänge und Kammern mit Teichen, Kies, Moos und Glühwürmchen, eine Gasspalte mit Grubengas unter der Decke, eine von Fels versiegelte Lavatasche.
+4. **Bedienleiste.** Ausgeklappt zwei Zeilen: Kategorien mit Einklappknopf, darunter Materialien oder Werkzeuge. Eingeklappt eine schmale Zeile mit dem aktuellen Werkzeug. Tempo (Pause, Normal, Schnell) und Pinselform (ein Knopf, öffnet Formen und Größen) sitzen klein in der rechten unteren Ecke der Welt.
+
+Bilder:
+- `docs/phase2/2d_physik.png`: Block durch Baumkrone, Fische an Land, abgeschrecktes Glas, Kiesdamm, Lawine, Dampfexplosion, Grubengas, gedämpfte Höhle;
+- `docs/phase2/2d_vorlagen.png`: die sieben Vorlagen;
+- `docs/phase2/2d_materialien.png`: alle Materialien, unten Basalt neben Stein und Ziegel, Glasscherben, Glas, Kies, Schnee, Eis, Lehm.
+
+### Abweichungen mit Begründung
+
+1. **Kippen statt Drehen.** Eine Struktur, deren Schwerpunkt über die Kante ragt, rutscht ab, ohne sich zu drehen. Echtes Kippen braucht die Körperphysik aus Phase 4.
+2. **Seitlich in Fels gebaute Strukturen halten weiter** (Regel 3.1.2 und Brücken nach 4.1.6). Ein Block, der eine Felswand berührt, ist verankert. Falls das als „Schweben“ empfunden wird, ist der nächste Schritt eine Tragfähigkeit pro Haftstelle; das gehört zu Phase 4.
+3. **Lawinenauslöser „erwärmt“** heißt: Der Schnee hat schon ein Drittel seiner Schmelzwärme aufgenommen. In der Spielplatzwelt mit 20 °C Luft rutscht Schnee an warmem Fels darum nach einigen Sekunden ab. Auf dem Berg ist die Luft deshalb kalt.
+4. **Druck aus warmer Luft** zählt mit (doppelte absolute Temperatur, doppelter Druck). Ein geschlossener Raum mit Feuer kann so ein Glasfenster sprengen. Kleine heiße Lufttaschen in Haufen bleiben ruhig: Bersten erst ab 40 Zellen überschüssigem Gas.
+5. **Wasser in den Poren des Kieses ist Süßwasser.** Salzwasser bleibt auf Kies stehen, sonst müsste jede Pore die Salzigkeit mitführen.
+6. **Größte Welt 600 × 340 statt 640 × 360.** Hochgerechnet lag 640 × 360 auf dem Fold2 bei etwa 7,6 ms, zu knapp an 8 ms (siehe Leistung).
+7. **„Normal, Schnell, Pause“ als drei kleine Symbole** in der Ecke statt einer beschrifteten Leiste. Pinselform und Größe sind ein Knopf mit kleinem Menü; das Wort „Pause“ über der Welt entfällt, das Pause-Symbol ist hervorgehoben.
+
+### Leistung
+
+Gemessen auf diesem Rechner (Linux, Java 21, 4 Kerne), Benchmark einzeln, je zwei Läufe. Der Rechner schwankt stark.
+
+| Welt | Phase 2c | Phase 2d |
+|---|---|---|
+| Voll aktive Welt 200 × 350 | 4,73 bis 5,18 ms | 4,49 bis 5,92 ms |
+| Voll aktive Welt mit Pflanzen, Tieren und Licht 200 × 350 | 5,31 bis 5,87 ms | 5,20 bis 5,78 ms |
+| **Größte Welt 600 × 340, voll aktiv mit Pflanzen, Tieren und Licht** | – | **15,2 bis 18,3 ms** |
+| Größte Welt 600 × 340, voll aktiv | – | 16,5 bis 17,3 ms |
+| Größte Welt, Wiese mit Feuer, Sand und Wasser | – | 2,6 bis 3,8 ms |
+| Bild der größten Welt, sichtbarer Ausschnitt (ein Drittel) | – | 1,9 bis 3,8 ms |
+
+Aufteilung eines Schritts der größten belebten Welt (lokal, 15,2 ms):
+
+| Zellen | Wärme | Strukturen | Licht | Druck | Fallen | Zufallsticks |
+|---|---|---|---|---|---|---|
+| 8,7 ms | 4,1 ms | 1,1 ms | 0,7 ms | 0,25 ms | 0,3 ms | 0,1 ms |
+
+- **Hochrechnung aufs Handy:** Das Fold2 brauchte für die belebte Welt 200 × 350 in 2c 2,2 ms, dieser Rechner 5,3 bis 5,9 ms (Faktor etwa 2,5). Die größte Welt kostet hier das 2,9- bis 3,4-Fache der kleinen. Das ergibt auf dem Fold2 **etwa 6,5 bis 7,5 ms** für die voll aktive, belebte größte Welt. Die Grenze von 8 ms ist eingehalten, aber nicht mit viel Luft.
+- **Die Strukturen** wurden in der belebten Welt fast jeden Schritt neu gesucht, weil Feuer und Wachstum ständig feste Zellen ändern. Dabei wurde jedes Mal das ganze Besitzer-Feld geleert. Jetzt werden nur die Zellen der letzten Suche zurückgesetzt: 1,1 statt 1,5 ms in der größten Welt. Eine Drosselung auf jeden dritten Schritt hätte weitere 0,7 ms gebracht, hätte aber das Rückgängigmachen ungenau gemacht; das habe ich verworfen.
+- **Druck** kostet 0,1 ms (200 × 350) bis 0,3 ms (größte Welt) pro Schritt.
+- **Zeichnen:** In der Ansicht ist etwa ein Drittel der größten Welt zu sehen. Gezeichnet wird nur dieser Ausschnitt, das spart rund zwei Drittel.
+- **Bitte auf dem Handy „Leistung messen“.** Die Zeile „Größte Welt 600 × 340, voll aktiv mit Pflanzen, Tieren und Licht“ ist der Wert für 4a.5.5. Liegt er über 8 ms, sind die nächsten Hebel:
+  1. Licht in großen Welten alle 16 statt 8 Schritte;
+  2. die Strukturen gedrosselt, mit den Strukturlisten im Schnappschuss, damit Undo exakt bleibt;
+  3. als letztes Mittel eine kleinere größte Welt (560 × 320).

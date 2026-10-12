@@ -20,8 +20,11 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
+import android.content.Context
 import androidx.test.core.app.ActivityScenario
+import androidx.test.core.app.ApplicationProvider
 import com.shootcat.react.sim.WorldSize
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -44,6 +47,16 @@ class AppSmokeTest {
 
     @get:Rule
     val compose = createEmptyComposeRule()
+
+    /**
+     * Every test starts from the default settings: the stored ones outlive a test here, and a folded bar or
+     * the volcano left behind by one would be the start of the next.
+     */
+    @Before
+    fun freshSettings() {
+        val app = ApplicationProvider.getApplicationContext<Context>()
+        for (name in listOf("react_settings", "react_progress_v3")) app.getSharedPreferences(name, Context.MODE_PRIVATE).edit().clear().commit()
+    }
 
     @Test
     fun titleSandboxAndSettings(): Unit = ActivityScenario.launch(MainActivity::class.java).use {

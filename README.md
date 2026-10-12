@@ -25,29 +25,35 @@ Alle Builds sind mit demselben Schlüssel signiert und installieren sich als Upd
 
 ## Spielplatz
 
-1. Startbildschirm, dann **Spielplatz**. Die Startlandschaft ist 200 × 350 Zellen groß:
-   - ein grasbewachsener Hügel mit zwei Bäumen, einem Busch, einem Holzstapel und Vögeln;
-   - ein Teich mit Fischen und einer Holzbrücke, eine Ranke wächst zu ihm hin;
-   - eine Sanddüne;
-   - unter dem Hügel eine dunkle Grotte mit Wasser, Moos und Glühwürmchen, tief im Fels eine Höhle mit Lava.
-2. **Material wählen** in der Leiste unten, in Kategorien. Jede Karte zeigt die Körnung des Materials, den Vorrat (hier ∞) und die Kosten pro Einheit.
-   - **Lose:** Sand, Erde, Kies, Lehm, Salz, Schnee, Geröll, Erzgeröll, Holzkohle, Asche.
-   - **Flüssig:** Wasser, Salzwasser, Lava, flüssiges Metall, Dampf, Rauch.
-   - **Bauen:** Holz, Ziegel, Stein, Glas, Metall, Eis.
+1. Startbildschirm, dann **Spielplatz**. Die Welt füllt die Höhe des Bildschirms und ist zwei bis drei Bildschirmbreiten breit; zwei Finger verschieben und zoomen. Hoch- und Querformat werden unterstützt; im Querformat steht die Bedienung als Spalte neben der Welt.
+   - **Neue Welt …** (Menü): eine Vorlage in einer Größe (Klein 320 × 240, Mittel 480 × 300, Groß 600 × 340). Die Wahl wird gemerkt.
+   - Vorlagen:
+     - **Wiese mit Teich**: Hügel mit Bäumen, Holzstapel und Vögeln, ein Teich mit Fischen und Holzbrücke, Dünen, eine dunkle Grotte mit Moos und Glühwürmchen, eine Lavahöhle im Fels;
+     - **Leeres Feld**;
+     - **Insel**;
+     - **Küste** mit Steilküste und Strand;
+     - **Berg mit Schnee** in kalter Luft, mit gefrorenem Teich;
+     - **Vulkan** mit Krater, Schlot, Magmakammer und Meer;
+     - **Höhlensystem** mit Gängen, Kammern, Teichen, einer Gasspalte voll Grubengas und einer versiegelten Lavatasche.
+2. **Material wählen** in der Leiste unten. Ausgeklappt hat sie zwei Zeilen: oben die Kategorien, darunter die Materialien oder Werkzeuge. Der Pfeil klappt sie auf eine schmale Zeile ein. Jede Karte zeigt die Körnung des Materials, den Vorrat (hier ∞) und die Kosten pro Einheit.
+   - **Lose:** Sand, Erde, Kies, Lehm, Salz, Schnee, Geröll, Erzgeröll, Glasscherben, Holzkohle, Asche.
+   - **Flüssig:** Wasser, Salzwasser, Lava, flüssiges Metall, Dampf, Rauch, Grubengas.
+   - **Bauen:** Holz, Ziegel, Stein, Basalt, Glas, Metall, Eis.
    - **Hitze:** Feuer, Glut, Lava.
-   - **Leben:** Samen, Gras, Moos, Ranke, Fisch, Glühwürmchen, Wurm, Vogel.
+   - **Leben:** Samen, Gras, Moos, Ranke, Fisch, Glühwürmchen, Wurm, Vogel. Tiere werden einzeln gesetzt: ein Tippen ein Tier, ein Strich alle 12 Zellen eines, in ihren Lebensraum (Fisch ins Wasser, Wurm in die Erde).
    - Dazu der Radierer, den es nur im Spielplatz gibt. Fels ist Gelände und nicht in der Hand des Spielers.
 3. **Malen und Schütten** mit einem Finger. Material landet nur dort, wo Luft ist, nie in Fels oder anderem Material. Ein liegen gelassener Finger schüttet weiter. Lose Stoffe fallen gestreut, feste Stoffe werden als geschlossene Form gezeichnet. Fünf Pinselgrößen, die kleinste setzt genau ein Partikel.
-   - **Bauwerkzeuge:** Pinsel, Linie, Rechteck und Rahmen. Beim Ziehen zeigt eine halbtransparente Vorschau, was entsteht; Loslassen baut es. Das geht auch in der Pause.
+   - **Bauwerkzeuge** (Pinselform in der Ecke): Pinsel, Linie, Rechteck und Rahmen. Beim Ziehen zeigt eine halbtransparente Vorschau, was entsteht; Loslassen baut es. Das geht auch in der Pause.
    - **Werkzeug:**
      - Eimer: schöpft eine Sorte loses oder flüssiges Material, gießt es mit seiner Temperatur wieder aus.
      - Hand: trägt lose Objekte, nicht zu schwer, nicht zu heiß, nicht in Fels verankert.
      - „Zu Brettern“ / „Ins Lager“: ein Stamm ergibt 3 Bretter pro Zelle.
    - **Modus „nur Beschaffen“** (Menü): keine unendliche Leiste mehr, nur Eimer, Hand und das Lager. Gebaut wird mit dem, was beschafft wurde.
-4. **Zwei Finger** zoomen (bis sechsfach) und verschieben. Kommt der zweite Finger in den ersten 70 ms, entsteht kein Klecks.
-5. **Pause, Normal, Schnell.** Normal sind 60 Schritte pro Sekunde, Schnell bis zu 180. In der Pause lassen sich mehrere Dinge setzen, die dann gemeinsam starten.
+4. **Zwei Finger** zoomen (heraus bis zur ganzen Welt, hinein bis sechsfach) und verschieben. Kommt der zweite Finger in den ersten 70 ms, entsteht kein Klecks.
+5. **Pause, Normal, Schnell** und die **Pinselform** (Pinsel, Linie, Rechteck, Rahmen, fünf Größen) sitzen klein in der rechten unteren Ecke der Welt. Normal sind 60 Schritte pro Sekunde, Schnell bis zu 180. In der Pause lassen sich mehrere Dinge setzen, die dann gemeinsam starten.
 6. **↶ Rückgängig** nimmt den letzten Strich zurück, bis zu 25 Striche. **↺ Neu beginnen** stellt die Startlandschaft wieder her und lässt sich ebenfalls rückgängig machen.
 7. Im **Menü** (Zahnrad) gibt es:
+   - **Neue Welt …**: Vorlage und Größe,
    - **Modus**: unendlicher Vorrat oder nur Beschaffen,
    - **Entdeckungsbuch**: jede zum ersten Mal beobachtete Eigenschaft („Neu: Sand behält Wärme“), mit kleiner Animation,
    - **Leistung messen** (Ergebnis zum Kopieren),
@@ -81,6 +87,9 @@ Das Modul ist reines Kotlin ohne Android. Es läuft identisch in den Tests auf d
   - Dampf kondensiert beim Abkühlen zu Wasser.
 - **Gase** steigen nach ihrer Dichte auf und verlassen die Welt nach oben. Unter Überhängen sammeln sie sich.
 - **Strukturen:** Zusammenhängende feste Zellen bilden eine Struktur. Berührt sie verankertes Gelände (Fels), steht sie, sonst fällt sie als Ganzes.
+  - Pflanzen und Gebautes sind getrennte Strukturen; Laub und Ranken tragen nichts Schweres.
+  - Liegt der Schwerpunkt einer losen Struktur neben ihrer Auflage, rutscht sie über die Kante ab.
+- **Druck und Explosionen:** Jeder geschlossene Gasbereich hat einen Druck (Gasmenge mal Temperatur, Dampf sechsfach). Übersteigt er die Festigkeit der schwächsten Wand (Glas 2 bis Metall 14, Fels nie), birst sie. Eine Explosion zerbricht Schwaches, entzündet Brennbares, löst Schnee und schleudert Pulver und Flüssigkeit fort. Wasser an Lava verdampft schlagartig.
 - **Licht** (`Light.kt`): ein Lichtfeld in Blöcken zu 2 × 2 Zellen, alle 8 Schritte neu.
   - Tageslicht fällt von oben ein und streut, Feuer, Glut, Lava, Glühendes und Glühwürmchen leuchten selbst.
   - Luft, Wasser, Glas und Laub lassen Licht durch, feste Stoffe nicht.
@@ -125,8 +134,16 @@ Die Einheiten stehen in der Datei.
 | Feuer | Gas | brennende Flamme, steigt, heizt stark, braucht Luft |
 | Rauch | Gas | steigt langsam, verdrängt Luft, verweht nach oben |
 | Dampf | Gas | steigt schnell, kondensiert unter 90 °C zu Wasser |
-| Lava | flüssig | zäh, 1250 °C, erstarrt unter 850 °C (mit Erstarrungswärme) zu Stein |
-| Asche, Holzkohle, Glas | entstehen | Asche und Holzkohle schwimmen; Holzkohle glüht lange ohne Flamme; Glas ist fest und durchsichtig |
+| Lava | flüssig | zäh, 1250 °C, erstarrt unter 850 °C (mit Erstarrungswärme) zu Basalt |
+| Basalt | fest (Struktur) | dunkel und porös; erkaltete Lava; schmilzt zu Lava, zerbricht zu Geröll |
+| Glas | fest (Struktur) | durchsichtig; heiß mit Wasser, Eis oder Schnee abgeschreckt springt es zu Glasscherben, gibt unter Druck als Erstes nach |
+| Glasscherben | Pulver | lassen Wasser durch, schmelzen bei 1000 °C wieder zu Glas |
+| Kies | Pulver | lässt Wasser durch (durch Dämme, in Höhlen darunter); Sand bleibt darauf liegen |
+| Lehm | Pulver | wasserdicht, nass weich, wird in großer Hitze zu Ziegel |
+| Schnee | Pulver | isoliert, schmilzt langsam, wird unter Last zu Eis, rutscht am Hang als Lawine ab, wenn er warm oder erschüttert wird |
+| Grubengas | Gas | leichter als Luft, sammelt sich unter Decken, kaum sichtbar, zündet als ganze Wolke an Feuer oder Glut |
+| Gasspalte | Gelände | gibt in Minen ab und zu Grubengas ab |
+| Asche, Holzkohle | entstehen | schwimmen; Holzkohle glüht lange ohne Flamme |
 | Gras | Erde mit Gras | wächst im Licht auf feuchte Erde daneben, hält Erde zusammen, brennt gut, stirbt an Salz und Hitze zu Erde |
 | Moos | Leben | wächst in dunklen, feuchten Höhlen an Wänden und Decken |
 | Ranke | fest (Struktur) | wächst zum nächsten Wasser, trägt als Brücke oder Leiter |
@@ -149,8 +166,9 @@ sim/                        Partikelsimulation, reines Kotlin (ohne Android)
   Session.kt                Pinsel, Bauformen, Eimer, Hand, Lager, Undo, Reset, Aktionsprotokoll, Wiedergabe
   SimRunner.kt              eigener Thread, feste Schrittweite, fertige Bilder, Leistungswerte
   Renderer.kt               Pixelbild, Dunst- und Glühschicht, Hintergrund
-  Terrain.kt                Startlandschaft des Spielplatzes (Rauschen nur aus Ganzzahl-Hashes)
-  Benchmark.kt              Schritte pro Sekunde: leere, voll aktive und belebte Welt
+  Terrain.kt                Wiese mit Teich (Startlandschaft), Rauschen nur aus Ganzzahl-Hashes
+  Templates.kt              Weltgrößen und die übrigen Vorlagen: Leeres Feld, Insel, Küste, Berg, Vulkan, Höhlen
+  Benchmark.kt              Schritte pro Sekunde: leere, voll aktive und belebte Welt, größte Welt
 app/                        Android-App (Kotlin, Jetpack Compose)
   ui/sandbox/               Spielplatz: Weltansicht, Gesten, Leiste, Tempo, Messung
   ui/title/                 Startbildschirm mit kleiner echter Simulation
@@ -159,7 +177,8 @@ app/                        Android-App (Kotlin, Jetpack Compose)
   audio/SoundManager.kt     Effekte (SoundPool) und Musik (MediaPlayer)
   data/                     Einstellungen, Fortschritt
 docs/PHASE1.md              Bericht zu Phase 1: Zusammenfassung, Abweichungen, Messwerte
-docs/PHASE2.md              Bericht zu Phase 1b und 2: Zusammenfassung, Abweichungen, Messwerte
+docs/PHASE2.md              Bericht zu Phase 1b und 2 (bis 2d): Zusammenfassung, Abweichungen, Messwerte
+docs/ELEMENTE.md            Vorschläge, die noch nicht umgesetzt sind (Schwarzpulver)
 docs/v2/                    Unterlagen der Raster-Version (Leitfaden V2)
 ```
 
