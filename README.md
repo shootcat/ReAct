@@ -63,6 +63,20 @@ Alle Builds sind mit demselben Schlüssel signiert und installieren sich als Upd
 
 Die Welt erzeugt Geräusche: Zischen beim Löschen, Brodeln beim Kochen, Knistern beim Brennen, Fauchen beim Entzünden.
 
+## Level (Phase 3)
+
+Jedes Level ist ein gemalter Boden (`terrain.png`, jede Farbe ein Material), eine Maske für verankertes Gelände (`anchor.png`) und eine `level.json` mit Werkzeugen, Vorrat, Zielen, Zielbereichen, Gebiet und den Grenzen für Gold, Silber und Bronze. Bewertet wird nach Zeit und Handgriffen: Eimer füllen, ausgießen, greifen, ablegen, bauen. Die Medaille ist die beste, deren Grenzen Zeit und Handgriffe beide einhalten.
+
+Im Level reichen Eimer und Hand nur an das, was zum Himmel offen ist: an Luft, Gas und Flüssigkeit, die mit der obersten Zeile verbunden sind, und an alles, was daran grenzt. Was hinter Fels, Eis oder Erde liegt, ist erst erreichbar, wenn der Weg dorthin offen ist („Da kommst du nicht hin“).
+
+| Level | Gebiet, Niveau | Ziel | Wege (Tests in `level/src/test`) |
+|---|---|---|---|
+| Trockener Teich | Wald, leicht | Fülle den Teich mit Wasser | Ast auf die Glut, der Stamm brennt durch (Gold); Erde aus dem Fenster schöpfen (Gold); Fenster anspülen (Silber); Rinne aufschütten (Silber); eimerweise tragen (Bronze) |
+| Signalfeuer | Vulkan, Kernniveau | Entzünde den Holzstoß auf dem Gipfel | Sand vom Strand auf dem Lavasee erhitzen und zweimal seitlich an den Holzstoß gießen: die erste Ladung taut, die zweite zündet (Gold); Schnee ins Meer räumen, dann heißer Sand (Silber); Salzwasser aus dem Meer taut den Schnee, dann heißer Sand (Silber) |
+| Tiefe Schmelze | Mine, Obergrenze | Bringe Glas in die tiefe Kammer | Salz taut das Eis, Sand auf dem Schlot zu Glas, mit Wasser abgeschreckt zu Scherben (Gold); Erdpfropf graben, Lava läuft aus, Sand darauf (Silber); Erzgeröll schmilzt zur Wärmebrücke (Silber) |
+
+Die Bilder der Lösungswege liegen unter `docs/phase3/`, die Malskripte unter `tools/levels/`.
+
 ## Simulation (`sim/`)
 
 Das Modul ist reines Kotlin ohne Android. Es läuft identisch in den Tests auf dem Rechner und in der App.

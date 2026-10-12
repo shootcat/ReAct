@@ -29,8 +29,8 @@ class SignalfeuerTest {
         return n
     }
 
-    /** Sand from the beach onto the lava, a second later back into the bucket, and onto the pile at ([x], [y]). */
-    private fun hotSand(x: Int, y: Int, wait: Int = 60) = "scoop 112 68 6 20\npour 29 62 1 20\nwait $wait\nscoop 29 66 3 20\npour $x $y 1 30\n"
+    /** Sand from the beach onto the lava, a moment later back into the bucket, and onto the pile at ([x], [y]). */
+    private fun hotSand(x: Int, y: Int, wait: Int = 90) = "scoop 112 68 6 20\npour 29 62 1 20\nwait $wait\nscoop 29 66 3 20\npour $x $y 1 30\n"
 
     /** Plays [script], lets the world run on up to [limit] seconds, and keeps a picture of the end. */
     private fun solve(name: String, script: String, limit: Int = 300): Pair<Play, Result?> {
@@ -92,6 +92,13 @@ class SignalfeuerTest {
         assertNull(r)
         assertEquals(80, count(play, "wood"), "nothing burnt")
         assertTrue(count(play, "snow", 125, 0, 170, 40) < 70, "the snow melted: ${count(play, "snow", 125, 0, 170, 40)} left")
+    }
+
+    @Test
+    fun `one load of hot sand beside the pile only melts the snow there`() {
+        val (play, r) = solve("einmal_seitlich", "wait 60\n" + hotSand(136, 18), limit = 60)
+        assertNull(r)
+        assertEquals(80, count(play, "wood"), "nothing burnt")
     }
 
     @Test

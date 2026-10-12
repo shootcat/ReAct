@@ -51,6 +51,13 @@ class Session(
     var held: Held? = null
         private set
 
+    /**
+     * In a level the bucket and the hand only reach what air or water connects to the open sky, and what
+     * lies right next to it: a chamber shut off by an ice plug cannot be reached until the plug is gone
+     * (Leitfaden V3, 5.4). The sandbox reaches everywhere.
+     */
+    var reachLimited = false
+
     /** The last thing worth telling the player (picked up, too heavy, …), and a counter that changes with it. */
     var notice = ""
         private set
@@ -101,6 +108,8 @@ class Session(
     var onStep: ((Session) -> Unit)? = null
 
     private fun restoreSupplies(s: Supplies) {
+        // the world went back in time: the same step may now look different
+        reachStep = -1
         supply = s.supply
         s.stock.copyInto(stock)
         bucketMaterial = s.bucketMaterial
@@ -281,16 +290,23 @@ class Session(
         if (bucketAmount == 0) {
             bucketMaterial = MaterialTable.AIR
             var best = Int.MAX_VALUE
+            var shut = false
             for (dy in -radius..radius) for (dx in -radius..radius) {
                 val d = dx * dx + dy * dy
                 if (d > r2 || d >= best || !w.inside(cx + dx, cy + dy)) continue
                 val i = w.index(cx + dx, cy + dy)
-                if (bucketable(i)) {
-                    best = d
-                    bucketMaterial = w.mat[i].toInt()
+                if (!bucketable(i)) continue
+                if (!touchable(i)) {
+                    shut = true
+                    continue
                 }
+                best = d
+                bucketMaterial = w.mat[i].toInt()
             }
-            if (bucketMaterial == MaterialTable.AIR) return
+            if (bucketMaterial == MaterialTable.AIR) {
+                if (shut) tell(OUT_OF_REACH)
+                return
+            }
         }
         for (dy in -radius..radius) {
             for (dx in -radius..radius) {
@@ -299,7 +315,7 @@ class Session(
                 val y = cy + dy
                 if (dx * dx + dy * dy > r2 || !w.inside(x, y)) continue
                 val i = w.index(x, y)
-                if (w.mat[i].toInt() != bucketMaterial || !bucketable(i)) continue
+                if (w.mat[i].toInt() != bucketMaterial || !bucketable(i) || !touchable(i)) continue
                 bucketTemp = (bucketTemp * bucketAmount + w.temp[i]) / (bucketAmount + 1)
                 bucketAmount++
                 w.clear(x, y, i)
@@ -313,6 +329,54 @@ class Session(
         val f = world.flags[i].toInt()
         return materials.bucketable[m] && (f and (Flag.BURNING or Flag.ANCHORED)) == 0 &&
             (materials.kind[m] == Kind.POWDER || materials.kind[m] == Kind.LIQUID)
+    }
+
+    private var reach = BooleanArray(0)
+    private var reachStep = -1
+    private var reachQueue = IntArray(0)
+
+    /** Gas and liquid connected to the open sky through gas and liquid: where the player's arm gets to. */
+    private fun reachMap(): BooleanArray {
+        val w = world
+        if (reachStep == w.step && reach.size == w.size) return reach
+        if (reach.size != w.size) {
+            reach = BooleanArray(w.size)
+            reachQueue = IntArray(w.size)
+        } else {
+            reach.fill(false)
+        }
+        val kind = materials.kind
+        fun passable(i: Int) = kind[w.mat[i].toInt()].let { it == Kind.GAS || it == Kind.LIQUID }
+        var head = 0
+        var tail = 0
+        for (x in 0 until w.width) if (passable(x)) {
+            reach[x] = true
+            reachQueue[tail++] = x
+        }
+        while (head < tail) {
+            val i = reachQueue[head++]
+            val x = i % w.width
+            for (j in intArrayOf(if (x > 0) i - 1 else -1, if (x < w.width - 1) i + 1 else -1, i - w.width, i + w.width)) {
+                if (j < 0 || j >= w.size || reach[j] || !passable(j)) continue
+                reach[j] = true
+                reachQueue[tail++] = j
+            }
+        }
+        reachStep = w.step
+        return reach
+    }
+
+    /** Open to the sky (always, without a limited reach). */
+    private fun open(i: Int): Boolean = !reachLimited || reachMap()[i]
+
+    /** Open, or right next to an open cell: the surface of a heap, the face of a wall. */
+    private fun touchable(i: Int): Boolean {
+        if (!reachLimited) return true
+        val r = reachMap()
+        if (r[i]) return true
+        val w = world.width
+        val x = i % w
+        return (x > 0 && r[i - 1]) || (x < w - 1 && r[i + 1]) || (i >= w && r[i - w]) || (i + w < r.size && r[i + w])
     }
 
     /** Air or another gas (smoke, steam): what is poured or put down takes its place. */
@@ -330,7 +394,7 @@ class Session(
                 val x = cx + dx
                 val y = cy + dy
                 if (dx * dx + dy * dy > r2 || !w.inside(x, y)) continue
-                if (!free(w.index(x, y))) continue
+                if (!free(w.index(x, y)) || !open(w.index(x, y))) continue
                 if (fill < 1f && !w.chance(fill)) continue
                 w.set(x, y, bucketMaterial, bucketTemp)
                 bucketAmount--
@@ -343,6 +407,7 @@ class Session(
     private fun grab(x: Int, y: Int) {
         val w = world
         var at = -1
+        var shut = false
         // a finger is broad: the nearest cell of something it could hold
         var best = Int.MAX_VALUE
         for (dy in -REACH..REACH) for (dx in -REACH..REACH) {
@@ -351,11 +416,15 @@ class Session(
             val i = w.index(x + dx, y + dy)
             val m = w.mat[i].toInt()
             if (m != MaterialTable.AIR && materials.kind[m] != Kind.GAS && materials.kind[m] != Kind.LIQUID && materials.kind[m] != Kind.STATIC) {
+                if (!touchable(i)) {
+                    shut = true
+                    continue
+                }
                 best = d
                 at = i
             }
         }
-        if (at < 0) return tell("Hier ist nichts zum Greifen")
+        if (at < 0) return tell(if (shut) OUT_OF_REACH else "Hier ist nichts zum Greifen")
         val piece = w.pieceAt(at, LUMP, MAX_CELLS)
         if (piece == null || piece.cells.any { !materials.grabbable[w.mat[it].toInt()] }) return tell("Das lässt sich nicht greifen")
         if (piece.tooBig) return tell("Zu groß zum Greifen")
@@ -385,6 +454,7 @@ class Session(
             val px = x + h.dx[k]
             val py = y + h.dy[k]
             if (!w.inside(px, py) || !free(w.index(px, py))) return tell("Kein Platz zum Ablegen")
+            if (!open(w.index(px, py))) return tell(OUT_OF_REACH)
         }
         for (k in 0 until h.size) {
             val px = x + h.dx[k]
@@ -463,6 +533,7 @@ class Session(
         pushUndo()
         log += Clear(world.step)
         world.clearAll()
+        reachStep = -1
     }
 
     private fun pushUndo(saveLog: Boolean = false) {
@@ -533,6 +604,7 @@ class Session(
 
         /** Hotter than this, the hand does not take it. */
         const val HAND_TEMP = 60f
+        const val OUT_OF_REACH = "Da kommst du nicht hin"
 
         /** Share of the difference to the surroundings a carried thing loses per step (half in about 20 seconds). */
         private const val CARRY_COOLING = 0.0006f

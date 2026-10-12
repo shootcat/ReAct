@@ -103,6 +103,42 @@ class SupplyTest {
     }
 
     @Test
+    fun `with a limited reach the tools only get to what is open to the sky`() {
+        val s = session { _, _ -> }
+        // a cave under the rock with sand and a log on it, reached only by a shaft stopped with earth
+        s.fill("rock", 2, 30, 61, 61)
+        s.fill("air", 20, 45, 40, 55)
+        s.fill("sand", 20, 53, 26, 55)
+        s.fill("trunk", 34, 54, 38, 55)
+        s.fill("air", 28, 30, 31, 44)
+        s.fill("earth", 28, 30, 31, 33)
+        s.reachLimited = true
+        s.tap(24, 53, Session.SCOOP, 3)
+        assertEquals(0, s.bucketAmount, "the sand in the shut cave")
+        assertEquals(Session.OUT_OF_REACH, s.notice)
+        s.tap(36, 54, Session.HAND)
+        assertNull(s.held, "the log in the shut cave")
+        // dig the plug out from above, tip the earth aside
+        s.bucketSize = 40
+        s.press(29, 31, Session.SCOOP, 3)
+        s.run(0.5f)
+        s.release()
+        assertEquals(materials.id("earth"), s.bucketMaterial)
+        s.tap(50, 20, Session.POUR, 3)
+        s.run(1f)
+        // now the cave is open
+        s.tap(36, 54, Session.HAND)
+        assertNotNull(s.held, s.notice)
+        // without the limit (the sandbox) everything is in reach
+        val free = session { _, _ -> }
+        free.fill("rock", 2, 30, 61, 61)
+        free.fill("air", 20, 45, 40, 55)
+        free.fill("sand", 20, 53, 40, 55)
+        free.tap(24, 53, Session.SCOOP, 3)
+        assertTrue(free.bucketAmount > 0)
+    }
+
+    @Test
     fun `the hand picks up a loose object and puts it down elsewhere, where it falls`() {
         val s = session { _, _ -> }
         s.fill("trunk", 10, 59, 25, 61)
