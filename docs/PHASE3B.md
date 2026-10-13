@@ -2,7 +2,8 @@
 
 Phase 3b vor Phase 4: Bedienung, Sichtbarkeit von Temperatur und Material, warme Luft, Level 2 und 3 organisch, Medaillen neu gemessen. Phase 4 ist nicht begonnen.
 
-**Build:** [`beta-95`](https://github.com/shootcat/ReAct/releases/tag/beta-95), APK und Screenshots dort.
+**Build:** [`beta-96`](https://github.com/shootcat/ReAct/releases/tag/beta-96), APK und Screenshots dort.
+- beta-95 war schon grün: Level 1 im App-Test Gold in 0:34 mit 1 Griff. beta-96 ändert nur den neuen App-Test. Die Materialinfo zeigt dort die Lava in der Höhle statt Luft, und die Hand-Hervorhebung wird aufgenommen, bevor Feuer den Stamm auf der Düne verbrennt.
 - beta-92 bis beta-94 waren rot, nur an App-Tests. sim und level waren immer grün.
   - Der neue Test suchte am Ende die Materialleiste. Im Werkzeug-Reiter heißt sie aber `tool_bar` (ab beta-93 behoben).
   - Level 1 ohne Medaille. Die Diagnose aus beta-94 ergab nach dem Schöpfen: Eimer leer, 0 Griffe. Der Griff war als langes Drücken gewertet worden, also als Materialinfo ohne Handgriff.

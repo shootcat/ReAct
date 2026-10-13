@@ -380,26 +380,22 @@ class AppSmokeTest {
 
     /**
      * Phase 3b: a finger held still asks what is there (and is no action), the heat picture over the whole
-     * world, with the hand everything it can take lights up, and zoomed far in the world stays in its box.
+     * world, with the hand everything it can take lights up (the fallen log and the stone on the dune), and
+     * zoomed far in the world stays in its box.
      */
     @Test
     fun infoHeatAndHand(): Unit = ActivityScenario.launch(MainActivity::class.java).use {
         compose.waitForIdle()
         compose.onNodeWithText("Spielplatz").performClick()
         run(1500)
-        // lava onto the bridge, so the heat picture has something to show
-        category("Hitze").performScrollTo().performClick()
-        compose.onNodeWithTag("material_Lava").performScrollTo().performClick()
-        paint(115, 125, holdMillis = 300)
-        run(1500)
-        // a finger held still on the pond
+        // a finger held still on the pond, then on the lava in the cave deep in the rock
         compose.onNodeWithTag("world").performTouchInput { down(cellToOffset(100, 172)) }
         run(800)
         compose.onNodeWithTag("info").assertExists()
         shot("35_info_wasser")
         compose.onNodeWithTag("world").performTouchInput { up() }
         run(300)
-        compose.onNodeWithTag("world").performTouchInput { down(cellToOffset(115, 126)) }
+        compose.onNodeWithTag("world").performTouchInput { down(cellToOffset(150, 312)) }
         run(800)
         compose.onNodeWithTag("world").performTouchInput { up() }
         run(200)
