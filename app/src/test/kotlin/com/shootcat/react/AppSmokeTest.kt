@@ -325,6 +325,10 @@ class AppSmokeTest {
         run(400)
         compose.onNodeWithTag("world").performTouchInput { up() }
         run(700)
+        // what the bucket holds now and the time and actions so far, for the message if no gold comes
+        val afterScoop = compose.onAllNodesWithTag("tool_bar").printToString(Int.MAX_VALUE) + "\n" +
+            compose.onAllNodesWithTag("level_hud").printToString(Int.MAX_VALUE) + "\n" +
+            compose.onAllNodesWithTag("notice").printToString(Int.MAX_VALUE)
         compose.onNodeWithTag("speed_Schnell").performClick()
         var waited = 0
         while (compose.onAllNodesWithTag("level_end").fetchSemanticsNodes().isEmpty() && waited < 120_000) {
@@ -339,7 +343,12 @@ class AppSmokeTest {
         // one bucket out of the window is the gold of this level (TrockenerTeichTest: 31 to 38 s, 1 action)
         val medal = compose.onNodeWithTag("medal").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)?.joinToString { it.text } ?: ""
         File("build/screenshots/level1_medaille.txt").writeText(medal)
-        if (medal != "Gold") throw AssertionError("Level 1 mit einem Eimer aus dem Fenster: $medal statt Gold")
+        if (medal != "Gold") {
+            throw AssertionError(
+                "Level 1 mit einem Eimer aus dem Fenster: $medal statt Gold\nNach dem Schöpfen:\n$afterScoop\nAm Ende:\n" +
+                    compose.onNodeWithTag("level_end").printToString(Int.MAX_VALUE),
+            )
+        }
         compose.onNodeWithTag("level_next").performClick()
         run(1500)
         shot("32_level2")
