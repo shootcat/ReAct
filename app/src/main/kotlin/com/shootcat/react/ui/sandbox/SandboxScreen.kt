@@ -307,14 +307,6 @@ fun SandboxScreen(
                 RoundIconButton(Glyph.GEAR, "Menü", { menu = true }, size = 44.dp)
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, containerColor = Palette.surfaceHigh) {
                     DropdownMenuItem(
-                        text = { Text("Wetter …", color = Palette.text) },
-                        onClick = {
-                            menu = false
-                            weather = true
-                        },
-                        modifier = Modifier.testTag("menu_weather"),
-                    )
-                    DropdownMenuItem(
                         text = { Text("Entdeckungsbuch", color = Palette.text) },
                         onClick = {
                             menu = false
@@ -380,6 +372,14 @@ fun SandboxScreen(
                             runner.post { it.setSupply(next) }
                             if (next == Session.Supply.PROCURE) onTool(Session.HAND)
                         },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Wetter …", color = Palette.text) },
+                        onClick = {
+                            menu = false
+                            weather = true
+                        },
+                        modifier = Modifier.testTag("menu_weather"),
                     )
                     DropdownMenuItem(
                         text = { Text("Entdeckungsbuch", color = Palette.text) },

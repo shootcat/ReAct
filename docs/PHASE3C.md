@@ -2,8 +2,11 @@
 
 Phase 3c nach 3b, vor Phase 4: Atmosphäre und Wetter. Wolken, Regen und Schnee, Wind, Gewitter mit Blitzen, Wetter im Level-Format und in den Vorlagen, Wetterregler im Spielplatz. Phase 4 ist nicht begonnen.
 
-**Build:** [`beta-98`](https://github.com/shootcat/ReAct/releases/tag/beta-98), APK und Screenshots dort.
-- beta-97 war rot, nur am neuen App-Test: Er suchte den Menüeintrag „Wetter …“ über ein Test-Tag und fand ihn nicht. Simulation, Level und alle übrigen App-Tests waren grün, die App kompilierte. Der Test sucht den Eintrag jetzt wie die anderen Tests über seinen Text, wartet kurz und zeigt bei einem Fehlschlag den ganzen Bildschirm.
+**Build:** [`beta-99`](https://github.com/shootcat/ReAct/releases/tag/beta-99), APK und Screenshots dort.
+- beta-97 und beta-98 waren rot, beide nur am neuen App-Test; Simulation, Level und alle übrigen App-Tests waren grün.
+  - beta-97: Der Test fand den Menüeintrag „Wetter …“ nicht.
+  - beta-98: Der Test gibt jetzt bei einem Fehlschlag den Bildschirm aus. Daran war die Ursache zu sehen: Der Eintrag war versehentlich ins Menü des Level-Bildschirms geraten statt ins Menü des Spielplatzes. Dort öffnete er nichts, weil die Wetterregler im Level gesperrt sind.
+  - Behoben: Der Eintrag steht jetzt im Spielplatz-Menü; das Level-Menü ist wieder wie in 3b.
 
 ## 1. Dampf, Kondensationshöhe, Wolken
 
