@@ -211,7 +211,7 @@ class AppSmokeTest {
         compose.onNodeWithTag("material_Schöpfen").performClick()
         paint(100, 172, holdMillis = 400)
         compose.onNodeWithTag("material_Gießen").performClick()
-        paint(40, 95, holdMillis = 800, wiggle = true)
+        paint(40, 95, holdMillis = 800)
         run(1500)
         shot("16_eimer")
         compose.onNodeWithContentDescription("Menü").performClick()
@@ -315,12 +315,13 @@ class AppSmokeTest {
         // of the rock wall (brush 3, the bucket is the first tool). Not its left edge: after a second and a
         // half the pool has seeped in there, and an empty bucket takes what lies under the finger, water.
         // A short wipe (3b): the stroke begins with the first movement, on the earth, which fixes what the
-        // bucket takes, and goes on scooping where the finger rests. (A still finger would ask what is there,
-        // and a tap scoops only once the finger lifts: in this slow test that can be after the water seeped in.)
+        // bucket takes, and goes on scooping where the finger rests. A finger held still would ask what is
+        // there instead: the test clock runs on while the screen settles, past the 0.45 s of a long press, and
+        // Robolectric's touch slop is 16 dp, so the wipe goes further than that.
         compose.onNodeWithTag("world").performTouchInput {
             down(levelCell(52, 46, 220, 140))
-            moveBy(Offset(30f, 0f))
-            moveBy(Offset(-30f, 0f))
+            moveBy(Offset(WIPE, 0f))
+            moveBy(Offset(-WIPE, 0f))
         }
         run(400)
         compose.onNodeWithTag("world").performTouchInput { up() }
@@ -328,7 +329,8 @@ class AppSmokeTest {
         // what the bucket holds now and the time and actions so far, for the message if no gold comes
         val afterScoop = compose.onAllNodesWithTag("tool_bar").printToString(Int.MAX_VALUE) + "\n" +
             compose.onAllNodesWithTag("level_hud").printToString(Int.MAX_VALUE) + "\n" +
-            compose.onAllNodesWithTag("notice").printToString(Int.MAX_VALUE)
+            compose.onAllNodesWithTag("notice").printToString(Int.MAX_VALUE) + "\n" +
+            "Materialinfo: " + compose.onAllNodesWithTag("info").printToString(Int.MAX_VALUE)
         compose.onNodeWithTag("speed_Schnell").performClick()
         var waited = 0
         while (compose.onAllNodesWithTag("level_end").fetchSemanticsNodes().isEmpty() && waited < 120_000) {
@@ -423,6 +425,11 @@ class AppSmokeTest {
         compose.onNodeWithTag("tool_bar").assertExists()
     }
 
+    private companion object {
+        /** A wipe further than Robolectric's touch slop (16 dp, 48 px here): a stroke, not a tap or a long press. */
+        const val WIPE = 60f
+    }
+
     /**
      * The screen position of cell (x, y) of a level of [w] × [h] cells, with the whole level on screen
      * (zoomed out as far as it goes, or small enough to fit): centred, as large as the view allows.
@@ -479,17 +486,15 @@ class AppSmokeTest {
     }
 
     /**
-     * Puts a finger down on cell (x, y) for a while: the brush pours for as long. A finger held still longer
-     * than a moment asks what is there instead (3b.1), so for a long pour it [wiggle]s first: a stroke goes on
-     * pouring where the finger rests.
+     * Puts a finger down on cell (x, y) for a while: the brush pours for as long. A finger held still asks what
+     * is there instead (3b.1), and the test clock may run past the 0.45 s of a long press while the screen
+     * settles, so it wipes a little first: a stroke goes on pouring where the finger rests.
      */
-    private fun paint(x: Int, y: Int, holdMillis: Long, wiggle: Boolean = false) {
+    private fun paint(x: Int, y: Int, holdMillis: Long) {
         compose.onNodeWithTag("world").performTouchInput {
             down(cellToOffset(x, y))
-            if (wiggle) {
-                moveBy(Offset(0f, 40f))
-                moveBy(Offset(0f, -40f))
-            }
+            moveBy(Offset(0f, WIPE))
+            moveBy(Offset(0f, -WIPE))
         }
         run(holdMillis)
         compose.onNodeWithTag("world").performTouchInput { up() }
