@@ -2,7 +2,11 @@
 
 Phase 3b vor Phase 4: Bedienung, Sichtbarkeit von Temperatur und Material, warme Luft, Level 2 und 3 organisch, Medaillen neu gemessen. Phase 4 ist nicht begonnen.
 
-**Build:** [`beta-92`](https://github.com/shootcat/ReAct/releases/tag/beta-92), APK und Screenshots dort.
+**Build:** [`beta-93`](https://github.com/shootcat/ReAct/releases/tag/beta-93), APK und Screenshots dort.
+- beta-92 war rot, an zwei App-Tests:
+  - Level 1 ohne Medaille: Zeitpunkt des Schöpfens, siehe „Tests“.
+  - Der neue Test suchte am Ende die Materialleiste, im Werkzeug-Reiter heißt sie aber `tool_bar`.
+  - sim und level waren grün. In beta-93 sind beide App-Tests angepasst.
 
 ## 1. Materialinfo durch langes Drücken
 
@@ -255,7 +259,7 @@ Gemessen auf diesem Rechner (JVM, etwa 2,5-mal langsamer als das Galaxy Z Fold2)
   - `LevelGateTest`: Freischalten.
 - **App-Test** (Robolectric, Screenshots im Release):
   - Neu: `infoHeatAndHand`, mit den Screenshots `35_info_wasser`, `36_info_lava`, `37_waermebild`, `38_hand_greifbar` und `39_zoom_im_rahmen`.
-  - Angepasst an das lange Drücken: Langes Schütten wischt erst kurz. Level 1 wird mit einem Tippen von 0,4 s geschöpft.
+  - Angepasst an das lange Drücken: Langes Schütten wischt erst kurz. Level 1 wird mit einem kurzen Wischen auf dem Erdpfropf geschöpft, das sofort beginnt. Ein Tippen schöpft erst beim Loslassen. Im langsamen Robolectric-Lauf war das in beta-92 zu spät: Wasser war schon eingesickert, und es gab keine Medaille.
 
 ## Zur Freigabe
 

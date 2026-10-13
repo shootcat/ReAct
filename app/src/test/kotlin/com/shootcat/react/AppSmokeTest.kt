@@ -314,9 +314,14 @@ class AppSmokeTest {
         // the level begins with all of it on screen; one bucket out of the middle of the earth in the window
         // of the rock wall (brush 3, the bucket is the first tool). Not its left edge: after a second and a
         // half the pool has seeped in there, and an empty bucket takes what lies under the finger, water.
-        // A short touch (3b): it scoops for as long as the finger was down; held still longer it would ask
-        // what is there instead.
-        compose.onNodeWithTag("world").performTouchInput { down(levelCell(52, 46, 220, 140)) }
+        // A short wipe (3b): the stroke begins with the first movement, on the earth, which fixes what the
+        // bucket takes, and goes on scooping where the finger rests. (A still finger would ask what is there,
+        // and a tap scoops only once the finger lifts: in this slow test that can be after the water seeped in.)
+        compose.onNodeWithTag("world").performTouchInput {
+            down(levelCell(52, 46, 220, 140))
+            moveBy(Offset(30f, 0f))
+            moveBy(Offset(-30f, 0f))
+        }
         run(400)
         compose.onNodeWithTag("world").performTouchInput { up() }
         run(700)
@@ -406,7 +411,7 @@ class AppSmokeTest {
         compose.onNodeWithTag("world").performTouchInput { pinch(cellToOffset(100, 170), 8f) }
         run(800)
         shot("39_zoom_im_rahmen")
-        compose.onNodeWithTag("material_bar").assertExists()
+        compose.onNodeWithTag("tool_bar").assertExists()
     }
 
     /**
