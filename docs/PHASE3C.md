@@ -2,11 +2,12 @@
 
 Phase 3c nach 3b, vor Phase 4: Atmosphäre und Wetter. Wolken, Regen und Schnee, Wind, Gewitter mit Blitzen, Wetter im Level-Format und in den Vorlagen, Wetterregler im Spielplatz. Phase 4 ist nicht begonnen.
 
-**Build:** [`beta-97`](https://github.com/shootcat/ReAct/releases/tag/beta-97), APK und Screenshots dort.
+**Build:** [`beta-98`](https://github.com/shootcat/ReAct/releases/tag/beta-98), APK und Screenshots dort.
+- beta-97 war rot, nur am neuen App-Test: Er suchte den Menüeintrag „Wetter …“ über ein Test-Tag und fand ihn nicht. Simulation, Level und alle übrigen App-Tests waren grün, die App kompilierte. Der Test sucht den Eintrag jetzt wie die anderen Tests über seinen Text, wartet kurz und zeigt bei einem Fehlschlag den ganzen Bildschirm.
 
 ## 1. Dampf, Kondensationshöhe, Wolken
 
-- **Neues Material „Wolke“** (`cloud`): ein Gas, etwas dichter als Dampf, weiß, zu 80 % lichtdurchlässig. Im Spielplatz liegt es unter „Flüssig“ neben Dampf.
+- **Neues Material „Wolke“** (`cloud`): ein Gas, doppelt so dicht wie Dampf und so dicht wie Luft (es schwebt, statt zu steigen), weiß, zu 80 % lichtdurchlässig. Im Spielplatz liegt es unter „Flüssig“ neben Dampf.
 - **Kondensationshöhe** (`cloud_base`): eine Zeile pro Welt.
   - Im Level steht sie in der `level.json`.
   - In den Vorlagen hängt sie von der Landschaft ab: Wiese, Feld, Insel, Küste und Vulkan auf 16 % der Höhe von oben, der Berg auf 20 %, das Höhlensystem auf 10 %.
@@ -19,7 +20,7 @@ Phase 3c nach 3b, vor Phase 4: Atmosphäre und Wetter. Wolken, Regen und Schnee,
 
 ## 2. Regen und Schnee
 
-- Eine Wolkenzelle mit mindestens 7 Wolkennachbarn (von 8) regnet: Alle 10 Schritte fällt mit 0,6 % ein Tropfen Wasser unter die Wolke.
+- Eine Wolkenzelle mit mindestens 7 Wolkennachbarn (von 8) regnet: Alle 10 Schritte wird sie mit 0,6 % zu einem Tropfen Wasser, der fällt.
 - Hat die Wolke Frost (0 °C oder kälter), fällt Schnee. Wolken nehmen wie offene Luft langsam die Lufttemperatur an; im Spielplatz macht der Temperaturregler unter 0 °C aus Regen Schnee.
 - Regen ist immer **Süßwasser**. Beim Verdampfen von Salzwasser bleibt das Salz zurück, der Dampf ist Wasserdampf.
 - Gemessen: Eine Wolke von 676 Zellen gibt in 30 s 358 Zellen Wasser. Dieselbe Wolke bei Frost gibt 358 Zellen Schnee.
@@ -29,7 +30,7 @@ Phase 3c nach 3b, vor Phase 4: Atmosphäre und Wetter. Wolken, Regen und Schnee,
 
 - **Feld pro Welt:** Richtung und Stärke (−1 bis 1, plus nach rechts), dazu Böen.
   - Die Böen sind eine Dreieckswelle um den Grundwind, mit fester Dauer (Level: `gust_seconds`, Spielplatz: 10 s). Sie hängen nur von der Schrittnummer ab und sind damit ohne Zufall.
-- **Was der Wind trägt,** steht pro Material in `materials.json` (`wind`, 0 bis 1): Rauch, Wolke 1, Dampf 0,9, Asche 0,85, Grubengas 0,8, Feuer und totes Laub 0,6, Schnee 0,55, Glut 0,35, Sand 0,2.
+- **Was der Wind trägt,** steht pro Material in `materials.json` (`wind`, 0 bis 1): Rauch 1, Dampf 0,9, Asche 0,85, Grubengas 0,8, Feuer und totes Laub 0,6, Schnee 0,55, Glut 0,35, Sand 0,2.
   - Gase im Freien wandern mit dem Wind, Zelle für Zelle. Am Rand der Welt weht er sie hinaus.
   - **Wolken ziehen als Ganzes:** Zuerst hatte der Wind jede Wolkenzelle einzeln mitgenommen. Damit zog er jede Wolke zu einem Streifen aus, eine Zelle dünn, und der regnete nie (gefunden im Test mit Salzwasser). Jetzt rückt das ganze Wolkenband eine Spalte weiter, sobald der Wind genug Weg gesammelt hat: bei Wind 1 sechs Spalten pro Sekunde, bei 0,15 etwa eine. Das geht ohne Zufall. Vor einer Wand oder einem Berg staut sich die Wolke und regnet dort ab. Gemessen: Eine Wolke von 30 × 9 Zellen zieht bei Wind 0,5 in 10 s 30 Spalten weit und ist danach 38 Spalten breit.
   - Pulver wird erst getragen, wenn der Wind stärker ist als 1 minus sein Windwert. Sand fliegt also erst ab 0,8, Schnee ab 0,45, Asche schon ab 0,15.
@@ -63,7 +64,7 @@ Phase 3c nach 3b, vor Phase 4: Atmosphäre und Wetter. Wolken, Regen und Schnee,
 
 - **Im Level gibt es keinen Zufall im Wetter.** Der Wind ist fest, die Böen sind eine feste Welle.
 - Regen und Blitze kommen nur aus Wolken, die im Gelände gemalt sind oder durch Dampf im Spiel entstehen. Ihre Würfel kommen aus dem einen Zufallsgenerator der Welt, in fester Reihenfolge. Derselbe Seed und dieselben Aktionen ergeben auf jedem Gerät dieselben Blitze an denselben Stellen.
-- **Zufallswetter nur im Spielplatz** und nur, wenn es eingeschaltet ist („Eigenes Wetter“). Dann dreht der Wind alle 10 s ein wenig, mit Böen. Wolkenbänke ziehen in 34 % der Fälle auf, ein Gewitter in 6 %. Auch das läuft über den Generator der Welt und ist mit dem Protokoll wiederholbar.
+- **Zufallswetter nur im Spielplatz** und nur, wenn es eingeschaltet ist („Eigenes Wetter“). Dann dreht der Wind alle 10 s ein wenig, mit Böen. Sind Wolken eingeschaltet, ziehen außerdem in 34 % der Fälle Wolkenbänke auf, in 6 % ein Gewitter. Auch das läuft über den Generator der Welt und ist mit dem Protokoll wiederholbar.
 - **Undo und Protokoll:** Das Wetter gehört zum Schnappschuss (Wind, Böen, Höhe, Temperatur, Gewitter). Wetteränderungen und „Gewitter auslösen“ sind Eingaben im Protokoll und werden beim Abspielen wiederholt.
 - Tests: `DeterminismTest` (alle grün), `WeatherTest` („gusts are a fixed rhythm, and the weather goes back with an undo“).
 - **Level 1 bis 3** bleiben ohne Wetter: kein Wind, keine Wolken. Ihre Wege und Medaillen gelten unverändert; die Lösungstests sind grün.

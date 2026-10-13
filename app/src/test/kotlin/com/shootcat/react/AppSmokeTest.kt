@@ -12,6 +12,7 @@ import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.TouchInjectionScope
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isRoot
@@ -458,9 +459,7 @@ class AppSmokeTest {
         var vm: AppViewModel? = null
         scenario.onActivity { vm = ViewModelProvider(it)[AppViewModel::class.java] }
         val world = vm!!.world.value!!.session.world
-        compose.onNodeWithContentDescription("Menü").performClick()
-        compose.onNodeWithTag("menu_weather").performClick()
-        compose.waitForIdle()
+        openWeather()
         compose.onNodeWithTag("weather_wind").performSemanticsAction(SemanticsActions.SetProgress) { it(0.6f) }
         compose.onNodeWithTag("weather_gusts").performClick()
         compose.waitForIdle()
@@ -471,9 +470,7 @@ class AppSmokeTest {
         assertTrue("gusts on", world.gust > 0f)
         assertTrue("the meadow has clouds", world.cloudBase > 0)
 
-        compose.onNodeWithContentDescription("Menü").performClick()
-        compose.onNodeWithTag("menu_weather").performClick()
-        compose.waitForIdle()
+        openWeather()
         compose.onNodeWithTag("weather_storm").performClick()
         run(300)
         assertTrue("a thunderstorm is going on", world.storm > 0)
@@ -503,6 +500,25 @@ class AppSmokeTest {
             "bolts seen: $bolts in ${waited / 1000.0} s, wind ${world.wind}, gust ${world.gust}, cloud base ${world.cloudBase}\n",
         )
         restoreDefaults()
+    }
+
+    /** Opens the weather controls from the menu; if the entry or the panel is missing, the failure shows the screen. */
+    private fun openWeather() {
+        compose.onNodeWithContentDescription("Menü").performClick()
+        compose.waitForIdle()
+        var waited = 0
+        while (compose.onAllNodesWithText("Wetter …").fetchSemanticsNodes().isEmpty() && waited < 2000) {
+            run(100)
+            waited += 100
+        }
+        if (compose.onAllNodesWithText("Wetter …").fetchSemanticsNodes().isEmpty()) {
+            throw AssertionError("Menüeintrag Wetter fehlt. Auf dem Bildschirm:\n" + compose.onAllNodes(isRoot()).printToString(Int.MAX_VALUE))
+        }
+        compose.onNodeWithText("Wetter …").performClick()
+        compose.waitForIdle()
+        if (compose.onAllNodesWithTag("weather_apply").fetchSemanticsNodes().isEmpty()) {
+            throw AssertionError("Wetterregler fehlen. Auf dem Bildschirm:\n" + compose.onAllNodes(isRoot()).printToString(Int.MAX_VALUE))
+        }
     }
 
     /**
