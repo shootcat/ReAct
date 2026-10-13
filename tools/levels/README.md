@@ -8,9 +8,13 @@ Hier liegen die Skripte, die die Bilder der Level gemalt haben. Sie brauchen Pyt
 python3 tools/levels/trockener_teich.py               # Level 1
 python3 tools/levels/signalfeuer.py                   # Level 2
 python3 tools/levels/tiefe_schmelze.py                # Level 3
+python3 tools/levels/gewitterfeuer.py                 # Level 4
+python3 tools/levels/regenmacher.py                   # Level 5
 python3 tools/levels/trockener_teich.py 40 30 100 80  # dazu ein Ausschnitt als Text
 ```
 
 `paint.py` enthält die Hilfen: Rechtecke, Vielecke, Kleckse, Rauschen, Speichern.
 
-Wärmequellen brauchen Abstand oder Dämmung: Magma hält seine Hitze unbegrenzt, und Fels leitet sie weit. Level 2 trennt deshalb Vulkan und Gipfel durch eine Schlucht und das Meer. Level 3 liegt in Tuff (verankerte Asche), der die Wärme nur langsam weitergibt.
+Wärmequellen brauchen Abstand oder Dämmung: Magma hält seine Hitze unbegrenzt, und Fels leitet sie weit. Level 2 trennt deshalb Vulkan und Gipfel durch eine Schlucht und das Meer. Level 3 liegt in Tuff (verankerte Asche), der die Wärme nur langsam weitergibt. Level 5 hat links und rechts der heißen Quelle je eine Felsspalte bis zum Grund; ohne sie kochte nach drei Minuten das Meer am Ufer, und nach fünf starben die Pflanzen auf dem Feld an der Wärme aus dem Fels.
+
+Wolken malt man mit der Farbe der Wolke (`cloud`); sie gehören an die Kondensationshöhe des Levels (`cloud_base`), sonst steigen oder sinken sie dorthin.

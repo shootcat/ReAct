@@ -3,6 +3,8 @@
 Phase 3c nach 3b, vor Phase 4: Atmosphäre und Wetter. Wolken, Regen und Schnee, Wind, Gewitter mit Blitzen, Wetter im Level-Format und in den Vorlagen, Wetterregler im Spielplatz. Phase 4 ist nicht begonnen.
 
 **Build:** [`beta-99`](https://github.com/shootcat/ReAct/releases/tag/beta-99), APK und Screenshots dort.
+
+**Nachtrag mit Level 4 und 5:** [`beta-101`](https://github.com/shootcat/ReAct/releases/tag/beta-101). Der Zwischenstand mit Level 4, beta-100, war ebenfalls grün. Was sich dafür an der Physik geändert hat, steht in Abschnitt 9; die Abschnitte 1 bis 4 sind auf den neuen Stand gebracht.
 - beta-97 und beta-98 waren rot, beide nur am neuen App-Test; Simulation, Level und alle übrigen App-Tests waren grün.
   - beta-97: Der Test fand den Menüeintrag „Wetter …“ nicht.
   - beta-98: Der Test gibt jetzt bei einem Fehlschlag den Bildschirm aus. Daran war die Ursache zu sehen: Der Eintrag war versehentlich ins Menü des Level-Bildschirms geraten statt ins Menü des Spielplatzes. Dort öffnete er nichts, weil die Wetterregler im Level gesperrt sind.
@@ -19,15 +21,17 @@ Phase 3c nach 3b, vor Phase 4: Atmosphäre und Wetter. Wolken, Regen und Schnee,
 - **Dampf in geschlossenen Höhlen** kondensiert wie bisher an den kalten Wänden, auch wenn die Welt eine Kondensationshöhe hat. Geschlossen heißt: kein Weg zum Himmel. Das prüft dieselbe Raumerkennung wie für den Druck.
 - **Wolken ballen sich:** Unter der Kondensationshöhe steigt Wolke auf. Darüber sinkt sie, solange Luft unter ihr ist, und rutscht schräg von anderer Wolke ab. So bilden sich Haufen an der Kondensationshöhe statt Eiszapfen. Neuer Dampf, der von unten kommt, legt sich oben auf den Haufen.
 - **Auflösen:** Ein einzelner Fetzen ohne Nachbarn löst sich langsam auf. Ohne Kondensationshöhe (Wolken im Spielplatz ausgeschaltet) verschwinden alle Wolken nach und nach.
-- Gemessen (`WeatherTest`): Offener Dampf (288 Zellen) wird in 15 s zu 217 Zellen Wolke, 71 Zellen sind schon als Regen gefallen. Ohne Kondensationshöhe werden daraus wie früher 288 Zellen Wasser. In einer geschlossenen Höhle mit Kondensationshöhe entsteht keine Wolke.
+- Gemessen (`WeatherTest`): Offener Dampf (288 Zellen) wird in 15 s zu 270 Zellen Wolke, 18 Zellen sind schon als Regen gefallen. Ohne Kondensationshöhe werden daraus wie früher 288 Zellen Wasser. In einer geschlossenen Höhle mit Kondensationshöhe entsteht keine Wolke.
 
 ## 2. Regen und Schnee
 
-- Eine Wolkenzelle mit mindestens 7 Wolkennachbarn (von 8) regnet: Alle 10 Schritte wird sie mit 0,6 % zu einem Tropfen Wasser, der fällt.
+- Eine Wolke regnet aus ihrer **Unterseite**, wo sie mindestens 4 Zellen dick ist: Alle 10 Schritte wird dort jede unterste Wolkenzelle mit 1 % zu einem Tropfen Wasser, der fällt, und die Wolke darüber sinkt nach.
+  - Bis zum Nachtrag regnete jede Wolkenzelle mit mindestens 7 Wolkennachbarn ab, also auch tief im Inneren. Eine dicke Gewitterbank war damit in 30 s leergeregnet. Jetzt regnet eine dicke Wolke lange und gleichmäßig, eine dünne gar nicht.
 - Hat die Wolke Frost (0 °C oder kälter), fällt Schnee. Wolken nehmen wie offene Luft langsam die Lufttemperatur an; im Spielplatz macht der Temperaturregler unter 0 °C aus Regen Schnee.
 - Regen ist immer **Süßwasser**. Beim Verdampfen von Salzwasser bleibt das Salz zurück, der Dampf ist Wasserdampf.
-- Gemessen: Eine Wolke von 676 Zellen gibt in 30 s 358 Zellen Wasser. Dieselbe Wolke bei Frost gibt 358 Zellen Schnee.
-- Salzwasser, das über Magma kocht, bei leichtem Wind (0,15): Nach 180 s sind neben dem Becken 28 Zellen Süßwasser gefallen und keine Zelle Salzwasser. Im Becken liegen 66 Zellen Salz.
+- Gemessen: Eine Wolke von 676 Zellen (52 breit, 13 dick) gibt in 30 s 99 Zellen Wasser, 577 Zellen Wolke bleiben. Dieselbe Wolke bei Frost gibt 99 Zellen Schnee.
+- Salzwasser, das über Magma kocht, bei leichtem Wind (0,15): Nach 180 s sind neben dem Becken 43 Zellen Süßwasser gefallen und keine Zelle Salzwasser. Im Becken liegen 66 Zellen Salz.
+- **Salz im Boden:** Versickert Salzwasser im Freien (im Tageslicht) in Erde, auf der Pflanzen wachsen, bleibt das Salz als Kruste obenauf liegen, und daneben wächst nichts. Bisher verschwand das Salz beim Versickern einfach, und Salzwasser wirkte auf einem Feld wie Süßwasser. In Sand, Kies und Tuff und in dunklen Höhlen läuft es weiter wie bisher; so bleiben die Wege von Level 3 unverändert (dort versickert salziges Schmelzwasser in der tiefen Kammer).
 
 ## 3. Wind
 
@@ -35,7 +39,8 @@ Phase 3c nach 3b, vor Phase 4: Atmosphäre und Wetter. Wolken, Regen und Schnee,
   - Die Böen sind eine Dreieckswelle um den Grundwind, mit fester Dauer (Level: `gust_seconds`, Spielplatz: 10 s). Sie hängen nur von der Schrittnummer ab und sind damit ohne Zufall.
 - **Was der Wind trägt,** steht pro Material in `materials.json` (`wind`, 0 bis 1): Rauch 1, Dampf 0,9, Asche 0,85, Grubengas 0,8, Feuer und totes Laub 0,6, Schnee 0,55, Glut 0,35, Sand 0,2.
   - Gase im Freien wandern mit dem Wind, Zelle für Zelle. Am Rand der Welt weht er sie hinaus.
-  - **Wolken ziehen als Ganzes:** Zuerst hatte der Wind jede Wolkenzelle einzeln mitgenommen. Damit zog er jede Wolke zu einem Streifen aus, eine Zelle dünn, und der regnete nie (gefunden im Test mit Salzwasser). Jetzt rückt das ganze Wolkenband eine Spalte weiter, sobald der Wind genug Weg gesammelt hat: bei Wind 1 sechs Spalten pro Sekunde, bei 0,15 etwa eine. Das geht ohne Zufall. Vor einer Wand oder einem Berg staut sich die Wolke und regnet dort ab. Gemessen: Eine Wolke von 30 × 9 Zellen zieht bei Wind 0,5 in 10 s 30 Spalten weit und ist danach 38 Spalten breit.
+  - **Wolken ziehen als Ganzes:** Zuerst hatte der Wind jede Wolkenzelle einzeln mitgenommen. Damit zog er jede Wolke zu einem Streifen aus, eine Zelle dünn, und der regnete nie (gefunden im Test mit Salzwasser). Jetzt rückt das ganze Wolkenband eine Spalte weiter, sobald der Wind genug Weg gesammelt hat: bei Wind 1 sechs Spalten pro Sekunde, bei 0,15 etwa eine. Das geht ohne Zufall. Gemessen: Eine Wolke von 30 × 9 Zellen zieht bei Wind 0,5 in 10 s 30 Spalten weit und ist danach 38 Spalten breit.
+  - **Stau am Berg (Steigungsregen):** Kann eine Wolkenzelle nicht weiter, weil Fels oder schon gestaute Wolke vor ihr liegt, steigt sie schräg darüber oder türmt sich auf der Stelle. So wird die Wolke an einem Berg oder einer Wand dick genug zum Regnen. Ohne diese Regel lag sie dort als eine Zelle dünne Schicht und regnete nie (gefunden beim Bau von Level 5).
   - Pulver wird erst getragen, wenn der Wind stärker ist als 1 minus sein Windwert. Sand fliegt also erst ab 0,8, Schnee ab 0,45, Asche schon ab 0,15.
   - Nur trockene, nicht verankerte Körner an der Oberfläche fliegen; nasser Sand bleibt liegen.
   - Gemessen (Verschiebung des Schwerpunkts): Rauch bei Wind 0,6 21,2 Zellen in 1 s (windstill 0,6). Schnee bei 0,7 und Asche bei 0,4 je 4,0 Zellen in 3 s. Sand bei 0,7 nichts, bei 1,0 3,8 Zellen, nass bei 1,0 nichts.
@@ -49,19 +54,19 @@ Phase 3c nach 3b, vor Phase 4: Atmosphäre und Wetter. Wolken, Regen und Schnee,
 
 ## 4. Gewitter
 
-- **Wann:** Unter einer Wolkendecke, die mindestens 24 Zellen breit und im Mittel 6 Zellen tief ist, kann alle 10 Schritte ein Blitz fallen. Die Wahrscheinlichkeit ist 2 %, während eines ausgelösten Gewitters 12 %, mit mindestens 1,5 s Pause zwischen zwei Blitzen.
-- **Wohin:** Unter der Decke wird jede Spalte bis zum ersten festen Halt abgesucht. Fallende Tropfen und Gase zählen nicht. Bewertet wird die Höhe (2 Punkte pro Zeile), dazu Metall +60, Baumkrone und Stamm +24, Wasser +10, Nasses +4. Metall zieht den Blitz also auch dann an, wenn es bis zu 30 Zeilen tiefer liegt als der höchste gewöhnliche Boden, oder bis zu 18 Zeilen tiefer als eine Baumkrone.
-- **Metall leitet ihn:** Trifft der Blitz Metall, läuft der Strom durch alles Metall, das daran hängt (bis 600 Zellen), und erhitzt es um 700 °C. Am unteren Ende geht er in den Untergrund, und dort wirkt er wie ein Einschlag. Steht eine Stange in der Erde, passiert dort nichts Besonderes: Sie ist ein Blitzableiter. Steht sie auf einem Holzstoß, brennt der Holzstoß. Ohne diese Regel hätte der Blitz nur die Spitze der Stange erhitzt. Im Labor wurde Holz neben einer 760 °C heißen Stange höchstens 111 °C warm und fing nie Feuer; ein Blitzableiter als Feuerquelle (Punkt 8) wäre so nicht möglich gewesen.
+- **Wann:** Unter einer Wolkendecke, die mindestens 24 Zellen breit und im Mittel 6 Zellen tief ist, kann alle 10 Schritte ein Blitz fallen. Die Wahrscheinlichkeit ist 2 %, während eines Gewitters (im Spielplatz ausgelöst oder im Level mit `storm_seconds`) 12 %, mit mindestens 1,5 s Pause zwischen zwei Blitzen.
+- **Wohin:** Unter allen Gewitterwolken zusammen wird jede Spalte bis zum ersten festen Halt abgesucht. Bis zum Nachtrag kam bei einer zerrissenen Decke immer der linke Teil zuerst an die Reihe, und der Blitz fiel dort, obwohl rechts ein besseres Ziel stand. Fallende Tropfen und Gase zählen nicht. Bewertet wird die Höhe (2 Punkte pro Zeile), dazu Metall +60, Baumkrone und Stamm +24, Wasser +10, Nasses +4. Metall zieht den Blitz also auch dann an, wenn es bis zu 30 Zeilen tiefer liegt als der höchste gewöhnliche Boden, oder bis zu 18 Zeilen tiefer als eine Baumkrone.
+- **Metall leitet ihn:** Trifft der Blitz Metall, läuft der Strom durch alles Metall, das daran hängt (bis 600 Zellen). Die getroffene Spitze wird 500 °C heißer, das übrige Metall 100 °C (bis zum Nachtrag alles 700 °C; ein Pfosten schmolz dann nach zwei Blitzen, was ein Blitzableiter nicht tut). Am unteren Ende geht er in den Untergrund, und dort wirkt er wie ein Einschlag. Steht eine Stange in der Erde, passiert dort nichts Besonderes: Sie ist ein Blitzableiter. Steht sie auf einem Holzstoß, brennt der Holzstoß. Ohne diese Regel hätte der Blitz nur die Spitze der Stange erhitzt. Im Labor wurde Holz neben einer 760 °C heißen Stange höchstens 111 °C warm und fing nie Feuer; ein Blitzableiter als Feuerquelle (Punkt 8) wäre so nicht möglich gewesen.
 - **Was er tut:**
   - Die Luft rund um den Einschlag (5 × 5 Zellen) wird 900 °C heiß.
-  - In den 3 × 3 Zellen um den Einschlag: Metall wird um 700 °C heißer, Brennbares wird 300 °C über seinen Zündpunkt gebracht und brennt, Wasser wird 160 °C heiß und verdampft zum Teil, alle anderen Stoffe außer dem Gelände (Fels, Erzader, Magma) werden 900 °C heiß.
+  - In den 3 × 3 Zellen um den Einschlag (bei Metall: um den Erdungspunkt unter seinem Fuß): Metall, das nicht schon geleitet hat, wird um 500 °C heißer, Brennbares wird 300 °C über seinen Zündpunkt gebracht und brennt, Wasser wird 160 °C heiß und verdampft zum Teil, alle anderen Stoffe außer dem Gelände (Fels, Erzader, Magma) werden 900 °C heiß.
   - Sand schmilzt zu einer Glasröhre, bis zu 8 Zellen tief und mit Ästen (Fulgurit). Liegt eine Pfütze auf dem Sand, geht der Fulgurit durch bis zu 4 Zellen Flüssigkeit in den Sand darunter.
 - **Licht und Ton:** Der Blitz ist ein gezackter Kanal mit weißem Kern und violettem Rand, 8 Schritte lang zu sehen. Die ganze Welt wird 10 Schritte lang aufgehellt. Dazu kommt Donner, ein neuer Klang: harter Knall, dann ein langes Grollen.
 - Gemessen:
-  - Eine Metallstange zwischen höherem Sand wird getroffen und ist danach 720 °C heiß.
-  - Ein Blitz in Sand gibt 8 Zellen Glas.
-  - Ein Holzpfahl unter einem Gewitter brennt nach dem Einschlag mit 11 Zellen.
-  - Eine Stange auf einem Holzstoß wird getroffen; 0,5 s später brennen 4 Zellen Holz. Dieselbe Stange daneben in der Erde: kein Feuer.
+  - Eine Metallstange zwischen höherem Sand wird getroffen, ihre Spitze ist danach 520 °C heiß.
+  - Ein Blitz in Sand gibt 7 Zellen Glas.
+  - Ein Holzpfahl unter einem Gewitter brennt nach dem Einschlag mit 10 Zellen.
+  - Eine Stange auf einem Holzstoß wird getroffen; 0,5 s später brennen 2 Zellen Holz, kurz darauf der Stoß. Dieselbe Stange daneben in der Erde: kein Feuer.
 
 ## 5. Determinismus
 
@@ -133,47 +138,81 @@ Gemessen auf diesem Rechner (JVM, etwa 2,5-mal langsamer als das Galaxy Z Fold2)
   - Größte Welt mit Wetter: 3,37 ms / 2,5 ≈ 1,35 ms pro Schritt, dazu etwa 1,2 ms pro Bild.
   - Den gültigen Wert liefert „Leistung messen“ auf dem Gerät.
 
-## 8. Vorschlag: Level 4
+## 8. Level 4 und 5
 
-Nur das Konzept; gebaut wird nach Freigabe.
+Im ersten Bericht standen hier zwei Konzepte. Beide sind nach Freigabe gebaut worden: Abschnitt 9.
 
-### „Gewitterfeuer“ (empfohlen): Der Blitzableiter als Feuerquelle
+## 9. Nachtrag: Level 4 „Gewitterfeuer“ und Level 5 „Regenmacher“
 
-- **Ziel:** Entzünde den Holzstoß auf dem Felsplateau. Im ganzen Level gibt es keine Flamme, keine Glut und keine Lava. Über dem Tal hängt eine schwere Gewitterwolke; der Blitz ist die einzige Feuerquelle.
-- **Was von selbst passiert:** Der Blitz trifft den höchsten Punkt, den hohen Baum auf dem Hügel links, oder den See. Der Holzstoß rechts bleibt kalt.
-- **Die Einsicht:** Der Blitz sucht Metall, läuft durch das Metall und schlägt an dessen unterem Ende in den Untergrund. Eine Metallstange, die *auf* dem Holzstoß steht, holt den Blitz genau dorthin und zündet ihn. Eine Stange, die *im Boden* steckt, leitet ihn harmlos ab (ein echter Blitzableiter).
-- **Welt** (etwa 220 × 140, Hochland):
-  - links ein Hügel mit einem hohen Baum, dem höchsten Punkt,
-  - in der Mitte ein See,
-  - rechts ein Felsplateau mit dem Holzstoß als Zielbereich,
-  - am Hang ein umgestürzter Zaun aus kurzen Metallstangen. Die Hand trägt bis zu 15 Zellen Metall (`MAX_LOAD`); das reicht, wenn der Holzstoß höchstens etwa 30 Zeilen tiefer liegt als die Baumkrone.
-  - oben eine gemalte Wolkenbank über die ganze Breite, Kondensationshöhe fest, kein Wind.
-- **Wege** (je ein Lösungstest, Grenzen nach dem Bau gemessen):
-  - Gold: eine Stange aus dem Zaun nehmen und senkrecht auf den Holzstoß stellen; 2 Handgriffe.
-  - Silber (beim Bau zu prüfen): eine Spur aus trockenem Laub oder Holz vom Baum hinüber zum Holzstoß. Der Blitz zündet den Baum, und das Feuer läuft die Spur entlang; das kostet mehr Zeit und mehr Griffe. Glut mit dem Eimer zu tragen geht nicht, denn der Eimer nimmt nichts, was brennt.
-  - Falle: Stange neben dem Stoß in den Boden stecken. Der Blitz fährt sichtbar in die Stange, und nichts brennt. Daraus lernt man, wohin der Strom geht.
-- **Determinismus:** Die Wolke ist gemalt und der Wind fest. Die Blitze kommen aus der Wolke über den Zufallsgenerator der Welt; derselbe Seed und dieselben Handgriffe ergeben dieselben Einschläge.
-- **Labor (`ZLabL4`, 200 × 120, Wolkenbank 12 Zeilen tief über der ganzen Breite, je 60 s):**
+### Was sich dafür an der Simulation geändert hat
 
-  | Aufbau | Einschläge | Holzstoß |
-  |---|---|---|
-  | ohne Stange | Baumkrone, See, Erde am Hügel | bleibt kalt (21 °C) |
-  | Stange (20 Zellen) auf dem Holzstoß | 2 in die Stange (dazu 2 in den Baum) | brennt 2,0 s nach Beginn, nach 60 s sind 66 von 96 Zellen verbrannt |
-  | Stange durch den Holzstoß bis in den Fels | 1 in die Stange | verkohlt erst innen, brennt nach 4,2 s |
-  | Stange neben dem Stoß im Fels (geerdet) | 1 in die Stange | brennt nicht, das Holz wird 85 °C warm |
-  | kurze Stange (12 Zellen) auf dem Stoß | keiner in 60 s | brennt nicht |
+Jeder Punkt kam aus einem Laborversuch, der zeigte, dass das Level sonst nicht trägt:
 
-  Dazu der feste Test `WeatherTest` („lightning runs down a metal rod and goes to ground at its foot“): Stange auf dem Holzstoß: 4 Zellen Holz brennen 0,5 s nach dem Einschlag. Stange in der Erde daneben: keine.
-- **Offen, vor dem Bau zu klären:**
-  - Eine Wolkenbank regnet sich in etwa einer Minute zur Hälfte ab. Damit das Gewitter anhält, braucht das Level entweder eine sehr dicke Bank oder eine kleine Erweiterung des Formats: `"storm_seconds"` in `weather`, also ein Gewitter wie im Spielplatz, aber fest im Level, ohne Zufallswetter.
-  - Der Regen macht Holz nass, und nasses Holz brennt nicht. Im Labor waren nach 30 s höchstens 9 von 96 Zellen nass, und das Feuer kam trotzdem. Ein Felsüberhang über einem Teil des Stoßes könnte daraus eine zweite, kleine Einsicht machen.
+1. **`storm_seconds`** im Levelformat: Das Level beginnt in einem Gewitter dieser Dauer. Es kommen nur Blitze aus vorhandenen Wolken, über den Seed.
+2. **Regen aus der Wolkenunterseite** (Abschnitt 2): Die Gewitterbank von Level 4 war vorher nach 30 s leergeregnet, jetzt blitzt es gut zwei Minuten (letzter Blitz bei 142 s).
+3. **Blitz zum besten Ziel unter allen Gewitterwolken** (Abschnitt 4): vorher bevorzugte er den linken Teil einer zerrissenen Decke.
+4. **Metall wird nur an der Spitze richtig heiß** (500 °C, sonst 100 °C): vorher schmolz ein Pfosten nach zwei Blitzen in den Sand.
+5. **Stau am Berg** (Abschnitt 3): ohne ihn regnete die Wolke in Level 5 nie, sie lag als dünne Schicht an der Kondensationshöhe.
+6. **Salzkruste im Boden** (Abschnitt 2): ohne sie löste Salzwasser, direkt aufs Feld gegossen, Level 5 in 18 s.
 
-### Alternative: „Regenmacher“ (Wolken und Wind)
+Level 1 bis 3 sind davon unberührt; alle ihre Lösungstests sind grün, mit denselben Medaillen.
 
-- Ein trockenes Feld soll grün werden (Ziel: Gras im Zielbereich). Es gibt nur Salzwasser, und Salzwasser tötet Gras.
-- Am Rand liegt ein Lavaschlot. Salzwasser auf der Lava verdampft, das Salz bleibt liegen. Der Dampf steigt zur Kondensationshöhe und wird Wolke. Der feste Wind trägt sie als Ganzes über das Feld, und dort regnet sie Süßwasser.
-- Einsicht: Verdampfen trennt Wasser vom Salz, und Wolken wandern mit dem Wind.
-- Gemessen (`WeatherTest`): Salzwasser, das über Magma kocht, gibt bei Wind 0,15 neben dem Becken 28 Zellen Süßwasser und kein Salzwasser.
+### Level 4 „Gewitterfeuer“ (Hochland, Kernniveau)
+
+- **Ziel:** Entzünde den Holzstoß auf dem Plateau.
+- **Welt** (200 × 130):
+  - Über dem ganzen Tal hängt eine Gewitterwolke (Kondensationshöhe 20, `storm_seconds` 180).
+  - Links ein Felsgrat und ein Hügel mit einem hohen Baum, in der Mitte ein See.
+  - Rechts ein Felsplateau mit dem Holzstoß, an seinem rechten Ende ein Sandhaufen.
+  - Unter einem Felsdach am linken Ende des Plateaus stehen alte Zaunpfosten aus Metall: einer mit 15 Zellen, drei mit 7.
+  - Kein Feuer im Level, nur die Hand.
+- **Ohne Eingriff:** Der erste Blitz trifft nach 0,3 s die Baumkrone, der Baum brennt ab. Danach gehen alle Blitze in den Grat, 57 in 180 s. Der Holzstoß bleibt unberührt.
+- **Wege** (`GewitterfeuerTest`, neun Tests):
+
+  | Weg | Zeit | Griffe | Medaille |
+  |---|---|---|---|
+  | langer Pfosten auf den Holzstoß | 5,3 s | 2 | Gold |
+  | ein kurzer Pfosten auf den Holzstoß (jeder reicht) | 5,8 s | 2 | Gold |
+  | erst den langen Pfosten neben den Stoß in den Fels gestellt: Er fängt jeden Blitz ab und ist zu heiß, um ihn wieder zu greifen; dann zwei kurze übereinander auf den Stoß, die höher reichen | 16,7 s | 6 | Silber |
+  | Pfosten erst nach 100 s auf den Stoß, der Regen hat das Holz schon etwas genässt | 103,8 s | 2 | Bronze |
+
+- **Fallen:**
+  - Pfosten in den Fels neben dem Stoß: 24 Einschläge in den Pfosten in 60 s, kein Feuer, danach „Zu heiß zum Anfassen“.
+  - Pfosten in den Sandhaufen: Der Blitz macht darunter Glas (Fulgurit), aber kein Feuer.
+  - Pfosten auf den Grat: ein Blitzableiter dort oben, der Holzstoß bleibt kalt.
+- **Determinismus:** Dieselben Handgriffe bringen dieselben Blitze an dieselben Stellen (eigener Test).
+- **Medaillen:** Gold 30 s und 2 Griffe, Silber 90 s und 6, Bronze 150 s und 20.
+
+![Level 4](phase3c/level4.png)
+
+### Level 5 „Regenmacher“ (Küste, Kernniveau)
+
+- **Ziel:** Bring das trockene Feld zum Grünen (40 lebende Pflanzenzellen im Feld; am Anfang sind es 15: drei Grasbüschel und sechs Samen).
+- **Welt** (220 × 130):
+  - Links das Meer, Salzwasser, hinter einer Felszunge.
+  - Dahinter eine heiße Quelle: ein leeres Steinbecken über einer Magmatasche, in Tuff. Links und rechts davon je eine Felsspalte bis zum Grund, damit die Wärme weder das Meer noch das Feld erreicht. Ohne die Spalten kochte nach 3 Minuten das Meer am Ufer, und nach 5 Minuten starben die Pflanzen an der Wärme aus dem Fels.
+  - In der Mitte das trockene Feld, rechts davon eine Steilwand, die weit über die Kondensationshöhe (26) reicht.
+  - Fester Wind 0,4 zum Berg hin, mit Böen. Nur der Eimer (30 Zellen).
+- **Ohne Eingriff:** 7 Minuten lang keine Wolke, nichts wächst, nichts stirbt.
+- **Wege** (`RegenmacherTest`, sieben Tests):
+
+  | Weg | Zeit | Griffe | Medaille |
+  |---|---|---|---|
+  | drei Eimer Salzwasser ins heiße Becken: es kocht, das Salz bleibt im Becken, die Wolke staut sich an der Steilwand und regnet aufs Feld | 34,7 s | 6 | Gold |
+  | sechs Eimer: mehr Wolke, aber mehr Griffe | 37,8 s | 12 | Silber |
+  | drei Eimer auf den heißen Tuff neben dem Becken: verdampft langsamer | 240,5 s | 6 | Bronze |
+
+- **Fallen:**
+  - Ein Eimer allein gibt zu wenig Regen: nach 7 Minuten 23 Pflanzen.
+  - Salzwasser direkt aufs Feld: Gras und Samen sterben, eine Salzkruste bleibt, auch späterer Regen bringt nichts zurück (5 Pflanzen nach 5 Minuten).
+- **Geprüft:** Der Regen ist Süßwasser (kein Salz auf dem Feld), dieselben Handgriffe ergeben dieselbe Welt.
+- **Medaillen:** Gold 90 s und 6 Griffe, Silber 180 s und 12, Bronze 300 s und 30.
+
+![Level 5](phase3c/level5.png)
+
+### Offen
+
+- Über einem großen Feuer beult sich eine Wolkendecke nach unten: Rauch steigt in die Wolke und verdrängt Wolkenzellen nach unten (zu sehen in den Bildern von Level 4 über dem brennenden Baum). Das ist nur eine Frage des Aussehens; die Blitze und der Regen sind davon nicht betroffen. Behebung wäre, dass Rauch an der Wolke ansteht statt sie zu verdrängen; das gehört zu einer späteren Runde Feinschliff.
 
 ## Entdeckungsbuch
 
@@ -188,7 +227,7 @@ Alle 70 Szenen zeigen ihre Eigenschaft innerhalb von 20 s (`DiscoveryTest`).
 
 ## Tests
 
-- `sim` und `level`: 168 Tests, alle grün (lokal, vor dem Push).
+- `sim` und `level`: 184 Tests, alle grün (lokal, vor dem Push), davon neu im Nachtrag `GewitterfeuerTest` (9) und `RegenmacherTest` (7).
 - Neu: `WeatherTest` mit 12 Tests und einem Bildertest:
   - offener Dampf wird zu Wolke, nicht zu Wasser;
   - in der geschlossenen Höhle kondensiert er wie bisher;
@@ -208,7 +247,7 @@ Alle 70 Szenen zeigen ihre Eigenschaft innerhalb von 20 s (`DiscoveryTest`).
   - Gewitter auslösen,
   - warten, bis ein Blitz auf dem Bildschirm ist, und ihn aufnehmen,
   - dann den Regen aufnehmen.
-  - Screenshots `40_wetter`, `41_gewitter_blitz`, `42_gewitter_regen`.
+  - Screenshots `40_wetter`, `41_gewitter_blitz`, `42_gewitter_regen`; im Nachtrag dazu `43_level4_gewitter` und `44_level5_regenmacher`.
 
 ## Bilder
 

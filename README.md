@@ -73,13 +73,14 @@ Jedes Level ist ein gemalter Boden (`terrain.png`, jede Farbe ein Material), ein
 Das Wetter eines Levels steht fest in der `level.json` (3c), nie zufällig:
 
 ```json
-"weather": { "cloud_base": 30, "wind": 0.2, "gust": 0.1, "gust_seconds": 10 }
+"weather": { "cloud_base": 30, "wind": 0.2, "gust": 0.1, "gust_seconds": 10, "storm_seconds": 180 }
 ```
 
 - `cloud_base`: die Kondensationshöhe als Zeile von oben. Darüber wird Dampf im Freien zu Wolke. Fehlt sie, gibt es keine Wolken, und Dampf kondensiert wie bisher beim Abkühlen.
 - `wind`: −1 bis 1, plus nach rechts; `gust` und `gust_seconds`: Böen als fester Rhythmus um den Wind herum.
+- `storm_seconds`: Das Level beginnt in einem Gewitter dieser Dauer. Blitze kommen so oft wie bei „Gewitter auslösen“ im Spielplatz, aber nur aus den Wolken, die da sind, und über den Seed der Welt.
 - Regen und Blitze kommen nur aus Wolken, die im Gelände gemalt sind oder im Spiel entstehen. Ihr Zufall läuft über den Seed der Welt; dieselben Aktionen ergeben dasselbe Wetter.
-- Level 1 bis 3 haben kein Wetter: kein Wind, keine Wolken. Ihre gemessenen Wege und Medaillen gelten unverändert.
+- Level 1 bis 3 haben kein Wetter: kein Wind, keine Wolken. Ihre gemessenen Wege und Medaillen gelten unverändert. Level 4 („Gewitterfeuer“) beginnt im Gewitter, Level 5 („Regenmacher“) hat Wind zum Berg hin.
 
 Im Level reichen Eimer und Hand nur an das, was zum Himmel offen ist: an Luft, Gas und Flüssigkeit, die mit der obersten Zeile verbunden sind, und an alles, was daran grenzt. Was hinter Fels, Eis oder Erde liegt, ist erst erreichbar, wenn der Weg dorthin offen ist („Da kommst du nicht hin“).
 
@@ -88,6 +89,8 @@ Im Level reichen Eimer und Hand nur an das, was zum Himmel offen ist: an Luft, G
 | Trockener Teich | Wald, leicht | Fülle den Teich mit Wasser | Ast auf die Glut, der Stamm brennt durch (Gold); Erde aus dem Fenster schöpfen (Gold); Fenster anspülen (Silber); Rinne aufschütten (Silber); eimerweise tragen (Bronze) |
 | Signalfeuer | Vulkan, Kernniveau | Entzünde den Holzstoß auf dem Gipfel | Sand vom Strand auf dem Lavasee erhitzen und zweimal seitlich an den Holzstoß gießen: die erste Ladung taut, die zweite zündet (Gold); Schnee ins Meer räumen, dann heißer Sand (Silber); Salzwasser aus dem Meer taut den Schnee, dann heißer Sand (Silber) |
 | Tiefe Schmelze | Mine, Obergrenze | Bringe Glas in die tiefe Kammer | Salz taut das Eis, Sand auf dem Schlot zu Glas, mit Wasser abgeschreckt zu Scherben (Gold); Erdpfropf graben, Lava läuft aus, Sand darauf (Silber); Erzgeröll schmilzt zur Wärmebrücke (Silber) |
+| Gewitterfeuer | Hochland, Kernniveau | Entzünde den Holzstoß auf dem Plateau | Ein Gewitter, aber kein Feuer im Level: einen Metallpfosten auf den Holzstoß stellen, der Blitz läuft hinein (Gold); ein geerdeter Pfosten fängt die Blitze ab, zwei kurze übereinander auf dem Stoß überragen ihn (Silber); spät, wenn der Regen das Holz schon nässt (Bronze) |
+| Regenmacher | Küste, Kernniveau | Bring das trockene Feld zum Grünen | Nur Salzwasser, und Salz tötet die Pflanzen: drei Eimer ins heiße Becken, der Dampf wird Wolke, der Wind treibt sie an die Steilwand, dort regnet sie Süßwasser aufs Feld (Gold); sechs Eimer (Silber); Salzwasser auf den heißen Tuff, langsamer (Bronze) |
 
 Die Bilder der Lösungswege liegen unter `docs/phase3/`, die Malskripte unter `tools/levels/`.
 
@@ -107,9 +110,9 @@ Das Modul ist reines Kotlin ohne Android. Es läuft identisch in den Tests auf d
 - **Warme Luft (3b):** Warme Luft steigt: Ist die Luft unter einer Zelle wärmer als die darüber, tauschen beide mit einer festen, deterministischen Wahrscheinlichkeit von 0,1 pro Schritt ihre Temperatur. Unter einer festen Decke breitet sich warme Luft seitlich aus. Eingeschlossene Luft (kein Weg zum Himmel, dieselbe Raumerkennung wie für den Druck) kühlt nicht auf die Umgebung ab: Ein mit Stein oder Holz verschlossener Gang über Magma wird nach 30 s im Mittel 206 °C warm, der offene nur 110 °C.
 - **Wetter (3c):**
   - **Wolken:** Dampf im Freien kühlt beim Steigen ab (0,3 °C pro Zeile). Ab der Kondensationshöhe (pro Level und Vorlage) wird er zu Wolke, nicht zu Wasser. Wolke ist ein eigenes Gas: Sie schwebt an der Kondensationshöhe, ballt sich zu Haufen und löst sich als einzelner Fetzen langsam auf. In geschlossenen Höhlen kondensiert Dampf wie bisher an kalten Flächen.
-  - **Regen und Schnee:** Eine Wolkenzelle mit mindestens 7 Wolkennachbarn regnet mit kleiner Wahrscheinlichkeit ab, bei Frost schneit sie. Regen ist immer Süßwasser, auch aus dem Dampf von Salzwasser; das Salz bleibt beim Verdampfen zurück.
-  - **Wind:** fest pro Level, mit Böen als Dreieckswelle (kein Zufall). Er trägt Gase, Rauch, Wolken, Asche, Schnee und trockenen Sand, je nach Material (`wind` in `materials.json`: Rauch 1, Asche 0,85, Schnee 0,55, Sand 0,2). Sand fliegt erst im Sturm, nasse oder verankerte Körner nie. Wolken ziehen als Ganzes (bei Wind 1 sechs Spalten pro Sekunde) und stauen sich vor Wänden und Bergen. Warme Luft und Flammen ziehen mit dem Wind, deshalb läuft ein Feuer vor allem in Windrichtung.
-  - **Gewitter:** Eine Wolkendecke, mindestens 24 Zellen breit und im Mittel 6 tief, kann Blitze geben. Der Blitz trifft unter der Wolke den höchsten Punkt, Metall weit bevorzugt, dann Baumkronen, dann Wasser. Er erhitzt Metall stark, entzündet Brennbares, kocht Wasser auf und schmilzt Sand zu einer Glasröhre (Fulgurit). Durch Metall läuft er bis zu dessen unterem Ende und schlägt dort in den Untergrund: Eine Stange in der Erde leitet ihn ab, eine Stange auf einem Holzstoß zündet ihn. Dazu ein Lichtblitz über der ganzen Welt und Donner.
+  - **Regen und Schnee:** Eine Wolke regnet aus ihrer Unterseite, wo sie mindestens 4 Zellen dick ist, bei Frost schneit sie. Dicke Wolken regnen deshalb lange, dünne gar nicht. Regen ist immer Süßwasser, auch aus dem Dampf von Salzwasser; das Salz bleibt beim Verdampfen zurück. Versickert Salzwasser im Freien in Erde, bleibt eine Salzkruste liegen, auf der nichts wächst.
+  - **Wind:** fest pro Level, mit Böen als Dreieckswelle (kein Zufall). Er trägt Gase, Rauch, Wolken, Asche, Schnee und trockenen Sand, je nach Material (`wind` in `materials.json`: Rauch 1, Asche 0,85, Schnee 0,55, Sand 0,2). Sand fliegt erst im Sturm, nasse oder verankerte Körner nie. Wolken ziehen als Ganzes (bei Wind 1 sechs Spalten pro Sekunde). Vor Wänden und Bergen steigen sie auf und türmen sich, bis sie abregnen (Steigungsregen). Warme Luft und Flammen ziehen mit dem Wind, deshalb läuft ein Feuer vor allem in Windrichtung.
+  - **Gewitter:** Eine Wolkendecke, mindestens 24 Zellen breit und im Mittel 6 tief, kann Blitze geben. Der Blitz trifft unter der Wolke den höchsten Punkt, Metall weit bevorzugt, dann Baumkronen, dann Wasser. Er erhitzt Metall stark, entzündet Brennbares, kocht Wasser auf und schmilzt Sand zu einer Glasröhre (Fulgurit). Durch Metall läuft er bis zu dessen unterem Ende und schlägt dort in den Untergrund: Eine Stange in der Erde leitet ihn ab, eine Stange auf einem Holzstoß zündet ihn. Die Spitze wird dabei 500 °C heißer, das übrige Metall 100 °C. Unter mehreren Gewitterwolken trifft er das beste Ziel unter allen. Dazu ein Lichtblitz über der ganzen Welt und Donner.
 - **Phasenwechsel nur über Temperaturschwellen:**
   - Entzünden (`ignite_temp`), Schmelzen (`melt_temp`), Sieden (`boil_temp`), Erstarren, Gefrieren und Kondensieren (`freeze_temp`).
   - Sieden und Erstarren brauchen zusätzlich latente Wärme. Wasser kocht deshalb nicht in einem einzigen Schritt weg, und Lava bleibt eine Weile flüssig.

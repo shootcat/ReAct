@@ -365,6 +365,15 @@ class AppSmokeTest {
         run(500)
         compose.onNodeWithTag("level_list").assertExists()
         shot("33_auswahl_mit_medaille")
+        // the levels of the weather (3c): a thunderstorm over the valley, the dry field under the cliff
+        for ((id, name) in listOf("gewitterfeuer" to "43_level4_gewitter", "regenmacher" to "44_level5_regenmacher")) {
+            compose.onNodeWithTag("level_$id").performScrollTo().performClick()
+            run(2500)
+            compose.onNodeWithTag("level_hud").assertExists()
+            shot(name)
+            compose.onNodeWithTag("back").performClick()
+            run(500)
+        }
     }
 
     /** A level in landscape: the goal beside the world; the bucket cannot reach the deep chamber behind the ice. */
