@@ -61,6 +61,7 @@ class Level(val spec: LevelSpec, val terrain: Picture, val anchor: Picture?) {
                 gustSteps = (w.gustSeconds * com.shootcat.react.sim.MaterialTable.STEPS_PER_SECOND).toInt(),
                 random = false,
             )
+            if (w.stormSeconds > 0f) world.startStorm((w.stormSeconds * com.shootcat.react.sim.MaterialTable.STEPS_PER_SECOND).toInt())
         }
         for (t in spec.trees) world.plantTree(t.x, t.y, t.tree)
         for (i in animals) world.placeAnimal(cells[i], i % width, i / width)

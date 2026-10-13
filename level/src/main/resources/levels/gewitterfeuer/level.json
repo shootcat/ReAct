@@ -1,0 +1,20 @@
+{
+  "id": "gewitterfeuer",
+  "name": "Gewitterfeuer",
+  "area": "Hochland",
+  "tier": "Kernniveau",
+  "seed": 404,
+  "tools": {"hand": true},
+  "trees": [
+    {"x": 68, "y": 65}
+  ],
+  "weather": {"cloud_base": 20, "storm_seconds": 180},
+  "goals": [
+    {"type": "ignite", "text": "Entzünde den Holzstoß auf dem Plateau", "area": [[160, 70], [186, 70], [186, 80], [160, 80]], "amount": 10, "hold": 2}
+  ],
+  "rating": {
+    "gold": {"seconds": 30, "actions": 2},
+    "silver": {"seconds": 90, "actions": 6},
+    "bronze": {"seconds": 150, "actions": 20}
+  }
+}

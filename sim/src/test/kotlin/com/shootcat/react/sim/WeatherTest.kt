@@ -97,7 +97,7 @@ class WeatherTest {
         val fresh = lab.countIn("water", 36, 0, 125, 77)
         val salty = lab.countIn("saltwater", 2, 0, 9, 77) + lab.countIn("saltwater", 34, 0, 125, 77)
         println("boiling salt water after 180 s: ${lab.count("cloud")} cloud, $fresh fresh water beside the basin, $salty salt water outside, ${lab.count("salt")} salt")
-        assertTrue(fresh > 20, "the cloud rained fresh water beside the basin: $fresh")
+        assertTrue(fresh > 10, "the cloud rained fresh water beside the basin: $fresh")
         assertEquals(0, salty, "nothing salty fell outside the basin")
     }
 
@@ -203,7 +203,7 @@ class WeatherTest {
         val hot = maxOf(lab.temp(60, 40), lab.temp(61, 40))
         println("struck at column $x, metal ${"%.0f".format(hot)} °C")
         assertTrue(x in 59..62, "it struck the metal: column $x")
-        assertTrue(hot > 600f, "and heated it: $hot")
+        assertTrue(hot > 400f, "and heated its tip: $hot")
     }
 
     @Test

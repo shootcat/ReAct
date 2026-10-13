@@ -265,6 +265,9 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     /** Per column in the band of clouds: how many cloud cells, and the lowest of them. */
     private val colClouds = IntArray(width)
     private val colBottom = IntArray(width)
+    private val colRun = IntArray(width)
+    private val spanX0 = IntArray(width / 2 + 1)
+    private val spanX1 = IntArray(width / 2 + 1)
     private val kindOf = materials.kind
     private val densityOf = materials.density
     private val fireId = materials.idOrNull("fire") ?: AIR
@@ -1836,25 +1839,33 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         }
         colClouds.fill(0)
         colBottom.fill(-1)
+        colRun.fill(0)
         val stir = windNow != 0f
         for (y in top..bottom) {
             val row = y * w
             for (x in 0 until w) {
                 val i = row + x
-                if (mat[i].toInt() != cloudId) continue
+                if (mat[i].toInt() != cloudId) {
+                    colRun[x] = 0
+                    continue
+                }
                 colClouds[x]++
                 colBottom[x] = y
-                val around = cloudAround(x, y)
-                if (around >= RAIN_AROUND && chance(RAIN_CHANCE)) {
+                val run = ++colRun[x]
+                // rain falls out of the underside of a cloud, where it is thick enough (3c.2): a thick cloud
+                // rains for long, a thin one not at all
+                if (run >= RAIN_DEPTH && (y + 1 >= height || mat[i + w].toInt() != cloudId) && chance(RAIN_CHANCE)) {
                     precipitate(x, y, i)
-                } else if (stir || around < CLUMPED) {
+                } else if (stir || cloudAround(x, y) < CLUMPED) {
                     wake(x, y)
                 }
             }
         }
         // thunderstorms: a bank of cloud at least STORM_WIDTH wide and on average STORM_DEPTH deep (raining
         // makes it patchy: a column with half that still belongs to it)
+        // (all the banks that are thunderclouds together: the stroke goes to the best point under any of them)
         val needWidth = if (storm > 0) STORM_WIDTH / 2 else STORM_WIDTH
+        var spans = 0
         var x = 0
         while (x < w) {
             if (colClouds[x] < STORM_DEPTH / 2) {
@@ -1865,12 +1876,13 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             var sum = 0
             while (x < w && colClouds[x] >= STORM_DEPTH / 2) sum += colClouds[x++]
             val span = x - x0
-            if (span >= needWidth && sum >= span * STORM_DEPTH && step - lastStrike >= STRIKE_PAUSE &&
-                chance(if (storm > 0) STRIKE_STORM else STRIKE_CHANCE)
-            ) {
-                strike(x0, x - 1)
+            if (span >= needWidth && sum >= span * STORM_DEPTH) {
+                spanX0[spans] = x0
+                spanX1[spans] = x - 1
+                spans++
             }
         }
+        if (spans > 0 && step - lastStrike >= STRIKE_PAUSE && chance(if (storm > 0) STRIKE_STORM else STRIKE_CHANCE)) strike(spans)
     }
 
     /**
@@ -1908,15 +1920,17 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     }
 
     /**
-     * Lightning out of the bank of cloud over columns [x0]..[x1] (3c.4): it strikes the highest point under it,
+     * Lightning out of the thunderclouds, the first [spans] in spanX0/spanX1 (3c.4): it strikes the highest point under them,
      * or one that conducts better (metal, a tree, water), down a jagged path from the bottom of the cloud.
      */
-    private fun strike(x0: Int, x1: Int) {
+    private fun strike(spans: Int) {
         val w = width
         var bestX = -1
         var bestY = 0
         var bestScore = Int.MIN_VALUE
-        for (x in x0..x1) {
+        var x0 = 0
+        var x1 = 0
+        for (k in 0 until spans) for (x in spanX0[k]..spanX1[k]) {
             var y = colBottom[x] + 1
             // down to the ground: past the air and past what is falling through it (rain, snow)
             while (y < height && (kindOf[mat[y * w + x].toInt()] == Kind.GAS || !supported(x, y))) y++
@@ -1926,6 +1940,8 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
                 bestScore = score
                 bestX = x
                 bestY = y
+                x0 = spanX0[k]
+                x1 = spanX1[k]
             }
         }
         if (bestX < 0) return
@@ -1976,8 +1992,8 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
      * Where lightning strikes: sand turns into a tube of glass (a fulgurite), burnable things catch fire, metal
      * gets very hot, water flashes to steam, anything else glows for a moment, and the air around is scorching.
      *
-     * Metal carries it (3c.4): the current runs through every piece of metal it touches, heats all of it, and
-     * goes to ground under the lowest end. A rod standing in the earth takes the lightning harmlessly away;
+     * Metal carries it (3c.4): the current runs through every piece of metal it touches, heats the tip and
+     * warms the rest, and goes to ground under the lowest end. A rod standing in the earth takes the lightning harmlessly away;
      * one standing on a woodpile sets it alight where its foot rests.
      */
     private fun hit(x: Int, y: Int) {
@@ -2034,8 +2050,8 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
 
     /**
      * The current of a stroke into the metal at (x, y) runs through all the metal touching it (up to
-     * [CONDUCT_LIMIT] cells, nearest first) and heats it; returns the cell where it leaves: the lowest one,
-     * the first found of those.
+     * [CONDUCT_LIMIT] cells, nearest first): the tip gets very hot, the rest of it warm. Returns the cell where
+     * it leaves: the lowest one, the first found of those.
      */
     private fun conduct(x: Int, y: Int): Int {
         val w = width
@@ -2049,7 +2065,8 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         var foot = start
         while (head < n) {
             val i = q[head++]
-            temp[i] += LIGHTNING_METAL
+            // the tip where it struck gets very hot, the rest only warm: a good conductor carries it away
+            temp[i] += if (i == start) LIGHTNING_METAL else LIGHTNING_RUN
             wakeHeat(i % w, i / w)
             if (i / w > foot / w) foot = i
             val cx = i % w
@@ -2108,6 +2125,15 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         val half = (width / 6).coerceIn(24, 70)
         cloudBank(cx, half, STORM_BANK_DEPTH)
         storm = STORM_STEPS
+        wakeAll()
+    }
+
+    /**
+     * A thunderstorm for [steps] steps out of the clouds that are there, without making any (a level's
+     * `storm_seconds`): lightning comes as often as in a storm called up in the sandbox.
+     */
+    fun startStorm(steps: Int) {
+        storm = maxOf(storm, steps)
         wakeAll()
     }
 
@@ -2834,9 +2860,9 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         private const val COLD_SURFACE = 60f
         /** Rain, snow, lightning are looked at every so many steps. */
         private const val WEATHER_EVERY = 10
-        /** A cloud cell with this many cloud cells around rains (or snows), with this chance per look. */
-        private const val RAIN_AROUND = 7
-        private const val RAIN_CHANCE = 0.006f
+        /** The underside of a cloud at least this many cells thick rains (or snows), with this chance per look. */
+        private const val RAIN_DEPTH = 4
+        private const val RAIN_CHANCE = 0.01f
         /** Cloud: chance per step to rise to its height from below, to sink back from far above; with this many cloud cells around it is part of a cloud and stays. */
         private const val CLOUD_RISE = 0.5f
         private const val CLOUD_SINK = 0.3f
@@ -2865,7 +2891,9 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         private const val FLASH_STEPS = 10
         /** What lightning does: the air around, metal, burnable things (above their ignition point), water, anything else. */
         private const val LIGHTNING_AIR = 900f
-        private const val LIGHTNING_METAL = 700f
+        private const val LIGHTNING_METAL = 500f
+        /** What the current warms the metal it runs through, past the tip. */
+        private const val LIGHTNING_RUN = 100f
         private const val LIGHTNING_KINDLE = 300f
         private const val LIGHTNING_WATER = 160f
         private const val LIGHTNING_HEAT = 900f

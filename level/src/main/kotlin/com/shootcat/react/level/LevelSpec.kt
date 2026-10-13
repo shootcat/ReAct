@@ -53,7 +53,9 @@ data class Heat(val area: List<List<Int>>, val temp: Float)
 /**
  * A level's weather (3c.5). [cloudBase]: the row at and above which steam in the open air turns into cloud
  * (none: no clouds, steam in the open condenses as it cools). [wind]: -1 (a gale to the left) to 1 (to the
- * right). [gust]: how far gusts take it above and below that, one gust every [gustSeconds].
+ * right). [gust]: how far gusts take it above and below that, one gust every [gustSeconds]. [stormSeconds]: the
+ * level begins in a thunderstorm that lasts this long: lightning comes as often as when the sandbox calls one
+ * up, but only out of the clouds that are there; its strokes fall by the world's seed like everything else.
  */
 @Serializable
 data class WeatherSpec(
@@ -61,6 +63,7 @@ data class WeatherSpec(
     val wind: Float = 0f,
     val gust: Float = 0f,
     @SerialName("gust_seconds") val gustSeconds: Float = 10f,
+    @SerialName("storm_seconds") val stormSeconds: Float = 0f,
 )
 
 @Serializable
