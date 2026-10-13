@@ -1,5 +1,6 @@
 package com.shootcat.react.sim
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -26,6 +27,17 @@ data class DiscoverySpec(
     val scene: List<SceneFill> = emptyList(),
     /** A roof of rock over the scene: dark inside. */
     val roof: Boolean = false,
+    /** The weather of the scene (3c); none: no clouds, no wind. */
+    val weather: SceneWeather? = null,
+)
+
+/** The weather of a scene: where clouds form, the wind, the temperature of the air, a thunderstorm. */
+@Serializable
+data class SceneWeather(
+    @SerialName("cloud_base") val cloudBase: Int = -1,
+    val wind: Float = 0f,
+    val ambient: Float? = null,
+    val storm: Boolean = false,
 )
 
 /** A rectangle of a material in a scene, at its own or the given temperature, wet if asked. */
@@ -75,6 +87,8 @@ class Discoveries(val materials: MaterialTable, val entries: List<DiscoverySpec>
     /** Builds the scene of [entry] into a new world of [SCENE_W] × [SCENE_H] cells. */
     fun scene(entry: Entry, seed: Long = 11L): World {
         val w = World(SCENE_W, SCENE_H, materials, seed)
+        val weather = entry.spec.weather
+        weather?.ambient?.let { w.setAmbient(it) }
         val rock = materials.id("rock")
         for (y in 0 until SCENE_H) for (x in 0 until SCENE_W) {
             if (y >= SCENE_H - 2 || x < 2 || x >= SCENE_W - 2 || (entry.spec.roof && y < 2)) w.set(x, y, rock)
@@ -86,6 +100,10 @@ class Discoveries(val materials: MaterialTable, val entries: List<DiscoverySpec>
                 w.set(x, y, m, f.t ?: Float.NaN)
                 if (f.wet) w.setWet(x, y, true)
             }
+        }
+        if (weather != null) {
+            w.setWeather(cloudBase = weather.cloudBase, wind = weather.wind)
+            if (weather.storm) w.callStorm(SCENE_W / 2)
         }
         w.wakeAll()
         return w

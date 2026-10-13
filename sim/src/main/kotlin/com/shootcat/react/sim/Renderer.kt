@@ -21,6 +21,7 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
     private val smoke = mt.idOrNull("smoke") ?: -1
     private val glass = mt.idOrNull("glass") ?: -1
     private val steam = mt.idOrNull("steam") ?: -1
+    private val cloud = mt.idOrNull("cloud") ?: -1
     private val grass = mt.idOrNull("grass") ?: -1
     private val fish = mt.idOrNull("fish") ?: -1
     private val bird = mt.idOrNull("bird") ?: -1
@@ -190,6 +191,12 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
         }
         computeShade(running, x0, y0, x1, y1)
         critterCount = 0
+        // the wind (3c.3): grass waves along it, faint streaks run through the open air
+        val wn = world.windNow
+        val windDir = if (wn > 0f) 1 else if (wn < 0f) -1 else 0
+        val windAbs = if (wn > 0f) wn else -wn
+        val windRun = frame * (1 + (windAbs * 4f).toInt()) * windDir
+        val streaks = if (windAbs >= STREAK_WIND) (windAbs * STREAK_DENSITY).toInt() else 0
         // how deep in clear water the first row lies, for each column
         for (x in x0..x1) {
             var d = 0
@@ -213,8 +220,11 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
                 out[i] = if ((clearLiquid[up] || up == fire) && down == up) {
                     if (up == fire) mix(flameRamp[FLAME_STEPS / 3], bg, 0.5f) else mix(scale(palette[up * SHADES + 8], s), bg, 0.35f)
                 } else if (down == grass && (variant[i + w].toInt() and 3) != 0) {
-                    // blades of grass stick up into the air
-                    mix(scale(palette[grass * SHADES + (variant[i + w].toInt() and (SHADES - 1))], 1.15f * s), bg, 0.35f)
+                    // blades of grass stick up into the air; in the wind a lighter wave runs over them
+                    val lean = windDir != 0 && ((x * 2 - windRun) and 31) < 6 + (windAbs * 10f).toInt()
+                    mix(scale(palette[grass * SHADES + (variant[i + w].toInt() and (SHADES - 1))], (if (lean) 1.4f else 1.15f) * s), bg, 0.35f)
+                } else if (streaks > 0 && s > 0.6f && streak(x - windRun, i / w, streaks)) {
+                    mix(0xFFFFFFFF.toInt(), bg, 0.82f)
                 } else {
                     bg
                 }
@@ -322,6 +332,19 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
                     out[i] = mix(scale(c, s), bg, 1f - mt.opacity[m] * fade)
                     continue
                 }
+                cloud -> {
+                    // white on top, greyer the more cloud lies above: a thick thundercloud has a dark belly (3c.1)
+                    var d = 0
+                    var j = i - w
+                    while (d < CLOUD_DEEP && j >= 0 && mat[j].toInt() == cloud) {
+                        d++
+                        j -= w
+                    }
+                    var k = mix(CLOUD_LIGHT, CLOUD_DARK, d / CLOUD_DEEP.toFloat())
+                    if (d == 0) k = mix(k, 0xFFFFFFFF.toInt(), 0.4f) else if ((v and 7) == 0) k = scale(k, 1.05f)
+                    out[i] = mix(scale(k, maxOf(s, 0.55f)), bg, 1f - mt.opacity[m])
+                    continue
+                }
                 firedamp -> {
                     // hardly to be seen: the air over it shimmers a little
                     val shimmer = 0.04f + 0.1f * wave((x * 5 + (i / w) * 3 + frame * 2) and 63)
@@ -367,6 +390,35 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
         }
         drawCritters(out, frame)
         highlight?.let { drawHighlight(out, it, frame, x0, y0, x1, y1) }
+        drawLightning(out, x0, y0, x1, y1)
+    }
+
+    /** A faint streak of wind through the air at (x, y): short dashes, few of them, [density] of 1024. */
+    private fun streak(x: Int, y: Int, density: Int): Boolean {
+        val cell = (x shr 3) * 73856093 xor y * 19349663
+        return ((cell ushr 7) and 1023) < density && (x and 7) < 5
+    }
+
+    /** The stroke of lightning and the flash it gives (3c.4). */
+    private fun drawLightning(out: IntArray, x0: Int, y0: Int, x1: Int, y1: Int) {
+        val w = world.width
+        val f = world.flash
+        if (f > 0) {
+            val k = f * FLASH
+            for (y in y0..y1) for (x in x0..x1) out[y * w + x] = mix(out[y * w + x], 0xFFF4F2FF.toInt(), k)
+        }
+        if (world.boltAge <= 0) return
+        for (n in 0 until world.boltLength) {
+            val x = world.boltX[n]
+            val y = world.boltY[n]
+            if (y < y0 || y > y1) continue
+            for (dx in -1..1) {
+                val xx = x + dx
+                if (xx < x0 || xx > x1) continue
+                val i = y * w + xx
+                out[i] = if (dx == 0) BOLT_CORE else mix(BOLT_EDGE, out[i], 0.55f)
+            }
+        }
     }
 
     /** What the hand could take, lit up and pulsing, its outline brightest (3b.3). */
@@ -592,6 +644,20 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
         private const val HEAT_TO = 1400f
         private val HEAT_T = floatArrayOf(-30f, 0f, 20f, 60f, 150f, 400f, 800f, 1400f)
         private val HEAT_C = intArrayOf(0x1c1a6e, 0x2f6fd0, 0x1f8a8a, 0x3fae4a, 0xd6d03a, 0xf08a24, 0xe02a1a, 0xfff2e4)
+
+        /** Clouds (3c.1): the colour of the top and of the belly of a cloud this deep. */
+        private const val CLOUD_LIGHT = 0xFFF2F5F9.toInt()
+        private const val CLOUD_DARK = 0xFF6E7480.toInt()
+        private const val CLOUD_DEEP = 12
+
+        /** Wind streaks from this wind on, so many of 1024 cells per unit of wind (3c.3). */
+        private const val STREAK_WIND = 0.15f
+        private const val STREAK_DENSITY = 40f
+
+        /** Lightning: its core, its violet edge, how much the flash lightens the picture at its start. */
+        private const val BOLT_CORE = 0xFFFFFFFF.toInt()
+        private const val BOLT_EDGE = 0xFFC8BCFF.toInt()
+        private const val FLASH = 0.045f
 
         /** Ice in the dark is never darker than this (3b.8). */
         private const val ICE_SHADE = 0.72f

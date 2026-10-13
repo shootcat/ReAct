@@ -35,7 +35,11 @@ object Event {
     const val MELT = 6
     const val SOAK = 7
     const val EXPLODE = 8
-    const val COUNT = 9
+
+    /** Weather (3c): a drop of rain or a flake of snow out of a cloud, a stroke of lightning. */
+    const val RAIN = 9
+    const val LIGHTNING = 10
+    const val COUNT = 11
 }
 
 /**
@@ -77,13 +81,21 @@ object Seen {
     const val AVALANCHE = 31
     const val BURST = 32
     const val EXPLODE = 33
-    const val COUNT = 34
+
+    /** Weather (3c): steam turned to cloud, rain and snow out of a cloud, carried by the wind, struck by lightning, sand turned to glass by it. */
+    const val CLOUD = 34
+    const val RAIN = 35
+    const val SNOWFALL = 36
+    const val BLOWN = 37
+    const val LIGHTNING = 38
+    const val FULGURITE = 39
+    const val COUNT = 40
 
     val NAMES = listOf(
         "ignite", "burn_out", "douse", "suffocate", "char", "melt", "salt_melt", "boil", "residue", "set", "condense",
         "dissolve", "soak", "erode", "seep", "grow", "die_heat", "die_salt", "die_dry", "flee", "dig", "fall",
         "hold_heat", "glow", "float", "conduct", "shine", "wet_no_fire", "crack", "permeate", "compact", "avalanche",
-        "burst", "explode",
+        "burst", "explode", "cloud", "rain", "snowfall", "blown", "lightning", "fulgurite",
     )
 
     fun parse(name: String): Int = NAMES.indexOf(name).also { require(it >= 0) { "unknown observation '$name'" } }
@@ -163,6 +175,96 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         ambient = t
         temp.fill(t)
     }
+
+    /** The temperature of the surroundings changes while the world runs (the weather of the sandbox, 3c.6): only the open air follows it. */
+    fun changeAmbient(t: Float) {
+        ambient = t
+        wakeAll()
+    }
+
+    // ------------------------------------------------------------------ weather (3c)
+
+    /**
+     * The condensation height (3c.1): steam out in the open air turns into cloud at this row and above it, and
+     * clouds hang in a band up to [CLOUD_BAND] rows higher. -1: no clouds, steam in the open condenses as it
+     * cools, as it always did. In a closed cave steam condenses on cold surfaces either way.
+     */
+    var cloudBase = -1
+        private set
+
+    /** The wind (3c.3): the chance per step that it carries smoke or a cloud one cell along, + to the right; 1 is a gale. */
+    var wind = 0f
+        private set
+
+    /** How far gusts take the wind above and below [wind], and the steps of one gust from calm to strong and back. */
+    var gust = 0f
+        private set
+    var gustSteps = GUST_STEPS
+        private set
+
+    /** The sandbox makes its own weather (3c.5): the wind turns, clouds come in. Never in a level. */
+    var randomWeather = false
+        private set
+
+    /** Steps left of a thunderstorm called up in the sandbox (3c.6): lightning comes more often. */
+    var storm = 0
+        private set
+
+    /** How far the wind has carried the clouds since they last moved a column, in columns, + to the right. */
+    private var cloudDrift = 0f
+
+    /** The wind of this step: [wind] with the gust, a triangle wave of the step, nothing random. */
+    var windNow = 0f
+        private set
+
+    /** Sets the weather; anything not given stays as it is. Wakes the whole world: the wind reaches everything. */
+    fun setWeather(
+        cloudBase: Int = this.cloudBase,
+        wind: Float = this.wind,
+        gust: Float = this.gust,
+        gustSteps: Int = this.gustSteps,
+        random: Boolean = this.randomWeather,
+    ) {
+        this.cloudBase = cloudBase.coerceIn(-1, height - 1)
+        this.wind = wind.coerceIn(-1f, 1f)
+        this.gust = gust.coerceIn(0f, 1f)
+        this.gustSteps = maxOf(2, gustSteps)
+        randomWeather = random
+        windNow = windAt(step)
+        wakeAll()
+    }
+
+    private fun windAt(s: Int): Float {
+        if (gust == 0f) return wind
+        val p = (s % gustSteps).toFloat() / gustSteps
+        val wave = if (p < 0.5f) p * 4f - 1f else 3f - p * 4f
+        return (wind + gust * wave).coerceIn(-1f, 1f)
+    }
+
+    /** The last stroke of lightning (3c.4), for the picture: its cells from the cloud down to where it struck. */
+    val boltX = IntArray(height)
+    val boltY = IntArray(height)
+    var boltLength = 0
+        private set
+
+    /** Steps the bolt still shows, and steps of the flash of light it gave. */
+    var boltAge = 0
+        private set
+    var flash = 0
+        private set
+    private var lastStrike = -STRIKE_PAUSE
+
+    private val cloudId = materials.idOrNull("cloud") ?: AIR
+    private val snowId = materials.idOrNull("snow") ?: AIR
+    private val sandId = materials.idOrNull("sand") ?: AIR
+    private val glassId = materials.idOrNull("glass") ?: AIR
+    private val metalId = materials.idOrNull("metal") ?: AIR
+    private val moltenMetalId = materials.idOrNull("molten_metal") ?: AIR
+    private val windOf = materials.wind
+
+    /** Per column in the band of clouds: how many cloud cells, and the lowest of them. */
+    private val colClouds = IntArray(width)
+    private val colBottom = IntArray(width)
     private val kindOf = materials.kind
     private val densityOf = materials.density
     private val fireId = materials.idOrNull("fire") ?: AIR
@@ -489,6 +591,9 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             heatAwake.fill(true)
         }
         mark = step + 1
+        windNow = windAt(step)
+        if (boltAge > 0) boltAge--
+        if (flash > 0) flash--
         var n = 0
         for (b in awake) if (b) n++
         awakeChunks = n
@@ -500,6 +605,8 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         living.randomTicks()
         if (structuresDirty) findStructures()
         dropLoose()
+        if (step % WEATHER_EVERY == 0 && (cloudBase >= 0 || randomWeather || storm > 0)) weather()
+        if (storm > 0) storm--
         if (step % PRESSURE_EVERY == 0) {
             val t0 = System.nanoTime()
             pressure()
@@ -524,6 +631,10 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         val holds = materials.holdsTemp
         val spawn = materials.spawnTemp
         val n = materials.count
+        val cloud = cloudId
+        // the wind carries warm air along with it (3c.3): it moves on downwind like warm air rises
+        val windDir = if (windNow > 0f) 1 else if (windNow < 0f) -1 else 0
+        windChance = ((if (windNow > 0f) windNow else -windNow) * WIND_HEAT * 65536f).toInt()
         for (cy in 0 until chunksY) {
             for (cx in 0 until chunksX) {
                 val c = cy * chunksX + cx
@@ -543,10 +654,17 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
                         val ma = m[i].toInt()
                         // right neighbour; warm air that cannot rise any further spreads sideways into cooler air
                         // under what holds it (3b.9)
+                        // (3c: most pairs are of the same temperature, so that is asked first; the rest only then)
                         if (x < w - 1) {
                             val j = i + 1
                             val d = tp[j] - tp[i]
-                            if (!spread && ma == AIR && m[j].toInt() == AIR && (d > RISE && lidded(j) && rises(j) || d < -RISE && lidded(i) && rises(i))) {
+                            if (!(d > EPS || d < -EPS)) {
+                                spread = false
+                            } else if (!spread && (d > RISE || d < -RISE) && ma == AIR && m[j].toInt() == AIR && (
+                                    d > RISE && (lidded(j) && rises(j) || windDir < 0 && windy(j) && !closed(j)) ||
+                                        d < -RISE && (lidded(i) && rises(i) || windDir > 0 && windy(i) && !closed(i))
+                                    )
+                            ) {
                                 tp[i] += d
                                 tp[j] -= d
                                 spread = true
@@ -554,15 +672,15 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
                                 if (x == x1) wakeChunk(cx + 1, cy)
                             } else {
                                 spread = false
-                                if (d > EPS || d < -EPS) {
-                                    val k = ma * n + m[j].toInt()
-                                    val da = pa[k] * d
-                                    tp[i] += da
-                                    tp[j] -= pb[k] * d
-                                    if (da > HEAT_WAKE || da < -HEAT_WAKE || d * pb[k] > HEAT_WAKE || d * pb[k] < -HEAT_WAKE) {
-                                        hot = true
-                                        if (x == x1) wakeChunk(cx + 1, cy)
-                                    }
+                                val k = ma * n + m[j].toInt()
+                                val da = pa[k] * d
+                                val db = pb[k] * d
+                                tp[i] += da
+                                tp[j] -= db
+                                // (once the chunk is known to be warm, only its edge still has to ask)
+                                if ((!hot || x == x1) && (da > HEAT_WAKE || da < -HEAT_WAKE || db > HEAT_WAKE || db < -HEAT_WAKE)) {
+                                    hot = true
+                                    if (x == x1) wakeChunk(cx + 1, cy)
                                 }
                             }
                         }
@@ -583,9 +701,10 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
                                 val ka = if (up) ra[k] else pa[k]
                                 val kb = if (up) rb[k] else pb[k]
                                 val da = ka * d
+                                val db = kb * d
                                 tp[i] += da
-                                tp[j] -= kb * d
-                                if (da > HEAT_WAKE || da < -HEAT_WAKE || d * kb > HEAT_WAKE || d * kb < -HEAT_WAKE) {
+                                tp[j] -= db
+                                if ((!hot || y == y1) && (da > HEAT_WAKE || da < -HEAT_WAKE || db > HEAT_WAKE || db < -HEAT_WAKE)) {
                                     hot = true
                                     if (y == y1) wakeChunk(cx, cy + 1)
                                 }
@@ -623,17 +742,20 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
                         }
                         // open air carries heat away and comes back to the temperature of the surroundings; air
                         // shut in keeps its warmth (3b.9)
-                        if (ma == AIR && !closed(i)) {
+                        if (ma == AIR || ma == cloud) {
+                            // (air at the temperature of the surroundings, most of it, has nothing to do)
                             val d = ambient - tp[i]
-                            if (y == 0) {
-                                // the top row is the open sky: what rises up to it is gone
-                                if (d > EPS || d < -EPS) hot = true
-                                tp[i] = ambient
-                            } else if (d > AIR_SNAP || d < -AIR_SNAP) {
-                                tp[i] += d * AIR_RELAX
-                                hot = true
-                            } else {
-                                tp[i] = ambient
+                            if (d != 0f && !closed(i)) {
+                                if (y == 0) {
+                                    // the top row is the open sky: what rises up to it is gone
+                                    if (d > EPS || d < -EPS) hot = true
+                                    tp[i] = ambient
+                                } else if (d > AIR_SNAP || d < -AIR_SNAP) {
+                                    tp[i] += d * AIR_RELAX
+                                    hot = true
+                                } else {
+                                    tp[i] = ambient
+                                }
                             }
                         } else if (holds[ma]) {
                             // fed from the deep: what it gave off is made up at once
@@ -662,6 +784,18 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         h *= 0x2c1b3c6d
         h = h xor (h ushr 12)
         return (h and 0xFFFF) < RISE_CHANCE
+    }
+
+    /** The chance (of 65536) this step that the wind carries a warm parcel of air on: see [heat]. */
+    private var windChance = 0
+
+    /** Whether the wind carries the warm air at [c] one cell downwind in this step; other bits of the same hash as [rises]. */
+    private fun windy(c: Int): Boolean {
+        var h = c * -0x61c88647 + step * -0x7a143589
+        h = h xor (h ushr 15)
+        h *= 0x2c1b3c6d
+        h = h xor (h ushr 12)
+        return ((h ushr 16) and 0xFFFF) < windChance
     }
 
     /** Air at [c] can rise no further: something other than air lies on it, a ceiling. */
@@ -788,7 +922,21 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             return
         }
         if (t >= mt.boilTemp[m] && boil(x, y, i, m)) return
-        if (t <= mt.freezeTemp[m] && freeze(x, y, i, m)) return
+        if (m == steamId && cloudBase >= 0 && !closed(i)) {
+            // steam out in the open (3c.1) does not condense as it cools in the air: it rises, cools with the
+            // height and turns into cloud at the condensation height; only on a cold surface it condenses to
+            // water. In a closed cave nothing changes.
+            if (y <= cloudBase) {
+                note(Seen.CLOUD, m)
+                change(x, y, i, cloudId)
+                return
+            }
+            // right under a cloud: the cloud grows on top, its base stays flat
+            if (y <= cloudBase + 2 && mat[i - width].toInt() == cloudId && cloudOnTop(x, y, i)) return
+            if (t <= mt.freezeTemp[m] && coldSurface(x, y, i) && freeze(x, y, i, m)) return
+        } else if (t <= mt.freezeTemp[m] && freeze(x, y, i, m)) {
+            return
+        }
 
         // wet material dries when it gets hot, and steams
         if (f and Flag.WET != 0 && t >= DRY_TEMP && chance(DRY_CHANCE)) {
@@ -1054,7 +1202,9 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         if (product == AIR) return
         val w = width
         val r = below(10)
-        val first = if (r < 5) 0 else if (r < 7) 1 else if (r < 9) 2 else 3
+        var first = if (r < 5) 0 else if (r < 7) 1 else if (r < 9) 2 else 3
+        // the wind bends flames, smoke and steam over to its side (3c.3)
+        if (windNow != 0f && chance(if (windNow > 0f) windNow else -windNow)) first = if (windNow > 0f) 2 else 1
         for (k in 0 until 4) {
             val dir = (first + k) and 3
             val nx = if (dir == 1) x - 1 else if (dir == 2) x + 1 else x
@@ -1178,6 +1328,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         if (fall(x, y, i, m)) return
         if ((flags[i].toInt() and Flag.VEL_MASK) != 0) setVelocity(i, 0)
         if (y >= height - 1) return
+        if (windOf[m] > 0f && windNow != 0f && lifted(x, y, i, m)) return
         if (materials.erodes[m] && breach(x, y, i, m)) return
         if (materials.avalanche[m]) {
             // snow that has taken up some melting heat comes loose
@@ -1485,8 +1636,13 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     }
 
     private fun moveGas(x: Int, y: Int, i: Int, m: Int) {
+        if (m == cloudId) {
+            moveCloud(x, y, i)
+            return
+        }
         val mt = materials
         val w = width
+        if (windNow != 0f && windOf[m] > 0f && blow(x, y, i, m)) return
         val d = if (coin()) 1 else -1
         if (chance(mt.rise[m])) {
             if (y == 0) {
@@ -1495,13 +1651,15 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
                 return
             }
             val up = i - w
-            if (rises(m, mat[up].toInt())) {
+            if (rises(m, mat[up].toInt()) && (m != steamId || mat[up].toInt() != cloudId)) {
                 swap(i, up, x, y, x, y - 1)
+                if (m == steamId) lapse(up)
                 return
             }
             val nx = x + d
-            if (nx in 0 until w && rises(m, mat[up + d].toInt())) {
+            if (nx in 0 until w && rises(m, mat[up + d].toInt()) && (m != steamId || mat[up + d].toInt() != cloudId)) {
                 swap(i, up + d, x, y, nx, y - 1)
+                if (m == steamId) lapse(up + d)
                 return
             }
         }
@@ -1514,6 +1672,472 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     /** A gas rises into a heavier gas (air included). */
     private fun rises(m: Int, q: Int): Boolean =
         q != m && kindOf[q] == Kind.GAS && densityOf[q] > densityOf[m]
+
+    /** Steam that rose a cell in the open cools, as rising air does (3c.1). */
+    private fun lapse(i: Int) {
+        if (cloudBase >= 0 && !closed(i)) temp[i] -= STEAM_LAPSE
+    }
+
+    /** A neighbour (4) that is not gas and cooler than [COLD_SURFACE]: steam in the open condenses on it as dew. */
+    private fun coldSurface(x: Int, y: Int, i: Int): Boolean {
+        val w = width
+        return (y > 0 && cold(i - w)) || (y < height - 1 && cold(i + w)) || (x > 0 && cold(i - 1)) || (x < w - 1 && cold(i + 1))
+    }
+
+    private fun cold(j: Int) = kindOf[mat[j].toInt()] != Kind.GAS && temp[j] < COLD_SURFACE
+
+    /** The wind carries a gas one cell downwind, out in the open (3c.3); out of the side of the world it is gone. */
+    private fun blow(x: Int, y: Int, i: Int, m: Int): Boolean {
+        val wn = windNow
+        if (closed(i) || !chance(if (wn > 0f) wn * windOf[m] else -wn * windOf[m])) return false
+        val d = if (wn > 0f) 1 else -1
+        val nx = x + d
+        if (nx < 0 || nx >= width) {
+            clear(x, y, i)
+            return true
+        }
+        val j = i + d
+        if (mat[j].toInt() != AIR) return false
+        swap(i, j, x, y, nx, y)
+        return true
+    }
+
+    /**
+     * Light, dry grains on top lift in a wind stronger than 1 minus their [MaterialTable.wind] and hop along
+     * downwind (3c.3): ash at a breeze, snow in a fresh wind, sand only in a gale. While it blows, the surface
+     * stays awake.
+     */
+    private fun lifted(x: Int, y: Int, i: Int, m: Int): Boolean {
+        val wn = windNow
+        val over = (if (wn > 0f) wn else -wn) - (1f - windOf[m])
+        if (over <= 0f || y == 0) return false
+        if (flags[i].toInt() and (Flag.WET or Flag.ANCHORED) != 0) return false
+        val up = i - width
+        if (mat[up].toInt() != AIR || closed(up)) return false
+        wake(x, y)
+        if (!chance(over * LIFT)) return false
+        val d = if (wn > 0f) 1 else -1
+        val nx = x + d
+        note(Seen.BLOWN, m)
+        if (nx < 0 || nx >= width) {
+            clear(x, y, i)
+            return true
+        }
+        if (mat[up + d].toInt() == AIR) {
+            swap(i, up + d, x, y, nx, y - 1)
+            return true
+        }
+        if (mat[i + d].toInt() == AIR) {
+            swap(i, i + d, x, y, nx, y)
+            return true
+        }
+        return false
+    }
+
+    /**
+     * A cloud (3c.1) rests on the condensation height like a soft heap: below it, it rises up to it (beside a
+     * cloud in the way); above it, it settles down onto it and slides off into a rounded top. So clouds get a
+     * flat base and a domed top, and grow upward. It drifts with the wind; a lone wisp slowly evaporates, and
+     * without a condensation height clouds dissolve. Rain, snow and lightning come in [weather].
+     */
+    private fun moveCloud(x: Int, y: Int, i: Int) {
+        val w = width
+        if (cloudBase < 0) {
+            if (chance(CLOUD_FADE)) clear(x, y, i) else wake(x, y)
+            return
+        }
+        if (y > cloudBase) {
+            val up = i - w
+            if (mat[up].toInt() == AIR) {
+                if (chance(CLOUD_RISE)) swap(i, up, x, y, x, y - 1) else wake(x, y)
+                return
+            }
+            val d = if (coin()) 1 else -1
+            val nx = x + d
+            if (nx in 0 until w && mat[up + d].toInt() == AIR && chance(CLOUD_RISE)) swap(i, up + d, x, y, nx, y - 1)
+            return
+        }
+        if (y < cloudBase) {
+            val down = i + w
+            val below = mat[down].toInt()
+            if (below == AIR) {
+                if (chance(CLOUD_SINK)) swap(i, down, x, y, x, y + 1) else wake(x, y)
+                return
+            }
+            if (below == cloudId && chance(CLOUD_SLIDE)) {
+                val d = if (coin()) 1 else -1
+                val nx = x + d
+                if (nx in 0 until w && mat[down + d].toInt() == AIR && mat[i + d].toInt() == AIR) {
+                    swap(i, down + d, x, y, nx, y + 1)
+                    return
+                }
+            }
+        }
+        if (chance(CLOUD_EVAPORATE) && cloudAround(x, y) == 0) clear(x, y, i)
+    }
+
+    /**
+     * Steam right under a cloud condenses onto it: a cloud cell more on top of that column of cloud (or of the
+     * one beside, if that is full up to the top of the band), the steam cell is gone. True if it found room.
+     */
+    private fun cloudOnTop(x: Int, y: Int, i: Int): Boolean {
+        val w = width
+        val limit = maxOf(0, cloudBase - CLOUD_BAND)
+        var k = y - 1
+        while (k > limit && mat[k * w + x].toInt() == cloudId) k--
+        if (mat[k * w + x].toInt() != AIR) return false
+        val t = temp[i]
+        note(Seen.CLOUD, steamId)
+        clear(x, y, i)
+        spawn(x, k, k * w + x, cloudId, t)
+        stamp[k * w + x] = mark
+        return true
+    }
+
+    /** Cloud cells among the 8 around (x, y). */
+    private fun cloudAround(x: Int, y: Int): Int {
+        val w = width
+        var n = 0
+        for (dy in -1..1) {
+            val yy = y + dy
+            if (yy < 0 || yy >= height) continue
+            for (dx in -1..1) {
+                val xx = x + dx
+                if ((dx == 0 && dy == 0) || xx < 0 || xx >= w) continue
+                if (mat[yy * w + xx].toInt() == cloudId) n++
+            }
+        }
+        return n
+    }
+
+    // ------------------------------------------------------------------ weather (3c)
+
+    /**
+     * Every [WEATHER_EVERY] steps, over the band of the clouds: dense cloud rains, in frost it snows; a wide,
+     * deep bank of cloud is a thunderstorm and strikes now and then; clouds that should drift or draw together
+     * are woken. In the sandbox with random weather the wind turns and clouds come in. Everything chance does
+     * here comes from the world's own generator: a level plays out the same every time.
+     */
+    private fun weather() {
+        val w = width
+        if (randomWeather && step % RANDOM_WEATHER_EVERY == 0) randomWeatherStep()
+        if (cloudBase < 0) return
+        val top = maxOf(0, cloudBase - CLOUD_BAND - 2)
+        val bottom = minOf(height - 2, cloudBase + 4)
+        // the wind takes the clouds along as a whole (3c.3), a column at a time once enough has come together
+        cloudDrift += windNow * CLOUD_DRIFT * WEATHER_EVERY
+        while (cloudDrift >= 1f) {
+            shiftClouds(1, top, bottom)
+            cloudDrift -= 1f
+        }
+        while (cloudDrift <= -1f) {
+            shiftClouds(-1, top, bottom)
+            cloudDrift += 1f
+        }
+        colClouds.fill(0)
+        colBottom.fill(-1)
+        val stir = windNow != 0f
+        for (y in top..bottom) {
+            val row = y * w
+            for (x in 0 until w) {
+                val i = row + x
+                if (mat[i].toInt() != cloudId) continue
+                colClouds[x]++
+                colBottom[x] = y
+                val around = cloudAround(x, y)
+                if (around >= RAIN_AROUND && chance(RAIN_CHANCE)) {
+                    precipitate(x, y, i)
+                } else if (stir || around < CLUMPED) {
+                    wake(x, y)
+                }
+            }
+        }
+        // thunderstorms: a bank of cloud at least STORM_WIDTH wide and on average STORM_DEPTH deep (raining
+        // makes it patchy: a column with half that still belongs to it)
+        val needWidth = if (storm > 0) STORM_WIDTH / 2 else STORM_WIDTH
+        var x = 0
+        while (x < w) {
+            if (colClouds[x] < STORM_DEPTH / 2) {
+                x++
+                continue
+            }
+            val x0 = x
+            var sum = 0
+            while (x < w && colClouds[x] >= STORM_DEPTH / 2) sum += colClouds[x++]
+            val span = x - x0
+            if (span >= needWidth && sum >= span * STORM_DEPTH && step - lastStrike >= STRIKE_PAUSE &&
+                chance(if (storm > 0) STRIKE_STORM else STRIKE_CHANCE)
+            ) {
+                strike(x0, x - 1)
+            }
+        }
+    }
+
+    /**
+     * Every cloud cell of rows [top]..[bottom] one column downwind ([dir]) into the air there, from the far side
+     * back: a bank moves on as one and keeps its shape instead of being torn into a thin streak. What reaches
+     * the edge of the world is blown out of it; a wall stops it, and the cloud piles up against it.
+     */
+    private fun shiftClouds(dir: Int, top: Int, bottom: Int) {
+        val w = width
+        for (y in top..bottom) {
+            val row = y * w
+            var x = if (dir > 0) w - 1 else 0
+            while (x in 0 until w) {
+                val i = row + x
+                if (mat[i].toInt() == cloudId) {
+                    val nx = x + dir
+                    if (nx < 0 || nx >= w) {
+                        clear(x, y, i)
+                    } else if (mat[i + dir].toInt() == AIR) {
+                        swap(i, i + dir, x, y, nx, y)
+                    }
+                }
+                x -= dir
+            }
+        }
+    }
+
+    /** A drop of rain, or a flake of snow in frost, out of a dense cloud: the cloud cell becomes it and falls. */
+    private fun precipitate(x: Int, y: Int, i: Int) {
+        val snow = temp[i] <= 0f
+        note(if (snow) Seen.SNOWFALL else Seen.RAIN, cloudId)
+        change(x, y, i, if (snow) snowId else waterId)
+        events[Event.RAIN]++
+        wake(x, y)
+    }
+
+    /**
+     * Lightning out of the bank of cloud over columns [x0]..[x1] (3c.4): it strikes the highest point under it,
+     * or one that conducts better (metal, a tree, water), down a jagged path from the bottom of the cloud.
+     */
+    private fun strike(x0: Int, x1: Int) {
+        val w = width
+        var bestX = -1
+        var bestY = 0
+        var bestScore = Int.MIN_VALUE
+        for (x in x0..x1) {
+            var y = colBottom[x] + 1
+            // down to the ground: past the air and past what is falling through it (rain, snow)
+            while (y < height && (kindOf[mat[y * w + x].toInt()] == Kind.GAS || !supported(x, y))) y++
+            if (y >= height) continue
+            val score = (height - y) * 2 + strikeBonus(y * w + x)
+            if (score > bestScore || (score == bestScore && coin())) {
+                bestScore = score
+                bestX = x
+                bestY = y
+            }
+        }
+        if (bestX < 0) return
+        // the bolt, from the bottom of the cloud near above the point down to it: a straight line with a jag
+        // that wanders and comes back to the point at the end
+        val sx = (bestX + below(9) - 4).coerceIn(x0, x1)
+        val sy = colBottom[sx] + 1
+        val rows = maxOf(1, bestY - sy)
+        var jag = 0
+        var n = 0
+        for (k in 0..rows) {
+            if (n >= boltX.size) break
+            val left = rows - k
+            jag = (jag + below(3) - 1).coerceIn(-minOf(3, left), minOf(3, left))
+            boltX[n] = (sx + (bestX - sx) * k / rows + jag).coerceIn(0, w - 1)
+            boltY[n] = sy + k
+            n++
+        }
+        boltLength = n
+        boltAge = BOLT_STEPS
+        flash = FLASH_STEPS
+        lastStrike = step
+        events[Event.LIGHTNING]++
+        hit(bestX, bestY)
+    }
+
+    /** Ground at (x, y) that bears itself: fixed or solid, or loose and lying on something, not falling through the air. */
+    private fun supported(x: Int, y: Int): Boolean {
+        val k = kindOf[mat[y * width + x].toInt()]
+        if (k == Kind.STATIC || k == Kind.SOLID || k == Kind.LIFE) return true
+        return y >= height - 1 || kindOf[mat[(y + 1) * width + x].toInt()] != Kind.GAS
+    }
+
+    /** How much more readily lightning strikes here than the bare height says: metal, a tree, water. */
+    private fun strikeBonus(i: Int): Int {
+        val q = mat[i].toInt()
+        val o = materials.organism[q]
+        return when {
+            q == metalId || q == moltenMetalId -> 60
+            o == Organism.TREE || o == Organism.LEAF -> 24
+            kindOf[q] == Kind.LIQUID -> 10
+            flags[i].toInt() and Flag.WET != 0 -> 4
+            else -> 0
+        }
+    }
+
+    /**
+     * Where lightning strikes: sand turns into a tube of glass (a fulgurite), burnable things catch fire, metal
+     * gets very hot, water flashes to steam, anything else glows for a moment, and the air around is scorching.
+     *
+     * Metal carries it (3c.4): the current runs through every piece of metal it touches, heats all of it, and
+     * goes to ground under the lowest end. A rod standing in the earth takes the lightning harmlessly away;
+     * one standing on a woodpile sets it alight where its foot rests.
+     */
+    private fun hit(x: Int, y: Int) {
+        val w = width
+        val struck = mat[y * w + x].toInt()
+        note(Seen.LIGHTNING, struck)
+        var gx = x
+        var gy = y
+        val conducted = struck == metalId || struck == moltenMetalId
+        if (conducted) {
+            scorch(x, y)
+            val foot = conduct(x, y)
+            gx = foot % w
+            gy = minOf(height - 1, foot / w + 1)
+        }
+        // into sand, or through a puddle or wet ground into the sand under it: a fulgurite
+        var sy = gy
+        while (sy < minOf(height - 1, gy + 4) && kindOf[mat[sy * w + gx].toInt()] == Kind.LIQUID) sy++
+        if (mat[sy * w + gx].toInt() == sandId) fulgurite(gx, sy)
+        scorch(gx, gy)
+        for (dy in -1..1) for (dx in -1..1) {
+            val xx = gx + dx
+            val yy = gy + dy
+            if (xx < 0 || xx >= w || yy < 0 || yy >= height) continue
+            val j = yy * w + xx
+            val q = mat[j].toInt()
+            when {
+                kindOf[q] == Kind.GAS -> {}
+                q == metalId || q == moltenMetalId -> if (!conducted) temp[j] += LIGHTNING_METAL
+                materials.flammable[q] -> temp[j] = maxOf(temp[j], materials.igniteTemp[q] + LIGHTNING_KINDLE)
+                kindOf[q] == Kind.LIQUID -> temp[j] = maxOf(temp[j], LIGHTNING_WATER)
+                kindOf[q] != Kind.STATIC -> temp[j] = maxOf(temp[j], LIGHTNING_HEAT)
+            }
+            wakeHeat(xx, yy)
+        }
+    }
+
+    /** The air within two cells of (x, y) is scorching after a stroke of lightning. */
+    private fun scorch(x: Int, y: Int) {
+        val w = width
+        for (dy in -2..2) for (dx in -2..2) {
+            val xx = x + dx
+            val yy = y + dy
+            if (xx < 0 || xx >= w || yy < 0 || yy >= height) continue
+            val j = yy * w + xx
+            if (mat[j].toInt() == AIR) temp[j] = maxOf(temp[j], LIGHTNING_AIR)
+            wakeHeat(xx, yy)
+        }
+    }
+
+    /** Marks of the cells the current has run through in [conduct]; cleared again after each stroke. */
+    private var conductBits: LongArray? = null
+    private val conductQueue = IntArray(CONDUCT_LIMIT)
+
+    /**
+     * The current of a stroke into the metal at (x, y) runs through all the metal touching it (up to
+     * [CONDUCT_LIMIT] cells, nearest first) and heats it; returns the cell where it leaves: the lowest one,
+     * the first found of those.
+     */
+    private fun conduct(x: Int, y: Int): Int {
+        val w = width
+        val bits = conductBits ?: LongArray((size + 63) ushr 6).also { conductBits = it }
+        val q = conductQueue
+        var n = 0
+        var head = 0
+        val start = y * w + x
+        q[n++] = start
+        bits[start ushr 6] = bits[start ushr 6] or (1L shl (start and 63))
+        var foot = start
+        while (head < n) {
+            val i = q[head++]
+            temp[i] += LIGHTNING_METAL
+            wakeHeat(i % w, i / w)
+            if (i / w > foot / w) foot = i
+            val cx = i % w
+            for (k in 0 until 4) {
+                val j = when (k) {
+                    0 -> if (i + w < size) i + w else -1
+                    1 -> if (cx > 0) i - 1 else -1
+                    2 -> if (cx < w - 1) i + 1 else -1
+                    else -> if (i >= w) i - w else -1
+                }
+                if (j < 0 || n >= CONDUCT_LIMIT) continue
+                val m = mat[j].toInt()
+                if (m != metalId && m != moltenMetalId) continue
+                if ((bits[j ushr 6] ushr (j and 63)) and 1L != 0L) continue
+                bits[j ushr 6] = bits[j ushr 6] or (1L shl (j and 63))
+                q[n++] = j
+            }
+        }
+        for (k in 0 until n) {
+            val i = q[k]
+            bits[i ushr 6] = bits[i ushr 6] and (1L shl (i and 63)).inv()
+        }
+        return foot
+    }
+
+    /** Lightning in sand: a thin, branching tube of glass down from where it struck. */
+    private fun fulgurite(x: Int, y: Int) {
+        val w = width
+        var cx = x
+        for (k in 0 until FULGURITE_DEPTH) {
+            val yy = y + k
+            if (yy >= height) break
+            val i = yy * w + cx
+            if (mat[i].toInt() != sandId) break
+            note(Seen.FULGURITE, sandId)
+            change(cx, yy, i, glassId)
+            temp[i] = FULGURITE_TEMP
+            // now and then a side branch
+            if (k > 0 && below(3) == 0) {
+                val sx = cx + if (coin()) 1 else -1
+                if (sx in 0 until w && mat[yy * w + sx].toInt() == sandId) {
+                    change(sx, yy, yy * w + sx, glassId)
+                    temp[yy * w + sx] = FULGURITE_TEMP
+                }
+            }
+            if (coin()) cx = (cx + below(3) - 1).coerceIn(0, w - 1)
+        }
+    }
+
+    /**
+     * A thunderstorm called up over column [cx] (3c.6): a wide, deep bank of cloud at the condensation height
+     * (made at the default height if there are no clouds yet), and for a while lightning comes more often.
+     */
+    fun callStorm(cx: Int) {
+        if (cloudBase < 0) setWeather(cloudBase = defaultCloudBase())
+        val half = (width / 6).coerceIn(24, 70)
+        cloudBank(cx, half, STORM_BANK_DEPTH)
+        storm = STORM_STEPS
+        wakeAll()
+    }
+
+    /** Where clouds form if nothing says otherwise: an eighth of the way down from the top. */
+    fun defaultCloudBase() = height / 8
+
+    /** A rounded bank of cloud, [half] cells either side of column [cx] and [depth] deep, at the condensation height; only into open air. */
+    private fun cloudBank(cx: Int, half: Int, depth: Int) {
+        val w = width
+        val y1 = cloudBase
+        val y0 = maxOf(0, y1 - depth + 1)
+        for (y in y0..y1) for (x in maxOf(0, cx - half)..minOf(w - 1, cx + half)) {
+            val dx = (x - cx).toFloat() / half
+            val dy = (y - (y0 + y1) / 2f) / ((y1 - y0 + 1) / 2f)
+            if (dx * dx + dy * dy * 0.6f > 1f + (below(20) - 10) / 60f) continue
+            val i = y * w + x
+            if (mat[i].toInt() != AIR || closed(i)) continue
+            spawn(x, y, i, cloudId, ambient)
+        }
+    }
+
+    /** The sandbox's own weather (3c.5): the wind turns a little, now and then clouds come in, rarely a storm. */
+    private fun randomWeatherStep() {
+        wind = (wind + (below(31) - 15) * 0.01f).coerceIn(-RANDOM_WIND, RANDOM_WIND)
+        gust = RANDOM_GUST
+        windNow = windAt(step)
+        if (cloudBase < 0) return
+        val r = below(100)
+        if (r < RANDOM_STORM) callStorm(below(width)) else if (r < RANDOM_CLOUD) cloudBank(below(width), (width / 14).coerceIn(10, 30), 6)
+    }
 
     // ------------------------------------------------------------------ pressure and explosions (4a.4)
 
@@ -2108,6 +2732,9 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         internal val placed: IntArray,
         internal val light: FloatArray,
         internal val closed: LongArray,
+        /** cloud base, gust steps, random weather (0/1), storm, last strike; wind, gust, ambient. */
+        internal val weatherInts: IntArray,
+        internal val weatherFloats: FloatArray,
     ) {
         val bytes: Int get() = mat.size * 9 + light.size * 4
     }
@@ -2115,6 +2742,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     fun snapshot() = Snapshot(
         step, mat.copyOf(), temp.copyOf(), life.copyOf(), variant.copyOf(), flags.copyOf(), rng, pending.copyOf(),
         heatPending.copyOf(), placed.copyOf(), light.level.copyOf(), closedBits.copyOf(),
+        intArrayOf(cloudBase, gustSteps, if (randomWeather) 1 else 0, storm, lastStrike), floatArrayOf(wind, gust, ambient, cloudDrift),
     )
 
     fun restore(s: Snapshot) {
@@ -2128,6 +2756,17 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         s.placed.copyInto(placed)
         s.light.copyInto(light.level)
         s.closed.copyInto(closedBits)
+        cloudBase = s.weatherInts[0]
+        gustSteps = s.weatherInts[1]
+        randomWeather = s.weatherInts[2] != 0
+        storm = s.weatherInts[3]
+        lastStrike = s.weatherInts[4]
+        wind = s.weatherFloats[0]
+        gust = s.weatherFloats[1]
+        ambient = s.weatherFloats[2]
+        cloudDrift = s.weatherFloats[3]
+        boltAge = 0
+        flash = 0
         stamp.fill(0)
         rng = s.rng
         step = s.step
@@ -2183,6 +2822,67 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
 
         /** Particles swapping places with more than this temperature difference stir up heat exchange. */
         private const val SWAP_HEAT = 0.5f
+
+        // weather (3c)
+        /** Steps of one gust, from calm to strong and back (10 s). */
+        const val GUST_STEPS = 600
+        /** Rows above the condensation height the clouds hang in. */
+        const val CLOUD_BAND = 14
+        /** Degrees steam cools per row it rises in the open. */
+        private const val STEAM_LAPSE = 0.3f
+        /** Steam in the open condenses on a surface cooler than this. */
+        private const val COLD_SURFACE = 60f
+        /** Rain, snow, lightning are looked at every so many steps. */
+        private const val WEATHER_EVERY = 10
+        /** A cloud cell with this many cloud cells around rains (or snows), with this chance per look. */
+        private const val RAIN_AROUND = 7
+        private const val RAIN_CHANCE = 0.006f
+        /** Cloud: chance per step to rise to its height from below, to sink back from far above; with this many cloud cells around it is part of a cloud and stays. */
+        private const val CLOUD_RISE = 0.5f
+        private const val CLOUD_SINK = 0.3f
+        private const val CLOUD_SLIDE = 0.1f
+        /** With this many cloud cells around, a cloud cell is inside a cloud: it needs no waking to settle. */
+        private const val CLUMPED = 4
+        /** A lone wisp of cloud evaporates now and then; without a condensation height clouds dissolve. */
+        private const val CLOUD_EVAPORATE = 0.002f
+        private const val CLOUD_FADE = 0.01f
+
+        /** Columns per step the clouds move in a wind of 1 (6 cells per second); a gentle wind of 0.15 moves them about one cell a second. */
+        private const val CLOUD_DRIFT = 0.1f
+        /** Grains lift in the wind with this chance per step and per unit of wind above their threshold. */
+        private const val LIFT = 0.5f
+        /** Share of the wind with which it carries warm air along per step. */
+        private const val WIND_HEAT = 0.6f
+        /** A thunderstorm: a bank of cloud this wide (columns) and deep (cloud cells per column). */
+        private const val STORM_WIDTH = 24
+        private const val STORM_DEPTH = 6
+        /** Chance per look that a thunderstorm strikes; more in a storm called up; never sooner than this after the last stroke. */
+        private const val STRIKE_CHANCE = 0.02f
+        private const val STRIKE_STORM = 0.12f
+        private const val STRIKE_PAUSE = 90
+        /** Steps a stroke of lightning shows and lights up the world. */
+        private const val BOLT_STEPS = 8
+        private const val FLASH_STEPS = 10
+        /** What lightning does: the air around, metal, burnable things (above their ignition point), water, anything else. */
+        private const val LIGHTNING_AIR = 900f
+        private const val LIGHTNING_METAL = 700f
+        private const val LIGHTNING_KINDLE = 300f
+        private const val LIGHTNING_WATER = 160f
+        private const val LIGHTNING_HEAT = 900f
+        private const val FULGURITE_DEPTH = 8
+
+        /** Cells of metal one stroke of lightning runs through at most. */
+        private const val CONDUCT_LIMIT = 600
+        private const val FULGURITE_TEMP = 1200f
+        /** A storm called up: how deep its bank of cloud, how many steps lightning comes more often (30 s). */
+        private const val STORM_BANK_DEPTH = 12
+        private const val STORM_STEPS = 1800
+        /** The sandbox's random weather: looked at every 10 s; strongest wind, gusts; chance (of 100) of a storm, of a cloud. */
+        private const val RANDOM_WEATHER_EVERY = 600
+        private const val RANDOM_WIND = 0.7f
+        private const val RANDOM_GUST = 0.15f
+        private const val RANDOM_STORM = 6
+        private const val RANDOM_CLOUD = 40
         private const val AIR_SNAP = 0.5f
 
         private const val SUFFOCATE = 0.05f

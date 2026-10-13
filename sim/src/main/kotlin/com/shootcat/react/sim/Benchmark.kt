@@ -88,6 +88,17 @@ object Benchmark {
         return world
     }
 
+    /**
+     * The busy meadow with weather (3c): clouds at the usual height, a fresh wind with gusts and a
+     * thunderstorm over the middle, so rain falls, the wind carries smoke and lightning strikes.
+     */
+    fun weatherWorld(materials: MaterialTable, width: Int, height: Int): World {
+        val world = sandboxWorld(materials, width, height)
+        world.setWeather(cloudBase = (height * 0.16f).toInt(), wind = 0.5f, gust = 0.2f)
+        world.callStorm(width / 2)
+        return world
+    }
+
     /** Measures [steps] steps after [warmup] steps, so the just-in-time compiler has settled (on the phone as well). */
     fun measure(name: String, world: World, steps: Int, warmup: Int = 300): Result {
         world.run(warmup)
@@ -135,6 +146,7 @@ object Benchmark {
             measure("Größte Welt $size, voll aktiv", fullWorld(materials, big.width, big.height), steps),
             measure("Größte Welt $size, voll aktiv mit Pflanzen, Tieren und Licht", livingWorld(materials, big.width, big.height), steps),
             measure("Größte Welt $size, Wiese mit Feuer, Sand und Wasser", sandboxWorld(materials, big.width, big.height), steps),
+            measure("Größte Welt $size, dieselbe Wiese mit Wind, Wolken und Gewitter", weatherWorld(materials, big.width, big.height), steps),
         )
     }
 

@@ -127,6 +127,19 @@ class SimRunner(val session: Session, backdrop: IntArray) {
         val stock: List<Int> = emptyList(),
         val notice: String = "",
         val noticeCount: Int = 0,
+        val weather: Weather = Weather(),
+    )
+
+    /** The weather of the world (3c), for the weather controls of the sandbox. */
+    data class Weather(
+        /** The condensation height, -1: no clouds. */
+        val cloudBase: Int = -1,
+        val wind: Float = 0f,
+        val gust: Float = 0f,
+        val random: Boolean = false,
+        val ambient: Float = 20f,
+        /** A thunderstorm is going on. */
+        val storm: Boolean = false,
     )
 
     @Volatile
@@ -331,6 +344,7 @@ class SimRunner(val session: Session, backdrop: IntArray) {
                 stock = if (stats.stock.size == session.stock.size && stats.stock.indices.all { stats.stock[it] == session.stock[it] }) stats.stock else session.stock.toList(),
                 notice = session.notice,
                 noticeCount = session.noticeCount,
+                weather = weatherOf(world, stats.weather),
             )
 
             // sleep until the next step is due (or a frame, or, when paused, until input arrives)
@@ -341,6 +355,17 @@ class SimRunner(val session: Session, backdrop: IntArray) {
             }
             if (wait > 200_000L && inbox.isEmpty()) LockSupport.parkNanos(wait)
         }
+    }
+
+    /** The weather as the controls show it; the old one again while nothing changed, so the UI sees no change. */
+    private fun weatherOf(w: World, old: Weather): Weather {
+        val storm = w.storm > 0
+        if (old.cloudBase == w.cloudBase && old.wind == w.wind && old.gust == w.gust && old.random == w.randomWeather &&
+            old.ambient == w.ambient && old.storm == storm
+        ) {
+            return old
+        }
+        return Weather(w.cloudBase, w.wind, w.gust, w.randomWeather, w.ambient, storm)
     }
 
     private companion object {

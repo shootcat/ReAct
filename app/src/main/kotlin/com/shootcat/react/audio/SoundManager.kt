@@ -61,7 +61,7 @@ class SoundManager(context: Context) {
         val id = loaded[name] ?: return
         if (id !in ready) return
         val now = SystemClock.uptimeMillis()
-        if (now - (lastPlayed[name] ?: 0L) < MIN_GAP_MILLIS) return
+        if (now - (lastPlayed[name] ?: 0L) < (GAPS[name] ?: MIN_GAP_MILLIS)) return
         lastPlayed[name] = now
         val v = (volume * (VOLUMES[name] ?: 0.8f)).coerceIn(0f, 1f)
         // A little variation keeps repeated sounds natural.
@@ -114,6 +114,9 @@ class SoundManager(context: Context) {
     private companion object {
         const val MAX_STREAMS = 6
         const val MIN_GAP_MILLIS = 90L
+
+        /** Long sounds of the weather (3c) play again only once they have nearly run out. */
+        val GAPS = mapOf("rain" to 1200L, "thunder" to 700L)
         const val MUSIC_VOLUME = 0.32f
 
         val EFFECTS = mapOf(
@@ -141,6 +144,7 @@ class SoundManager(context: Context) {
             "clink" to R.raw.sfx_clink,
             "chime" to R.raw.sfx_chime,
             "squelch" to R.raw.sfx_squelch,
+            "thunder" to R.raw.sfx_thunder,
         )
 
         val VOLUMES = mapOf(
@@ -154,6 +158,7 @@ class SoundManager(context: Context) {
             "crumble" to 0.7f,
             "chime" to 0.6f,
             "clink" to 0.6f,
+            "thunder" to 0.95f,
         )
 
         val MUSIC = mapOf(

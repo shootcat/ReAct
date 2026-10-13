@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.os.Looper
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.ViewRootForTest
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsNodeInteraction
@@ -19,13 +20,18 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.printToString
 import android.content.Context
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
+import androidx.lifecycle.ViewModelProvider
 import com.shootcat.react.sim.WorldSize
+import com.shootcat.react.ui.AppViewModel
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -424,6 +430,9 @@ class AppSmokeTest {
     private companion object {
         /** A wipe further than Robolectric's touch slop (16 dp, 48 px here): a stroke, not a tap or a long press. */
         const val WIPE = 60f
+
+        /** A bolt younger than this many steps (of eight) is still on the next picture. */
+        const val BOLT_FRESH = 5
     }
 
     /**
@@ -435,6 +444,65 @@ class AppSmokeTest {
         val ox = (width - w * s) / 2f
         val oy = (height - h * s) / 2f
         return Offset(ox + (x + 0.5f) * s, oy + (y + 0.5f) * s)
+    }
+
+    /**
+     * The weather of the sandbox (3c.6): the controls, wind with gusts taken over, then a thunderstorm called
+     * up over the middle of the screen, caught while a bolt is on screen, and the rain under it.
+     */
+    @Test
+    fun weatherControlsAndStorm(): Unit = ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+        compose.waitForIdle()
+        compose.onNodeWithText("Spielplatz").performClick()
+        run(800)
+        var vm: AppViewModel? = null
+        scenario.onActivity { vm = ViewModelProvider(it)[AppViewModel::class.java] }
+        val world = vm!!.world.value!!.session.world
+        compose.onNodeWithContentDescription("Menü").performClick()
+        compose.onNodeWithTag("menu_weather").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("weather_wind").performSemanticsAction(SemanticsActions.SetProgress) { it(0.6f) }
+        compose.onNodeWithTag("weather_gusts").performClick()
+        compose.waitForIdle()
+        shot("40_wetter", compose.onNodeWithTag("weather_apply"))
+        compose.onNodeWithTag("weather_apply").performClick()
+        run(500)
+        assertEquals("wind taken over", 0.6f, world.wind, 0.01f)
+        assertTrue("gusts on", world.gust > 0f)
+        assertTrue("the meadow has clouds", world.cloudBase > 0)
+
+        compose.onNodeWithContentDescription("Menü").performClick()
+        compose.onNodeWithTag("menu_weather").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("weather_storm").performClick()
+        run(300)
+        assertTrue("a thunderstorm is going on", world.storm > 0)
+        // a bolt lasts eight steps: look often, and draw the screen while it is there
+        var waited = 0
+        var bolts = 0
+        var caught = false
+        while (waited < 40_000 && !(caught && bolts >= 2)) {
+            Thread.sleep(20)
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(20))
+            compose.mainClock.advanceTimeBy(20)
+            waited += 20
+            if (world.boltAge >= BOLT_FRESH) {
+                bolts++
+                if (!caught) {
+                    run(50)
+                    shot("41_gewitter_blitz")
+                    caught = true
+                }
+                run(200)
+            }
+        }
+        assertTrue("no lightning within ${waited / 1000} s", caught)
+        run(3000)
+        shot("42_gewitter_regen")
+        File("build/screenshots/weather_robolectric.txt").writeText(
+            "bolts seen: $bolts in ${waited / 1000.0} s, wind ${world.wind}, gust ${world.gust}, cloud base ${world.cloudBase}\n",
+        )
+        restoreDefaults()
     }
 
     /**

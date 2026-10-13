@@ -30,6 +30,8 @@ data class LevelSpec(
     val heat: List<Heat> = emptyList(),
     /** Trees (or bushes, [Tree.tree] false) grown at the start, standing on the ground below (x, y). */
     val trees: List<Tree> = emptyList(),
+    /** The weather (3c): where clouds form, the wind. Fixed for the level; there is no random weather in a level. */
+    val weather: WeatherSpec? = null,
     val goals: List<GoalSpec>,
     val rating: Rating,
 )
@@ -47,6 +49,19 @@ data class Tools(
 
 @Serializable
 data class Heat(val area: List<List<Int>>, val temp: Float)
+
+/**
+ * A level's weather (3c.5). [cloudBase]: the row at and above which steam in the open air turns into cloud
+ * (none: no clouds, steam in the open condenses as it cools). [wind]: -1 (a gale to the left) to 1 (to the
+ * right). [gust]: how far gusts take it above and below that, one gust every [gustSeconds].
+ */
+@Serializable
+data class WeatherSpec(
+    @SerialName("cloud_base") val cloudBase: Int? = null,
+    val wind: Float = 0f,
+    val gust: Float = 0f,
+    @SerialName("gust_seconds") val gustSeconds: Float = 10f,
+)
 
 @Serializable
 data class Tree(val x: Int, val y: Int, val tree: Boolean = true)

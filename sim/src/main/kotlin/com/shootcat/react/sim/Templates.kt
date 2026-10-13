@@ -34,8 +34,19 @@ enum class Template(val label: String) {
             VOLCANO -> Templates.volcano(world, seed)
             CAVES -> Templates.caves(world, seed)
         }
+        // clouds form above the landscape (3c.1): high over the meadow, lower round the snowy mountain, where
+        // its peaks reach into them; no wind to begin with
+        world.setWeather(cloudBase = (world.height * cloudHeight).toInt().coerceAtLeast(World.CLOUD_BAND + 2))
         world.wakeAll()
     }
+
+    /** Where the clouds form, as a share of the world's height from the top. */
+    private val cloudHeight: Float
+        get() = when (this) {
+            MOUNTAIN -> 0.2f
+            CAVES -> 0.1f
+            else -> 0.16f
+        }
 }
 
 /**

@@ -38,6 +38,10 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -95,6 +99,7 @@ import com.shootcat.react.sim.Session
 import com.shootcat.react.sim.SimRunner
 import com.shootcat.react.sim.Template
 import com.shootcat.react.sim.Terrain
+import com.shootcat.react.sim.World
 import com.shootcat.react.sim.WorldSize
 import com.shootcat.react.ui.components.Glyph
 import com.shootcat.react.ui.components.RoundIconButton
@@ -121,7 +126,7 @@ private const val STORE = "Lager"
 private val CATEGORIES = listOf(
     TOOLS to emptyList(),
     "Lose" to listOf("sand", "earth", "gravel", "clay", "salt", "snow", "rubble", "ore_rubble", "glass_shards", "charcoal", "ash"),
-    "Flüssig" to listOf("water", "saltwater", "lava", "molten_metal", "steam", "smoke", "firedamp"),
+    "Flüssig" to listOf("water", "saltwater", "lava", "molten_metal", "steam", "cloud", "smoke", "firedamp"),
     "Bauen" to listOf("wood", "brick", "stone", "basalt", "glass", "metal", "ice"),
     "Hitze" to listOf("fire", "ember", "lava"),
     "Leben" to listOf("seed", "grass", "moss", "vine", "fish", "firefly", "worm", "bird"),
@@ -160,6 +165,7 @@ fun SandboxScreen(
 ) {
     var speed by remember(runner) { mutableStateOf(runner.speed) }
     var newWorld by remember { mutableStateOf(false) }
+    var weather by remember { mutableStateOf(false) }
     var stats by remember { mutableStateOf(runner.stats) }
     var menu by remember { mutableStateOf(false) }
     var benchmark by remember { mutableStateOf<String?>(null) }
@@ -300,6 +306,14 @@ fun SandboxScreen(
             Box {
                 RoundIconButton(Glyph.GEAR, "Menü", { menu = true }, size = 44.dp)
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, containerColor = Palette.surfaceHigh) {
+                    DropdownMenuItem(
+                        text = { Text("Wetter …", color = Palette.text) },
+                        onClick = {
+                            menu = false
+                            weather = true
+                        },
+                        modifier = Modifier.testTag("menu_weather"),
+                    )
                     DropdownMenuItem(
                         text = { Text("Entdeckungsbuch", color = Palette.text) },
                         onClick = {
@@ -524,6 +538,24 @@ fun SandboxScreen(
         )
     }
 
+    if (weather && level == null) {
+        WeatherDialog(
+            now = stats.weather,
+            worldHeight = runner.height,
+            onDismiss = { weather = false },
+            onApply = { w ->
+                weather = false
+                runner.post { it.setWeather(w.cloudBase, w.wind, w.gust, w.random, w.ambient) }
+            },
+            onStorm = {
+                weather = false
+                val v = runner.viewport
+                val cx = if (v != null) (v[0] + v[2]) / 2 else runner.width / 2
+                runner.post { it.storm(cx) }
+            },
+        )
+    }
+
     if (measuring) {
         AlertDialog(
             onDismissRequest = {},
@@ -550,7 +582,7 @@ fun SandboxScreen(
     }
 }
 
-/** What happened in the world, as sounds: crackling fire, hissing water, boiling, setting lava. */
+/** What happened in the world, as sounds: crackling fire, hissing water, boiling, setting lava, rain and thunder. */
 private fun playEvents(sound: SoundManager, e: IntArray) {
     fun volume(n: Int) = (0.35f + 0.15f * ln(n.toFloat())).coerceIn(0.3f, 1f)
     if (e[Event.EXTINGUISH] > 0) sound.play("hiss", volume(e[Event.EXTINGUISH]))
@@ -561,6 +593,8 @@ private fun playEvents(sound: SoundManager, e: IntArray) {
     if (e[Event.MELT] > 0) sound.play("melt", volume(e[Event.MELT]))
     if (e[Event.CONDENSE] > 3) sound.play("condense", 0.5f)
     if (e[Event.SOAK] > 3) sound.play("soak", 0.4f)
+    if (e[Event.RAIN] > 4) sound.play("rain", volume(e[Event.RAIN]) * 0.6f)
+    if (e[Event.LIGHTNING] > 0) sound.play("thunder", 1f)
 }
 
 @Composable
@@ -1150,6 +1184,12 @@ private const val NOTICE_TICKS = 21
 /** The material info stays this many ticks (of 80 ms) after the finger let go. */
 private const val INFO_TICKS = 40
 
+/** Where clouds form when the sandbox switches them on: as on a meadow, a sixth of the way down. */
+private const val CLOUD_HEIGHT = 0.16f
+
+/** How far the gusts of the sandbox take the wind above and below what is set. */
+private const val GUST = 0.25f
+
 /** Touches on a control lying over the world never reach the world (3b.4). */
 fun Modifier.blockTouches(): Modifier = pointerInput(Unit) {
     awaitPointerEventScope {
@@ -1470,6 +1510,133 @@ private fun NewWorldDialog(onDismiss: () -> Unit, onCreate: (Template, WorldSize
             TextButton(onClick = onDismiss) { Text("Abbrechen") }
         },
     )
+}
+
+/**
+ * The weather controls of the sandbox (3c.6): wind with or without gusts, the temperature of the air, clouds
+ * on or off, weather of its own; and a thunderstorm over the middle of the screen. Changes count once, as one
+ * action, when they are taken over.
+ */
+@Composable
+private fun WeatherDialog(
+    now: SimRunner.Weather,
+    worldHeight: Int,
+    onDismiss: () -> Unit,
+    onApply: (SimRunner.Weather) -> Unit,
+    onStorm: () -> Unit,
+) {
+    var wind by remember { mutableFloatStateOf(now.wind) }
+    var gusts by remember { mutableStateOf(now.gust > 0f) }
+    var ambient by remember { mutableFloatStateOf(now.ambient) }
+    var clouds by remember { mutableStateOf(now.cloudBase >= 0) }
+    var random by remember { mutableStateOf(now.random) }
+    // clouds keep the height they have; switched on again, they come at the usual one
+    val base = remember { if (now.cloudBase >= 0) now.cloudBase else (worldHeight * CLOUD_HEIGHT).toInt().coerceAtLeast(World.CLOUD_BAND + 2) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Palette.surface,
+        title = { Text("Wetter", color = Palette.text) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()).testTag("weather_panel"), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                val strength = abs(wind)
+                Text(
+                    when {
+                        strength < 0.05f -> "Wind: still"
+                        else -> "Wind: ${(strength * 10).roundToInt()} von 10, nach ${if (wind > 0f) "rechts" else "links"}"
+                    },
+                    color = Palette.text,
+                )
+                Slider(
+                    value = wind,
+                    onValueChange = { wind = (it * 10).roundToInt() / 10f },
+                    valueRange = -1f..1f,
+                    steps = 19,
+                    colors = sliderColors(),
+                    modifier = Modifier.testTag("weather_wind"),
+                )
+                WeatherToggle("Böen", gusts, "weather_gusts") { gusts = it }
+                Text("Lufttemperatur: ${ambient.roundToInt()} °C", color = Palette.text)
+                Slider(
+                    value = ambient,
+                    onValueChange = { ambient = it.roundToInt().toFloat() },
+                    valueRange = -20f..40f,
+                    colors = sliderColors(),
+                    modifier = Modifier.testTag("weather_temp"),
+                )
+                WeatherToggle("Wolken", clouds, "weather_clouds") { clouds = it }
+                WeatherToggle("Eigenes Wetter (Wind dreht, Wolken ziehen auf)", random, "weather_random") { random = it }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Gewitter auslösen",
+                    color = Palette.background,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Palette.accent)
+                        .clickable(onClick = onStorm)
+                        .padding(vertical = 10.dp)
+                        .testTag("weather_storm"),
+                )
+                if (now.storm) Text("Ein Gewitter ist im Gang.", color = Palette.textDim, fontSize = 12.sp)
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onApply(
+                        SimRunner.Weather(
+                            cloudBase = if (clouds) base else -1,
+                            wind = wind,
+                            gust = if (gusts) GUST else 0f,
+                            random = random,
+                            ambient = ambient,
+                            storm = now.storm,
+                        ),
+                    )
+                },
+                modifier = Modifier.testTag("weather_apply"),
+            ) { Text("Übernehmen") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Abbrechen") }
+        },
+    )
+}
+
+@Composable
+private fun sliderColors() = SliderDefaults.colors(
+    thumbColor = Palette.accent,
+    activeTrackColor = Palette.accent,
+    inactiveTrackColor = Palette.surfaceHigh,
+    activeTickColor = Palette.accentDeep,
+    inactiveTickColor = Palette.outline,
+)
+
+@Composable
+private fun WeatherToggle(label: String, checked: Boolean, tag: String, onChange: (Boolean) -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable { onChange(!checked) }
+            .padding(vertical = 2.dp)
+            .testTag(tag),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, color = Palette.text, modifier = Modifier.weight(1f))
+        Switch(
+            checked = checked,
+            onCheckedChange = onChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Palette.background,
+                checkedTrackColor = Palette.accent,
+                uncheckedThumbColor = Palette.textDim,
+                uncheckedTrackColor = Palette.surfaceHigh,
+                uncheckedBorderColor = Palette.outline,
+            ),
+        )
+    }
 }
 
 @Composable

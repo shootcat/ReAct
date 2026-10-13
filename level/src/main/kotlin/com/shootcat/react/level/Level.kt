@@ -53,6 +53,15 @@ class Level(val spec: LevelSpec, val terrain: Picture, val anchor: Picture?) {
             }
         }
         for (h in spec.heat) for (i in Area.of(h.area, width, height).cells) world.setTemperature(i % width, i / width, h.temp)
+        spec.weather?.let { w ->
+            world.setWeather(
+                cloudBase = w.cloudBase ?: -1,
+                wind = w.wind,
+                gust = w.gust,
+                gustSteps = (w.gustSeconds * com.shootcat.react.sim.MaterialTable.STEPS_PER_SECOND).toInt(),
+                random = false,
+            )
+        }
         for (t in spec.trees) world.plantTree(t.x, t.y, t.tree)
         for (i in animals) world.placeAnimal(cells[i], i % width, i / width)
         world.wakeAll()

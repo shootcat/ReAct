@@ -167,6 +167,22 @@ class Session(
     /** The object in the hand goes into the store. */
     data class Store(override val step: Int) : Input
 
+    /**
+     * The sandbox's weather changed (3c.6): condensation height (-1: no clouds), wind and gusts, random weather,
+     * the temperature of the surroundings.
+     */
+    data class Weather(
+        override val step: Int,
+        val cloudBase: Int,
+        val wind: Float,
+        val gust: Float,
+        val random: Boolean,
+        val ambient: Float,
+    ) : Input
+
+    /** A thunderstorm called up over column [x] (3c.6). */
+    data class Storm(override val step: Int, val x: Int) : Input
+
     /** A finger touches the world: one action begins (and can be undone as a whole). With the hand it picks up or puts down. */
     fun press(x: Int, y: Int, tool: Int, radius: Int) {
         if (down) release()
@@ -273,6 +289,24 @@ class Session(
     }
 
     // ------------------------------------------------------------------ procuring (4.3)
+
+    /** Sets the weather of the sandbox (3c.6): undoable, and written to the log so it plays back the same. */
+    fun setWeather(cloudBase: Int, wind: Float, gust: Float, random: Boolean, ambient: Float) {
+        if (down) release()
+        pushUndo()
+        log += Weather(world.step, cloudBase, wind, gust, random, ambient)
+        world.setWeather(cloudBase = cloudBase, wind = wind, gust = gust, random = random)
+        if (ambient != world.ambient) world.changeAmbient(ambient)
+    }
+
+    /** Calls up a thunderstorm over column [x] (3c.6): a bank of cloud, and lightning for a while. Undoable. */
+    fun storm(x: Int) {
+        if (down) release()
+        pushUndo()
+        log += Storm(world.step, x)
+        world.callStorm(x)
+        tell("Ein Gewitter zieht auf")
+    }
 
     /** Switches the supply (an action of its own, undoable). */
     fun setSupply(mode: Supply) {
@@ -737,6 +771,8 @@ class Session(
                         is Clear -> s.clear()
                         is Mode -> s.setSupply(input.supply)
                         is Store -> s.store()
+                        is Weather -> s.setWeather(input.cloudBase, input.wind, input.gust, input.random, input.ambient)
+                        is Storm -> s.storm(input.x)
                     }
                     k++
                 }

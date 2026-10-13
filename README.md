@@ -6,7 +6,7 @@ REACT wird ein Physik-Puzzle mit fein simulierter Materie, im Stil von Noita ode
 - Sand rieselt, Wasser fließt, Holz brennt, Lava erstarrt, Dampf steigt auf.
 - Was passiert, ergibt sich aus den **Eigenschaften** der Materialien (Dichte, Zündpunkt, Wärmeleitung …), nicht aus Rezepten.
 
-**Stand: Phase 1 „Spielplatz“ ist freigegeben; fertig sind Phase 1b, 2a (Bauen, Materialien), 2b (Pflanzen, Tiere, Licht) und 2c (Beschaffen, Entdeckungsbuch). Phase 2 wartet auf die Freigabe** (Leitfaden V3, aktualisierte Fassung). Berichte: [`docs/PHASE1.md`](docs/PHASE1.md), [`docs/PHASE2.md`](docs/PHASE2.md).
+**Stand: Phase 3c (Atmosphäre und Wetter) ist fertig: Wolken, Regen und Schnee, Wind, Gewitter mit Blitzen, Wetterregler im Spielplatz. Phase 4 ist nicht begonnen.** Berichte: [`docs/PHASE1.md`](docs/PHASE1.md), [`docs/PHASE2.md`](docs/PHASE2.md), [`docs/PHASE3.md`](docs/PHASE3.md), [`docs/PHASE3B.md`](docs/PHASE3B.md), [`docs/PHASE3C.md`](docs/PHASE3C.md).
 
 Die Raster-Version mit Leveln (Leitfaden V1 und V2) ist nicht mehr Teil dieses Branches. Sie liegt hier:
 - Commit `a7fc414` (Tag `grid-legacy`),
@@ -37,7 +37,7 @@ Alle Builds sind mit demselben Schlüssel signiert und installieren sich als Upd
      - **Höhlensystem** mit Gängen, Kammern, Teichen, einer Gasspalte voll Grubengas und einer versiegelten Lavatasche.
 2. **Material wählen** in der Leiste unten. Ausgeklappt hat sie zwei Zeilen: oben die Kategorien, darunter die Materialien oder Werkzeuge. Der Pfeil klappt sie auf eine schmale Zeile ein. Jede Karte zeigt die Körnung des Materials, den Vorrat (hier ∞) und die Kosten pro Einheit.
    - **Lose:** Sand, Erde, Kies, Lehm, Salz, Schnee, Geröll, Erzgeröll, Glasscherben, Holzkohle, Asche.
-   - **Flüssig:** Wasser, Salzwasser, Lava, flüssiges Metall, Dampf, Rauch, Grubengas.
+   - **Flüssig:** Wasser, Salzwasser, Lava, flüssiges Metall, Dampf, Wolke, Rauch, Grubengas.
    - **Bauen:** Holz, Ziegel, Stein, Basalt, Glas, Metall, Eis.
    - **Hitze:** Feuer, Glut, Lava.
    - **Leben:** Samen, Gras, Moos, Ranke, Fisch, Glühwürmchen, Wurm, Vogel. Tiere werden einzeln gesetzt: ein Tippen ein Tier, ein Strich alle 12 Zellen eines, in ihren Lebensraum (Fisch ins Wasser, Wurm in die Erde).
@@ -56,6 +56,7 @@ Alle Builds sind mit demselben Schlüssel signiert und installieren sich als Upd
 6. **↶ Rückgängig** nimmt den letzten Strich zurück, bis zu 25 Striche. **↺ Neu beginnen** stellt die Startlandschaft wieder her und lässt sich ebenfalls rückgängig machen.
 7. Im **Menü** (Zahnrad) gibt es:
    - **Neue Welt …**: Vorlage und Größe,
+   - **Wetter …** (3c): Wind (−10 bis 10, links bis rechts), Böen an oder aus, Lufttemperatur (−20 bis 40 °C), Wolken an oder aus, eigenes Wetter (der Wind dreht langsam, Wolkenbänke ziehen auf, selten ein Gewitter) und **Gewitter auslösen** über der Mitte des Bildschirms. „Übernehmen“ ist ein Handgriff und lässt sich rückgängig machen. Nur im Spielplatz, nie im Level,
    - **Modus**: unendlicher Vorrat oder nur Beschaffen,
    - **Entdeckungsbuch**: jede zum ersten Mal beobachtete Eigenschaft („Neu: Sand behält Wärme“), mit kleiner Animation,
    - **Leistung messen** (Ergebnis zum Kopieren),
@@ -63,11 +64,22 @@ Alle Builds sind mit demselben Schlüssel signiert und installieren sich als Upd
    - **Alles leeren**,
    - **Einstellungen**: Geräusche, Musik, Vibration, Leistungsanzeige.
 
-Die Welt erzeugt Geräusche: Zischen beim Löschen, Brodeln beim Kochen, Knistern beim Brennen, Fauchen beim Entzünden.
+Die Welt erzeugt Geräusche: Zischen beim Löschen, Brodeln beim Kochen, Knistern beim Brennen, Fauchen beim Entzünden, Rauschen bei Regen und Donner bei jedem Blitz.
 
 ## Level (Phase 3)
 
 Jedes Level ist ein gemalter Boden (`terrain.png`, jede Farbe ein Material), eine Maske für verankertes Gelände (`anchor.png`) und eine `level.json` mit Werkzeugen, Vorrat, Zielen, Zielbereichen, Gebiet und den Grenzen für Gold, Silber und Bronze. Bewertet wird nach Zeit und Handgriffen: Eimer füllen, ausgießen, greifen, ablegen, bauen. Die Medaille ist die beste, deren Grenzen Zeit und Handgriffe beide einhalten.
+
+Das Wetter eines Levels steht fest in der `level.json` (3c), nie zufällig:
+
+```json
+"weather": { "cloud_base": 30, "wind": 0.2, "gust": 0.1, "gust_seconds": 10 }
+```
+
+- `cloud_base`: die Kondensationshöhe als Zeile von oben. Darüber wird Dampf im Freien zu Wolke. Fehlt sie, gibt es keine Wolken, und Dampf kondensiert wie bisher beim Abkühlen.
+- `wind`: −1 bis 1, plus nach rechts; `gust` und `gust_seconds`: Böen als fester Rhythmus um den Wind herum.
+- Regen und Blitze kommen nur aus Wolken, die im Gelände gemalt sind oder im Spiel entstehen. Ihr Zufall läuft über den Seed der Welt; dieselben Aktionen ergeben dasselbe Wetter.
+- Level 1 bis 3 haben kein Wetter: kein Wind, keine Wolken. Ihre gemessenen Wege und Medaillen gelten unverändert.
 
 Im Level reichen Eimer und Hand nur an das, was zum Himmel offen ist: an Luft, Gas und Flüssigkeit, die mit der obersten Zeile verbunden sind, und an alles, was daran grenzt. Was hinter Fels, Eis oder Erde liegt, ist erst erreichbar, wenn der Weg dorthin offen ist („Da kommst du nicht hin“).
 
@@ -93,6 +105,11 @@ Das Modul ist reines Kotlin ohne Android. Es läuft identisch in den Tests auf d
 - **Chunks zu 32 × 32:** Nur Chunks, in denen im Schritt davor etwas passiert ist, werden gerechnet; ruhende Bereiche schlafen.
 - **Wärme:** Jede Zelle tauscht pro Schritt Wärme mit ihren Nachbarn. Die Rate ist das geometrische Mittel beider Leitfähigkeiten, verteilt nach Wärmekapazität. Dabei bleibt die Wärmemenge erhalten, und der Austausch ist immer stabil. Offene Luft kühlt langsam auf die Umgebungstemperatur ab; die oberste Zeile ist der Himmel und hat immer Umgebungstemperatur.
 - **Warme Luft (3b):** Warme Luft steigt: Ist die Luft unter einer Zelle wärmer als die darüber, tauschen beide mit einer festen, deterministischen Wahrscheinlichkeit von 0,1 pro Schritt ihre Temperatur. Unter einer festen Decke breitet sich warme Luft seitlich aus. Eingeschlossene Luft (kein Weg zum Himmel, dieselbe Raumerkennung wie für den Druck) kühlt nicht auf die Umgebung ab: Ein mit Stein oder Holz verschlossener Gang über Magma wird nach 30 s im Mittel 206 °C warm, der offene nur 110 °C.
+- **Wetter (3c):**
+  - **Wolken:** Dampf im Freien kühlt beim Steigen ab (0,3 °C pro Zeile). Ab der Kondensationshöhe (pro Level und Vorlage) wird er zu Wolke, nicht zu Wasser. Wolke ist ein eigenes Gas: Sie schwebt an der Kondensationshöhe, ballt sich zu Haufen und löst sich als einzelner Fetzen langsam auf. In geschlossenen Höhlen kondensiert Dampf wie bisher an kalten Flächen.
+  - **Regen und Schnee:** Eine Wolkenzelle mit mindestens 7 Wolkennachbarn regnet mit kleiner Wahrscheinlichkeit ab, bei Frost schneit sie. Regen ist immer Süßwasser, auch aus dem Dampf von Salzwasser; das Salz bleibt beim Verdampfen zurück.
+  - **Wind:** fest pro Level, mit Böen als Dreieckswelle (kein Zufall). Er trägt Gase, Rauch, Wolken, Asche, Schnee und trockenen Sand, je nach Material (`wind` in `materials.json`: Rauch 1, Asche 0,85, Schnee 0,55, Sand 0,2). Sand fliegt erst im Sturm, nasse oder verankerte Körner nie. Wolken ziehen als Ganzes (bei Wind 1 sechs Spalten pro Sekunde) und stauen sich vor Wänden und Bergen. Warme Luft und Flammen ziehen mit dem Wind, deshalb läuft ein Feuer vor allem in Windrichtung.
+  - **Gewitter:** Eine Wolkendecke, mindestens 24 Zellen breit und im Mittel 6 tief, kann Blitze geben. Der Blitz trifft unter der Wolke den höchsten Punkt, Metall weit bevorzugt, dann Baumkronen, dann Wasser. Er erhitzt Metall stark, entzündet Brennbares, kocht Wasser auf und schmilzt Sand zu einer Glasröhre (Fulgurit). Durch Metall läuft er bis zu dessen unterem Ende und schlägt dort in den Untergrund: Eine Stange in der Erde leitet ihn ab, eine Stange auf einem Holzstoß zündet ihn. Dazu ein Lichtblitz über der ganzen Welt und Donner.
 - **Phasenwechsel nur über Temperaturschwellen:**
   - Entzünden (`ignite_temp`), Schmelzen (`melt_temp`), Sieden (`boil_temp`), Erstarren, Gefrieren und Kondensieren (`freeze_temp`).
   - Sieden und Erstarren brauchen zusätzlich latente Wärme. Wasser kocht deshalb nicht in einem einzigen Schritt weg, und Lava bleibt eine Weile flüssig.
@@ -103,8 +120,8 @@ Das Modul ist reines Kotlin ohne Android. Es läuft identisch in den Tests auf d
 - **Wasser:**
   - Es wird von Erde und Sand teilweise aufgesogen; nasse Erde rutscht, nasser Sand hält.
   - Fließendes Wasser trägt lose Körner mit.
-  - Dampf kondensiert beim Abkühlen zu Wasser.
-- **Gase** steigen nach ihrer Dichte auf und verlassen die Welt nach oben. Unter Überhängen sammeln sie sich.
+  - Dampf kondensiert beim Abkühlen zu Wasser, im Freien mit Kondensationshöhe zu Wolken (3c).
+- **Gase** steigen nach ihrer Dichte auf und verlassen die Welt nach oben. Unter Überhängen sammeln sie sich. Der Wind trägt sie seitlich mit und weht sie am Rand aus der Welt.
 - **Strukturen:** Zusammenhängende feste Zellen bilden eine Struktur. Berührt sie verankertes Gelände (Fels), steht sie, sonst fällt sie als Ganzes.
   - Pflanzen und Gebautes sind getrennte Strukturen; Laub und Ranken tragen nichts Schweres.
   - Liegt der Schwerpunkt einer losen Struktur neben ihrer Auflage, rutscht sie über die Kante ab.
