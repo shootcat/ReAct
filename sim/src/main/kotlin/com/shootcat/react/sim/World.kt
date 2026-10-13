@@ -2606,7 +2606,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     /**
      * A structure that lies still: if its centre of weight is beside the cells it rests on, it tips over the
      * edge. Without turning (that comes with real body physics), it slides one cell down and to that side,
-     * or only to the side, if there is room. Plants with leaves or vines are held by their roots.
+     * or only to the side, if that soon brings it over an edge. Plants with leaves or vines are held by their roots.
      */
     private fun tip(cells: IntArray, density: Float, plant: Boolean): Boolean {
         val w = width
@@ -2631,14 +2631,42 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             centre > right + TIP_MARGIN -> 1
             else -> return false
         }
-        for (o in intArrayOf(w + side, side)) {
-            if (canMove(cells, o, density, plant)) {
-                shift(cells, o)
-                note(Seen.FALL, mat[cells[0]].toInt())
-                return true
-            }
+        if (canMove(cells, w + side, density, plant)) {
+            shift(cells, w + side)
+            note(Seen.FALL, mat[cells[0]].toInt())
+            return true
+        }
+        // only to the side if that brings it over an edge within the width it rests on: on flat ground it would
+        // slide on and on (a slanted bar raced across the meadow); there it stays, until bodies can turn (Phase 4)
+        if (canMove(cells, side, density, plant) && dropsWithin(cells, side, right - left + 2, density, plant)) {
+            shift(cells, side)
+            note(Seen.FALL, mat[cells[0]].toInt())
+            return true
         }
         return false
+    }
+
+    /** Whether the structure, slid up to [reach] cells to [side] through room it may pass, could then fall a cell. */
+    private fun dropsWithin(cells: IntArray, side: Int, reach: Int, density: Float, plant: Boolean): Boolean {
+        for (k in 1..reach) {
+            if (!canShift(cells, k * side, 0, density, plant)) return false
+            if (canShift(cells, k * side, 1, density, plant)) return true
+        }
+        return false
+    }
+
+    /** The structure could stand [dx] columns and [dy] rows from where it is: every cell in its own place or one it may pass. */
+    private fun canShift(cells: IntArray, dx: Int, dy: Int, density: Float, plant: Boolean): Boolean {
+        val w = width
+        for (c in cells) {
+            val tx = c % w + dx
+            val ty = c / w + dy
+            if (tx < 0 || tx >= w || ty < 0 || ty >= height) return false
+            val t = ty * w + tx
+            if (owner[t] == owner[c] && owner[t] != 0) continue
+            if (!passable(t, density, plant)) return false
+        }
+        return true
     }
 
     /** The structure (cells [cells]) can move by [o] cells: every cell lands in its own place or in one it may pass. */

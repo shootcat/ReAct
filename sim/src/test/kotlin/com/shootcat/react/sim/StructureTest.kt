@@ -179,6 +179,34 @@ class StructureTest {
     }
 
     @Test
+    fun `a slanted bar on flat ground stays where it lands, it does not slide away`() {
+        // until bodies can turn (Phase 4) it cannot fall over; before, it slid sideways on and on, to the edge of the world
+        val mt = MaterialTable.load()
+        val s = Session(mt, 160, 70, 7L) { w ->
+            for (y in 60 until 70) for (x in 0 until 160) w.set(x, y, mt.id(if (y < 64) "earth" else "rock"))
+        }
+        s.begin(Session.Supply.UNLIMITED)
+        s.shape(Session.ShapeKind.LINE, 60, 40, 80, 22, mt.id("metal"), 1)
+        repeat(60) { s.tick() }
+        val landed = (0 until s.world.size).filter { s.world.mat[it].toInt() == mt.id("metal") }.map { it % 160 }
+        repeat(300) { s.tick() }
+        val later = (0 until s.world.size).filter { s.world.mat[it].toInt() == mt.id("metal") }.map { it % 160 }
+        assertEquals(landed.min(), later.min(), "it stayed where it landed")
+        assertEquals(landed.max(), later.max())
+    }
+
+    @Test
+    fun `a plank with its weight beyond the edge of what holds it slides off and comes down`() {
+        val lab = Lab()
+        // a platform of dead wood; a bar of metal lying on it, most of it beyond its right edge
+        lab.rect("deadwood", 20, 40, 27, 61)
+        lab.rect("metal", 22, 39, 41, 39)
+        lab.seconds(3f)
+        assertEquals(0, hanging(lab, "metal"), "nothing of it hangs in the air")
+        assertTrue(shape(lab, "metal").maxOf { it.second } > 50, "it came down beside the platform")
+    }
+
+    @Test
     fun `leaves carry nothing, a block in a tree crown falls through it`() {
         val lab = Lab(64, 80)
         lab.rect("earth", 2, 66, 61, 77)

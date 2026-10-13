@@ -89,7 +89,7 @@ Im Level reichen Eimer und Hand nur an das, was zum Himmel offen ist: an Luft, G
 | Trockener Teich | Wald, leicht | Fülle den Teich mit Wasser | Ast auf die Glut, der Stamm brennt durch (Gold); Erde aus dem Fenster schöpfen (Gold); Fenster anspülen (Silber); Rinne aufschütten (Silber); eimerweise tragen (Bronze) |
 | Signalfeuer | Vulkan, Kernniveau | Entzünde den Holzstoß auf dem Gipfel | Sand vom Strand auf dem Lavasee erhitzen und zweimal seitlich an den Holzstoß gießen: die erste Ladung taut, die zweite zündet (Gold); Schnee ins Meer räumen, dann heißer Sand (Silber); Salzwasser aus dem Meer taut den Schnee, dann heißer Sand (Silber) |
 | Tiefe Schmelze | Mine, Obergrenze | Bringe Glas in die tiefe Kammer | Salz taut das Eis, Sand auf dem Schlot zu Glas, mit Wasser abgeschreckt zu Scherben (Gold); Erdpfropf graben, Lava läuft aus, Sand darauf (Silber); Erzgeröll schmilzt zur Wärmebrücke (Silber) |
-| Gewitterfeuer | Hochland, Kernniveau | Entzünde den Holzstoß auf dem Plateau | Ein Gewitter, aber kein Feuer im Level: einen Metallpfosten auf den Holzstoß stellen, der Blitz läuft hinein (Gold); ein geerdeter Pfosten fängt die Blitze ab, zwei kurze übereinander auf dem Stoß überragen ihn (Silber); spät, wenn der Regen das Holz schon nässt (Bronze) |
+| Gewitterfeuer | Hochland, Kernniveau | Entzünde den Holzstoß auf dem Plateau | Ein Gewitter, aber kein Feuer im Level: einen Metallpfosten auf den Holzstoß stellen, der Blitz läuft hinein (Gold); ein geerdeter Pfosten fängt die Blitze ab, zwei kurze übereinander auf dem Stoß überragen ihn (Silber); spät, wenn der Regen das Holz schon nässt (Bronze); noch später ist es zu nass |
 | Regenmacher | Küste, Kernniveau | Bring das trockene Feld zum Grünen | Nur Salzwasser, und Salz tötet die Pflanzen: drei Eimer ins heiße Becken, der Dampf wird Wolke, der Wind treibt sie an die Steilwand, dort regnet sie Süßwasser aufs Feld (Gold); sechs Eimer (Silber); Salzwasser auf den heißen Tuff, langsamer (Bronze) |
 
 Die Bilder der Lösungswege liegen unter `docs/phase3/`, die Malskripte unter `tools/levels/`.
@@ -127,7 +127,7 @@ Das Modul ist reines Kotlin ohne Android. Es läuft identisch in den Tests auf d
 - **Gase** steigen nach ihrer Dichte auf und verlassen die Welt nach oben. Unter Überhängen sammeln sie sich. Der Wind trägt sie seitlich mit und weht sie am Rand aus der Welt.
 - **Strukturen:** Zusammenhängende feste Zellen bilden eine Struktur. Berührt sie verankertes Gelände (Fels), steht sie, sonst fällt sie als Ganzes.
   - Pflanzen und Gebautes sind getrennte Strukturen; Laub und Ranken tragen nichts Schweres.
-  - Liegt der Schwerpunkt einer losen Struktur neben ihrer Auflage, rutscht sie über die Kante ab.
+  - Liegt der Schwerpunkt einer losen Struktur neben ihrer Auflage, rutscht sie über die Kante ab. Auf flachem Boden bleibt sie liegen, wie sie gelandet ist; echtes Umkippen (Drehen) kommt mit der Körperphysik in Phase 4.
 - **Druck und Explosionen:** Jeder geschlossene Gasbereich hat einen Druck (Gasmenge mal Temperatur, Dampf sechsfach). Übersteigt er die Festigkeit der schwächsten Wand (Glas 2 bis Metall 14, Fels nie), birst sie. Eine Explosion zerbricht Schwaches, entzündet Brennbares, löst Schnee und schleudert Pulver und Flüssigkeit fort. Wasser an Lava verdampft schlagartig.
 - **Licht** (`Light.kt`): ein Lichtfeld in Blöcken zu 2 × 2 Zellen, alle 8 Schritte neu.
   - Tageslicht fällt von oben ein und streut, Feuer, Glut, Lava, Glühendes und Glühwürmchen leuchten selbst.

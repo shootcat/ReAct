@@ -5,6 +5,8 @@ Phase 3c nach 3b, vor Phase 4: Atmosphäre und Wetter. Wolken, Regen und Schnee,
 **Build:** [`beta-99`](https://github.com/shootcat/ReAct/releases/tag/beta-99), APK und Screenshots dort.
 
 **Nachtrag mit Level 4 und 5:** [`beta-101`](https://github.com/shootcat/ReAct/releases/tag/beta-101). Der Zwischenstand mit Level 4, beta-100, war ebenfalls grün. Was sich dafür an der Physik geändert hat, steht in Abschnitt 9; die Abschnitte 1 bis 4 sind auf den neuen Stand gebracht.
+
+**Korrektur „schräges Metall gleitet“:** [`beta-102`](https://github.com/shootcat/ReAct/releases/tag/beta-102), Abschnitt 10.
 - beta-97 und beta-98 waren rot, beide nur am neuen App-Test; Simulation, Level und alle übrigen App-Tests waren grün.
   - beta-97: Der Test fand den Menüeintrag „Wetter …“ nicht.
   - beta-98: Der Test gibt jetzt bei einem Fehlschlag den Bildschirm aus. Daran war die Ursache zu sehen: Der Eintrag war versehentlich ins Menü des Level-Bildschirms geraten statt ins Menü des Spielplatzes. Dort öffnete er nichts, weil die Wetterregler im Level gesperrt sind.
@@ -166,20 +168,22 @@ Level 1 bis 3 sind davon unberührt; alle ihre Lösungstests sind grün, mit den
   - Rechts ein Felsplateau mit dem Holzstoß, an seinem rechten Ende ein Sandhaufen.
   - Unter einem Felsdach am linken Ende des Plateaus stehen alte Zaunpfosten aus Metall: einer mit 15 Zellen, drei mit 7.
   - Kein Feuer im Level, nur die Hand.
-- **Ohne Eingriff:** Der erste Blitz trifft nach 0,3 s die Baumkrone, der Baum brennt ab. Danach gehen alle Blitze in den Grat, 57 in 180 s. Der Holzstoß bleibt unberührt.
-- **Wege** (`GewitterfeuerTest`, neun Tests):
+- **Ohne Eingriff:** Der erste Blitz trifft nach 0,3 s die Baumkrone, der Baum brennt ab. Danach gehen alle Blitze in den Grat, 53 in 180 s. Der Holzstoß bleibt unberührt.
+- **Wege** (`GewitterfeuerTest`, zehn Tests):
 
   | Weg | Zeit | Griffe | Medaille |
   |---|---|---|---|
   | langer Pfosten auf den Holzstoß | 5,3 s | 2 | Gold |
   | ein kurzer Pfosten auf den Holzstoß (jeder reicht) | 5,8 s | 2 | Gold |
-  | erst den langen Pfosten neben den Stoß in den Fels gestellt: Er fängt jeden Blitz ab und ist zu heiß, um ihn wieder zu greifen; dann zwei kurze übereinander auf den Stoß, die höher reichen | 16,7 s | 6 | Silber |
-  | Pfosten erst nach 100 s auf den Stoß, der Regen hat das Holz schon etwas genässt | 103,8 s | 2 | Bronze |
+  | erst den langen Pfosten neben den Stoß in den Fels gestellt: Er fängt jeden Blitz ab und ist zu heiß, um ihn wieder zu greifen; dann zwei kurze übereinander auf den Stoß, die höher reichen | 8,2 s | 6 | Silber |
+  | Pfosten erst nach 90 s auf den Stoß, der Regen hat das Holz schon etwas genässt | 94,0 s | 2 | Bronze |
 
 - **Fallen:**
   - Pfosten in den Fels neben dem Stoß: 24 Einschläge in den Pfosten in 60 s, kein Feuer, danach „Zu heiß zum Anfassen“.
   - Pfosten in den Sandhaufen: Der Blitz macht darunter Glas (Fulgurit), aber kein Feuer.
   - Pfosten auf den Grat: ein Blitzableiter dort oben, der Holzstoß bleibt kalt.
+  - Zu spät: Ab etwa 100 s hat der Regen den Holzstoß durchnässt. Der Blitz schlägt 21-mal in den Pfosten, das nasse Holz verkohlt um seinen Fuß (23 Zellen), aber es brennt nicht.
+  - Fällt beim Ablegen gerade ein Regentropfen an die Stelle, meldet die Hand „Kein Platz zum Ablegen“; ein zweites Tippen legt den Pfosten ab (ein Griff mehr).
 - **Determinismus:** Dieselben Handgriffe bringen dieselben Blitze an dieselben Stellen (eigener Test).
 - **Medaillen:** Gold 30 s und 2 Griffe, Silber 90 s und 6, Bronze 150 s und 20.
 
@@ -214,6 +218,19 @@ Level 1 bis 3 sind davon unberührt; alle ihre Lösungstests sind grün, mit den
 
 - Über einem großen Feuer beult sich eine Wolkendecke nach unten: Rauch steigt in die Wolke und verdrängt Wolkenzellen nach unten (zu sehen in den Bildern von Level 4 über dem brennenden Baum). Das ist nur eine Frage des Aussehens; die Blitze und der Regen sind davon nicht betroffen. Behebung wäre, dass Rauch an der Wolke ansteht statt sie zu verdrängen; das gehört zu einer späteren Runde Feinschliff.
 
+## 10. Korrektur: schräges Metall gleitet über den Boden
+
+- **Gemeldet:** Schräg gesetztes Metall bewegt sich, statt umzufallen.
+- **Nachgestellt:** Eine schräge Metallstange (Linienwerkzeug) auf flacher Erde glitt in 2 s 70 bis 90 Zellen seitwärts, bis an den Rand der Welt. Auf Fels blieb sie schräg stehen, weil alles, was Fels berührt, als verankert gilt.
+- **Ursache:** Liegt der Schwerpunkt einer losen Struktur neben ihrer Auflage, müsste sie kippen, also sich drehen. Drehen gibt es erst mit der Körperphysik in Phase 4 („fallen, kippen, drehen, rollen“). Bis dahin schob die Simulation die Struktur eine Zelle schräg nach unten oder, wenn das nicht ging, nur zur Seite, damit sie über eine Kante kommt. Auf flachem Boden kommt nie eine Kante, also glitt sie Schritt für Schritt weiter.
+- **Behoben, ohne Phase 4 vorzuziehen:** Nur zur Seite rutscht eine Struktur jetzt nur noch, wenn sie dadurch innerhalb ihrer Auflagebreite über eine Kante kommt und fallen kann. Eine Planke, die mit ihrem Gewicht über eine Kante ragt, rutscht also weiter ab. Eine schräge Stange auf flachem Boden bleibt liegen, wie sie gelandet ist.
+- **Was bleibt:** Sie bleibt schräg stehen, statt umzufallen. Echtes Umkippen kommt mit Phase 4.
+- **Tests:** `StructureTest` „a slanted bar on flat ground stays where it lands“ und „a plank with its weight beyond the edge … slides off“.
+- **Folgen für die Level:**
+  - Alle Lösungstests sind grün, Level 1 bis 5, mit denselben Medaillen.
+  - In Level 4 verschiebt sich der Ablauf ein wenig (ein brennendes Stück Baum gleitet nicht mehr). Der Silberweg ist jetzt schneller (8,2 s statt 16,7 s).
+  - Der Bronzeweg kommt jetzt bei 90 s statt 100 s, weil das Holz ab etwa 100 s zu nass ist. Das steht als eigene Falle im Test.
+
 ## Entdeckungsbuch
 
 Acht neue Einträge, jeder mit kleiner Szene samt Wetter:
@@ -227,7 +244,7 @@ Alle 70 Szenen zeigen ihre Eigenschaft innerhalb von 20 s (`DiscoveryTest`).
 
 ## Tests
 
-- `sim` und `level`: 184 Tests, alle grün (lokal, vor dem Push), davon neu im Nachtrag `GewitterfeuerTest` (9) und `RegenmacherTest` (7).
+- `sim` und `level`: 187 Tests, alle grün (lokal, vor dem Push), davon neu im Nachtrag `GewitterfeuerTest` (10) und `RegenmacherTest` (7) und in der Korrektur zwei in `StructureTest`.
 - Neu: `WeatherTest` mit 12 Tests und einem Bildertest:
   - offener Dampf wird zu Wolke, nicht zu Wasser;
   - in der geschlossenen Höhle kondensiert er wie bisher;

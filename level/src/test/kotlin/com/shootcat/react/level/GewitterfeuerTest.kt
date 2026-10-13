@@ -52,7 +52,9 @@ class GewitterfeuerTest {
         val result = play.perform(Action.parse(script), limitSeconds = limit)
         Pictures.write(w, backdrop, "level4_$name", scale = 3)
         println("$name: ${play.state}, ${result ?: "${w.step / 60f} s"}, ${strikes.size} strokes: " +
-            strikes.take(8).joinToString { "%.1f s %s at %d,%d".format(it.second, it.material, it.x, it.y) })
+            strikes.take(8).joinToString { "%.1f s %s at %d,%d".format(it.second, it.material, it.x, it.y) } +
+            " … " + strikes.filter { it.second > 95f }.take(8).joinToString { "%.1f s %s at %d,%d".format(it.second, it.material, it.x, it.y) } +
+            "; notice '${play.session.notice}'")
         return Triple(play, result, strikes)
     }
 
@@ -97,11 +99,45 @@ class GewitterfeuerTest {
         assertTrue(strikes.take(3).count { it.x == 185 } >= 1, "first the post in the rock: ${strikes.map { it.x }}")
     }
 
+    /**
+     * Takes the long post after [seconds] and stands it on the pile. A falling drop of rain may be just where the
+     * post is to go ("Kein Platz zum Ablegen"): then the player taps again a moment later, one more action.
+     */
+    private fun lateOnPile(seconds: Int, limit: Int): Pair<Play, Result?> {
+        val play = play()
+        val w = play.session.world
+        val check = play.session.onStep
+        var struck = 0
+        play.session.onStep = { s ->
+            check?.invoke(s)
+            if (w.boltAge == BOLT_NEW && w.boltX[w.boltLength - 1] in 170..175) struck++
+        }
+        play.perform(Action.parse("wait ${seconds * 60}\nhand 142 79"), limitSeconds = 0)
+        var tries = 0
+        while (play.session.held != null && tries < 10) {
+            play.perform(Action.parse("hand 172 72\nwait 10"), limitSeconds = 0)
+            tries++
+        }
+        assertNull(play.session.held, "the post is on the pile")
+        val r = play.perform(emptyList(), limitSeconds = limit)
+        println("post at $seconds s: ${play.state}, $r, $tries tries to put it down, $struck strokes into it")
+        return play to r
+    }
+
     @Test
     fun `a post stood on the pile late, when the rain has wetted it a little, still kindles it, bronze`() {
-        val (_, r, _) = solve("spaet", "wait 6000\nhand 142 79\nhand 172 72", limit = 150)
-        val result = assertNotNull(r)
-        assertEquals(Medal.BRONZE, result.medal)
+        val (_, r) = lateOnPile(90, 150)
+        assertEquals(Medal.BRONZE, assertNotNull(r).medal)
+    }
+
+    @Test
+    fun `too late the rain has soaked the woodpile, the lightning goes into the post and the wet wood only chars`() {
+        val (play, r) = lateOnPile(100, 160)
+        assertNull(r, "it never burns")
+        val charred = count(play, "charcoal", 158, 66, 188, 80)
+        println("too late: ${count(play, "wood")} wood left, $charred charcoal")
+        assertTrue(charred > 0, "around the foot of the post the wood chars")
+        assertTrue(count(play, "wood") > 36, "most of the pile is still there")
     }
 
     @Test
