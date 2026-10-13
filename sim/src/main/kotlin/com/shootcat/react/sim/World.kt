@@ -278,6 +278,9 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
 
     /** How readily ground takes in fresh water: absorbent soil soaks it up, permeable gravel lets it into its pores. */
     private val takesWater = FloatArray(materials.count) { maxOf(materials.absorbs[it], materials.permeable[it]) }
+
+    /** Ground that plants grow on (earth): it keeps the salt of salt water it soaks up. */
+    private val plantSoil = BooleanArray(materials.count) { q -> (0 until materials.count).any { materials.growsOn[it] == q } }
     private val plantOf = materials.plant
     private val softOf = materials.soft
 
@@ -1610,7 +1613,11 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         }
     }
 
-    /** Absorbent ground next to water soaks some of it up and becomes wet; water runs into the pores of gravel. */
+    /**
+     * Absorbent ground next to water soaks some of it up and becomes wet; water runs into the pores of gravel.
+     * In soil that plants grow on, out in the daylight, what was dissolved in it stays on top: salt water leaves
+     * its salt, a crust nothing grows by.
+     */
     private fun soak(x: Int, y: Int, i: Int): Boolean {
         val ab = if (mat[i].toInt() == waterId) takesWater else materials.absorbs
         val w = width
@@ -1633,7 +1640,10 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         flags[j] = (f or Flag.WET).toByte()
         note(Seen.SOAK, mat[j].toInt())
         wake(jx, jy)
-        clear(x, y, i)
+        // soil that plants grow on, out in the open, takes the water and not what is dissolved in it: salt water
+        // leaves a crust of salt on top (3c, level 5); through sand and gravel, and deep down, it runs on
+        val residue = materials.boilResidue[mat[i].toInt()]
+        if (residue >= 0 && plantSoil[mat[j].toInt()] && lightAt(x, y) >= SALT_CRUST_LIGHT) change(x, y, i, residue) else clear(x, y, i)
         events[Event.SOAK]++
         return true
     }
@@ -1888,7 +1898,8 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     /**
      * Every cloud cell of rows [top]..[bottom] one column downwind ([dir]) into the air there, from the far side
      * back: a bank moves on as one and keeps its shape instead of being torn into a thin streak. What reaches
-     * the edge of the world is blown out of it; a wall stops it, and the cloud piles up against it.
+     * the edge of the world is blown out of it. Against a mountain or a wall it rises and piles up, thick
+     * enough to rain on the windward side.
      */
     private fun shiftClouds(dir: Int, top: Int, bottom: Int) {
         val w = width
@@ -1903,6 +1914,12 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
                         clear(x, y, i)
                     } else if (mat[i + dir].toInt() == AIR) {
                         swap(i, i + dir, x, y, nx, y)
+                    } else if (y > top && mat[i + dir - w].toInt() == AIR) {
+                        // up the slope in front, or onto the cloud piled there: air driven against a mountain rises
+                        swap(i, i + dir - w, x, y, nx, y - 1)
+                    } else if (y > top && mat[i - w].toInt() == AIR) {
+                        // blocked: it piles up where it stands
+                        swap(i, i - w, x, y, x, y - 1)
                     }
                 }
                 x -= dir
@@ -2898,6 +2915,9 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         private const val LIGHTNING_WATER = 160f
         private const val LIGHTNING_HEAT = 900f
         private const val FULGURITE_DEPTH = 8
+
+        /** Salt water soaking into soil leaves a crust of salt where it is at least this light (out in the open). */
+        private const val SALT_CRUST_LIGHT = 0.5f
 
         /** Cells of metal one stroke of lightning runs through at most. */
         private const val CONDUCT_LIMIT = 600

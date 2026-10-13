@@ -1,0 +1,17 @@
+{
+  "id": "regenmacher",
+  "name": "Regenmacher",
+  "area": "Küste",
+  "tier": "Kernniveau",
+  "seed": 505,
+  "tools": {"bucket": true, "bucket_size": 30, "hand": false},
+  "weather": {"cloud_base": 26, "wind": 0.4, "gust": 0.1, "gust_seconds": 12},
+  "goals": [
+    {"type": "grow", "text": "Bring das trockene Feld zum Grünen", "area": [[140, 70], [187, 70], [187, 86], [140, 86]], "amount": 40, "hold": 2}
+  ],
+  "rating": {
+    "gold": {"seconds": 90, "actions": 6},
+    "silver": {"seconds": 180, "actions": 12},
+    "bronze": {"seconds": 300, "actions": 30}
+  }
+}
