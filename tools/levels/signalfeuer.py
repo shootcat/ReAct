@@ -4,7 +4,7 @@ On the left a volcano with a lava lake in its crater, kept liquid by the magma b
 down to the bottom of the world: the heat of the volcano cannot creep through the rock to the other side.
 On the right a mountain with a small beach at its foot and the woodpile on its summit, under a hood of snow.
 """
-import sys, os
+import sys, os, math
 sys.path.insert(0, os.path.dirname(__file__))
 from paint import Canvas, fbm, ROOT
 
@@ -50,17 +50,45 @@ for x in range(0, CHASM[0]):
         if not CRATER[0] - 2 <= x <= CRATER[1] + 2:
             c.put(x, y, 'basalt', True)
 
-# the lava lake over the magma, in a bowl of tuff (anchored ash): it keeps the heat in, rock would carry it
-# through the whole volcano to the sea
-for x in range(CRATER[0] - 4, CRATER[1] + 5):
-    for y in range(52, MAGMA + 10):
+# the crater (3b.5: organic, no box): a funnel with uneven walls down to the lava lake, which lies in a
+# rounded bowl with the magma under and around its lower part; all of it in tuff (anchored ash) that keeps
+# the heat in, rock would carry it through the whole volcano to the sea
+MID = (CRATER[0] + CRATER[1]) / 2
+HALF = (CRATER[1] - CRATER[0]) / 2 + 0.5
+DEPTH = MAGMA - LAVA + 1  # the deepest point of the lake under its surface
+
+def half_width(y):
+    """Half the width of the crater at row y: a funnel above the lake, a bowl below its surface."""
+    wob = (fbm(y / 4, 9.5, 3) - 0.5) * 3
+    if y < LAVA:
+        return HALF + (LAVA - y) * 0.45 + wob
+    t = (y - LAVA) / DEPTH
+    if t >= 1:
+        return -1
+    return HALF * math.sqrt(1 - t * t) + wob * 0.6
+
+for x in range(CRATER[0] - 12, CRATER[1] + 13):
+    for y in range(52, MAGMA + 12):
         if c.get(x, y) == 'rock':
             c.put(x, y, 'ash', True)
-for x in range(CRATER[0], CRATER[1] + 1):
-    for y in range(LAVA, MAGMA):
-        c.put(x, y, 'lava', False)
-    for y in range(MAGMA, MAGMA + 6):
-        c.put(x, y, 'magma', True)
+for y in range(56, LAVA + DEPTH):
+    hw = half_width(y)
+    if hw <= 0:
+        continue
+    for x in range(int(MID - hw), int(MID + hw) + 1):
+        c.put(x, y, 'air' if y < LAVA else 'lava', False)
+# the walls of the funnel are lined with dark basalt, two cells thick; the tuff lies behind it
+for y in range(52, LAVA):
+    for x in range(CRATER[0] - 12, CRATER[1] + 13):
+        if c.get(x, y) == 'ash' and any(c.get(x + dx, y + dy) == 'air' for dx in range(-2, 3) for dy in range(-2, 3)):
+            c.put(x, y, 'basalt', True)
+# the magma: under the deeper half of the bowl and below it, three to five cells thick
+for y in range(LAVA + 3, LAVA + DEPTH + 6):
+    for x in range(CRATER[0] - 2, CRATER[1] + 3):
+        if c.get(x, y) not in ('ash', 'rock'):
+            continue
+        if any(c.get(x + dx, y + dy) == 'lava' for dx in range(-4, 5) for dy in range(-5, 1)):
+            c.put(x, y, 'magma', True)
 
 # the sea, and the beach: a thin layer of sand on the rock
 for x in range(CHASM[1] + 1, BEACH[1] + 1):

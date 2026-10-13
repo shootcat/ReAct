@@ -207,6 +207,18 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     private var closedStart = IntArray(17)
     private var closedCount = 0
 
+    /**
+     * Gas cells of the closed regions at the last check, one bit each: air shut in there keeps its warmth and
+     * gives it only to the walls; open air is the atmosphere and comes back to its temperature. Part of the
+     * snapshot, so a world restored in the middle of the check interval goes on exactly as it did.
+     */
+    private val closedBits = LongArray((size + 63) ushr 6)
+
+    /** Whether the gas at (x, y) was shut in at the last check (3b.9). */
+    fun shutIn(x: Int, y: Int): Boolean = closed(y * width + x)
+
+    private fun closed(i: Int) = (closedBits[i ushr 6] ushr (i and 63)) and 1L != 0L
+
     /** The pressure in the closed gas region around each cell found at the last check, for display and tests (1: the air outside). */
     fun pressureAt(x: Int, y: Int): Float {
         val r = region[y * width + x]
@@ -525,28 +537,46 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
                 var hot = false
                 for (y in y0..y1) {
                     var i = y * w + x0
+                    // warm air that went sideways this step moves on only in the next (one cell per step either way)
+                    var spread = false
                     for (x in x0..x1) {
                         val ma = m[i].toInt()
-                        // right neighbour
+                        // right neighbour; warm air that cannot rise any further spreads sideways into cooler air
+                        // under what holds it (3b.9)
                         if (x < w - 1) {
                             val j = i + 1
                             val d = tp[j] - tp[i]
-                            if (d > EPS || d < -EPS) {
-                                val k = ma * n + m[j].toInt()
-                                val da = pa[k] * d
-                                tp[i] += da
-                                tp[j] -= pb[k] * d
-                                if (da > HEAT_WAKE || da < -HEAT_WAKE || d * pb[k] > HEAT_WAKE || d * pb[k] < -HEAT_WAKE) {
-                                    hot = true
-                                    if (x == x1) wakeChunk(cx + 1, cy)
+                            if (!spread && ma == AIR && m[j].toInt() == AIR && (d > RISE && lidded(j) && rises(j) || d < -RISE && lidded(i) && rises(i))) {
+                                tp[i] += d
+                                tp[j] -= d
+                                spread = true
+                                hot = true
+                                if (x == x1) wakeChunk(cx + 1, cy)
+                            } else {
+                                spread = false
+                                if (d > EPS || d < -EPS) {
+                                    val k = ma * n + m[j].toInt()
+                                    val da = pa[k] * d
+                                    tp[i] += da
+                                    tp[j] -= pb[k] * d
+                                    if (da > HEAT_WAKE || da < -HEAT_WAKE || d * pb[k] > HEAT_WAKE || d * pb[k] < -HEAT_WAKE) {
+                                        hot = true
+                                        if (x == x1) wakeChunk(cx + 1, cy)
+                                    }
                                 }
                             }
                         }
-                        // lower neighbour; out of a hotter gas below, heat rises faster
+                        // lower neighbour; out of a hotter gas below, heat rises faster, and warmer air below
+                        // rises: it changes places with the cooler air above (3b.9)
                         if (y < h - 1) {
                             val j = i + w
                             val d = tp[j] - tp[i]
-                            if (d > EPS || d < -EPS) {
+                            if (d > RISE && ma == AIR && m[j].toInt() == AIR && rises(j)) {
+                                tp[i] += d
+                                tp[j] -= d
+                                hot = true
+                                if (y == y1) wakeChunk(cx, cy + 1)
+                            } else if (d > EPS || d < -EPS) {
                                 val mj = m[j].toInt()
                                 val k = ma * n + mj
                                 val up = d > 0f && kindOf[mj] == Kind.GAS
@@ -577,7 +607,12 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
                         if (y == y0 && upAsleep) {
                             val j = i - w
                             val d = tp[i] - tp[j]
-                            if (d > EPS || d < -EPS) {
+                            if (d > RISE && ma == AIR && m[j].toInt() == AIR && rises(i)) {
+                                tp[j] += d
+                                tp[i] -= d
+                                hot = true
+                                wakeChunk(cx, cy - 1)
+                            } else if (d > EPS || d < -EPS) {
                                 val k = m[j].toInt() * n + ma
                                 val dj = pa[k] * d
                                 tp[j] += dj
@@ -586,10 +621,15 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
                                 if (d * pb[k] > HEAT_WAKE || d * pb[k] < -HEAT_WAKE) hot = true
                             }
                         }
-                        // open air carries heat away and comes back to the temperature of the surroundings
-                        if (ma == AIR) {
+                        // open air carries heat away and comes back to the temperature of the surroundings; air
+                        // shut in keeps its warmth (3b.9)
+                        if (ma == AIR && !closed(i)) {
                             val d = ambient - tp[i]
-                            if (d > AIR_SNAP || d < -AIR_SNAP) {
+                            if (y == 0) {
+                                // the top row is the open sky: what rises up to it is gone
+                                if (d > EPS || d < -EPS) hot = true
+                                tp[i] = ambient
+                            } else if (d > AIR_SNAP || d < -AIR_SNAP) {
                                 tp[i] += d * AIR_RELAX
                                 hot = true
                             } else {
@@ -610,6 +650,22 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             }
         }
     }
+
+    /**
+     * Whether the warm parcel of air at [c] moves on in this step: not every step, so warm air rises at a
+     * walk and does not sweep the warmth off every hot surface. A hash of place and step, not the world's
+     * dice, so nothing else changes its course.
+     */
+    private fun rises(c: Int): Boolean {
+        var h = c * -0x61c88647 + step * -0x7a143589
+        h = h xor (h ushr 15)
+        h *= 0x2c1b3c6d
+        h = h xor (h ushr 12)
+        return (h and 0xFFFF) < RISE_CHANCE
+    }
+
+    /** Air at [c] can rise no further: something other than air lies on it, a ceiling. */
+    private fun lidded(c: Int): Boolean = c >= width && mat[c - width].toInt() != AIR
 
     internal fun wakeChunk(cx: Int, cy: Int) {
         if (cx in 0 until chunksX && cy in 0 until chunksY) {
@@ -722,8 +778,10 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
 
         // phase changes, all at temperature thresholds; salt next to ice or snow lowers its melting point
         val t = temp[i]
-        val byHeat = t >= mt.meltTemp[m]
-        if ((byHeat && melted(x, y, i, m)) || (!byHeat && t >= mt.saltMeltTemp[m] && saltyNeighbour(x, y, i))) {
+        val byHeat = t >= mt.meltTemp[m] && melted(x, y, i, m)
+        // salt melts it at once, also when warm salt has brought it up to its melting point and the heat
+        // alone would still have to gather (3b: the warm air of a gallery warms the salt heap in it)
+        if (byHeat || (t >= mt.saltMeltTemp[m] && saltyNeighbour(x, y, i))) {
             note(if (byHeat) Seen.MELT else Seen.SALT_MELT, m)
             change(x, y, i, mt.meltProduct[m])
             events[Event.MELT]++
@@ -1494,6 +1552,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         gasDirty = false
         val w = width
         region.fill(0)
+        closedBits.fill(0L)
         closedCount = 0
         var used = 0
         var id = 0
@@ -1525,8 +1584,10 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             if (used + count > closedCells.size) closedCells = closedCells.copyOf(maxOf(closedCells.size * 2, used + count))
             closedStart[closedCount] = used
             for (c in 0 until count) {
-                closedCells[used++] = fillCells[c]
-                region[fillCells[c]] = -closedCount - 1
+                val j = fillCells[c]
+                closedCells[used++] = j
+                region[j] = -closedCount - 1
+                closedBits[j ushr 6] = closedBits[j ushr 6] or (1L shl (j and 63))
             }
             closedPressure[closedCount] = 1f
             closedCount++
@@ -2046,13 +2107,14 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         internal val heatPending: BooleanArray,
         internal val placed: IntArray,
         internal val light: FloatArray,
+        internal val closed: LongArray,
     ) {
         val bytes: Int get() = mat.size * 9 + light.size * 4
     }
 
     fun snapshot() = Snapshot(
         step, mat.copyOf(), temp.copyOf(), life.copyOf(), variant.copyOf(), flags.copyOf(), rng, pending.copyOf(),
-        heatPending.copyOf(), placed.copyOf(), light.level.copyOf(),
+        heatPending.copyOf(), placed.copyOf(), light.level.copyOf(), closedBits.copyOf(),
     )
 
     fun restore(s: Snapshot) {
@@ -2065,6 +2127,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         s.heatPending.copyInto(heatPending)
         s.placed.copyInto(placed)
         s.light.copyInto(light.level)
+        s.closed.copyInto(closedBits)
         stamp.fill(0)
         rng = s.rng
         step = s.step
@@ -2108,6 +2171,15 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         /** A temperature change above this keeps a chunk awake. */
         private const val HEAT_WAKE = 0.02f
         private const val AIR_RELAX = 0.03f
+
+        /** Air below warmer than this than the air above rises into its place (3b.9). */
+        private const val RISE = 0.5f
+
+        /**
+         * Chance per step (of 65536) that a warm parcel of air moves on: one in ten, about six cells a second.
+         * Every step would carry the warmth off hot surfaces so fast that sand on lava no longer turns to glass.
+         */
+        private const val RISE_CHANCE = 6554
 
         /** Particles swapping places with more than this temperature difference stir up heat exchange. */
         private const val SWAP_HEAT = 0.5f

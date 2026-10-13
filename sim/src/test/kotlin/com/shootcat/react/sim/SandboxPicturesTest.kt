@@ -58,6 +58,38 @@ class MaterialPicturesTest {
     }
 }
 
+/** Phase 3b, for the report: glowing by temperature, salt, snow, metal and ice in the dark of a cave, the heat picture. */
+class HeatPicturesTest {
+    @Test
+    fun `glow by temperature, ice in the dark and the heat picture`() {
+        val materials = MaterialTable.load()
+        // a row of stone blocks from cold to white heat; not stepped, so each keeps its temperature
+        val temps = listOf(20f, 450f, 600f, 750f, 900f, 1100f, 1300f, 1500f)
+        val cell = 12
+        val row = World(temps.size * cell, cell, materials, 3L)
+        for ((k, t) in temps.withIndex()) {
+            for (y in 1 until cell - 1) for (x in k * cell + 1 until (k + 1) * cell - 1) row.set(x, y, materials.id("stone"), t)
+        }
+        Pictures.write(row, IntArray(row.size) { 0xFF1A2230.toInt() }, "glow_steps", scale = 6, lit = false)
+        Pictures.write(row, IntArray(row.size) { 0xFF1A2230.toInt() }, "glow_steps_thermal", scale = 6, lit = false, thermal = true)
+
+        // a cave in rock with a narrow opening: ice, salt, snow and metal on its floor, apart, in its shade
+        val lab = Lab(96, 48)
+        lab.rect("rock", 0, 0, 95, 47)
+        lab.rect("air", 0, 0, 95, 5)
+        lab.rect("air", 4, 14, 91, 41)
+        lab.rect("air", 46, 5, 47, 14)
+        lab.rect("ice", 8, 30, 23, 41, -5f)
+        lab.rect("salt", 30, 37, 41, 41)
+        lab.rect("snow", 54, 37, 65, 41, -2f)
+        lab.rect("metal", 72, 32, 87, 41)
+        lab.world.wakeAll()
+        lab.seconds(1f)
+        Pictures.write(lab.world, Backdrop.of(lab.world), "cave_materials", scale = 6)
+        Pictures.write(lab.world, Backdrop.of(lab.world), "cave_materials_thermal", scale = 6, thermal = true)
+    }
+}
+
 /** Plants, animals and light in the sandbox (2b), for the report. */
 class LifePicturesTest {
     @Test

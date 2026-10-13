@@ -42,14 +42,16 @@ Alle Builds sind mit demselben Schlüssel signiert und installieren sich als Upd
    - **Hitze:** Feuer, Glut, Lava.
    - **Leben:** Samen, Gras, Moos, Ranke, Fisch, Glühwürmchen, Wurm, Vogel. Tiere werden einzeln gesetzt: ein Tippen ein Tier, ein Strich alle 12 Zellen eines, in ihren Lebensraum (Fisch ins Wasser, Wurm in die Erde).
    - Dazu der Radierer, den es nur im Spielplatz gibt. Fels ist Gelände und nicht in der Hand des Spielers.
-3. **Malen und Schütten** mit einem Finger. Material landet nur dort, wo Luft ist, nie in Fels oder anderem Material. Ein liegen gelassener Finger schüttet weiter. Lose Stoffe fallen gestreut, feste Stoffe werden als geschlossene Form gezeichnet. Fünf Pinselgrößen, die kleinste setzt genau ein Partikel.
+3. **Malen und Schütten** mit einem Finger. Material landet nur dort, wo Luft ist, nie in Fels oder anderem Material. Ein Tippen schüttet so lange, wie der Finger lag; ein Strich schüttet weiter, solange der Finger danach liegen bleibt. Lose Stoffe fallen gestreut, feste Stoffe werden als geschlossene Form gezeichnet. Fünf Pinselgrößen, die kleinste setzt genau ein Partikel.
    - **Bauwerkzeuge** (Pinselform in der Ecke): Pinsel, Linie, Rechteck und Rahmen. Beim Ziehen zeigt eine halbtransparente Vorschau, was entsteht; Loslassen baut es. Das geht auch in der Pause.
    - **Werkzeug:**
-     - Eimer: schöpft eine Sorte loses oder flüssiges Material, gießt es mit seiner Temperatur wieder aus, auch in Rauch oder Dampf, nicht in Feuer.
-     - Hand: trägt lose Objekte, nicht zu schwer, nicht zu heiß, nicht in Fels verankert; legt sie in Luft, Rauch oder Dampf ab.
-     - „Zu Brettern“ / „Ins Lager“: ein Stamm ergibt 3 Bretter pro Zelle.
-   - **Modus „nur Beschaffen“** (Menü): keine unendliche Leiste mehr, nur Eimer, Hand und das Lager. Gebaut wird mit dem, was beschafft wurde.
-4. **Zwei Finger** zoomen (heraus bis zur ganzen Welt, hinein bis sechsfach) und verschieben. Kommt der zweite Finger in den ersten 70 ms, entsteht kein Klecks.
+     - Eimer: schöpft eine Sorte loses oder flüssiges Material, gießt es mit seiner Temperatur wieder aus, auch in Rauch oder Dampf, nicht in Feuer. Die erste Berührung legt die Sorte fest; beim Wischen wird nur diese geschöpft, und ein durchgehendes Wischen ist ein Handgriff. Ein kurzes Tippen mit dem Eimer dauert mindestens einen ganzen Zug (0,45 s), damit auch Pinsel 1 den Eimer ganz leert.
+     - Hand: trägt lose Objekte, nicht zu schwer, nicht zu heiß, nicht in Fels verankert; legt sie in Luft, Rauch oder Dampf ab. Ist die Hand gewählt, leuchtet alles auf, was sie gerade nehmen kann.
+     - „Zu Brettern“ / „Ins Lager“: ein Stamm ergibt 3 Bretter pro Zelle. Loses aus dem Eimer (auch Lehm) kommt mit „Ins Lager“ ebenfalls ins Lager, Flüssiges nicht.
+   - **Modus „nur Beschaffen“** (Menü): keine unendliche Leiste mehr, nur Eimer, Hand und das Lager. Gebaut wird mit dem, was beschafft wurde. Wie im Level reichen Eimer und Hand dann nur an das, was zum Himmel offen ist.
+   - **Langes Drücken** (ein Finger, 0,45 s still): eine Karte zeigt Name, Temperatur, Zustand (heiß, brennt, nass, verankert) und ob Eimer und Hand es nehmen können, und wenn nicht, warum. Der Finger kann weiterwandern. Das ist kein Handgriff und verändert nichts.
+   - **Wärmebild** (Thermometer in der Ecke): die ganze Welt in Falschfarben nach Temperatur, von Dunkelblau (Frost) über Blaugrün (20 °C), Grün, Gelb (150 °C), Orange und Rot bis Weiß (1400 °C). Ohne Wärmebild glühen heiße Stoffe abgestuft: dunkelrot ab etwa 450 °C, dann orange, gelb und weiß bei 1500 °C.
+4. **Zwei Finger** zoomen (heraus bis zur ganzen Welt, hinein bis sechsfach) und verschieben. Kommt der zweite Finger, bevor der erste sich bewegt hat, entsteht kein Klecks. Die Welt bleibt in ihrem Rahmen und wird nie über die Bedienung gezeichnet; Berührungen auf der Bedienung erreichen die Welt nicht.
 5. **Pause, Normal, Schnell** und die **Pinselform** (Pinsel, Linie, Rechteck, Rahmen, fünf Größen) sitzen klein in der rechten unteren Ecke der Welt. Normal sind 60 Schritte pro Sekunde, Schnell bis zu 180. In der Pause lassen sich mehrere Dinge setzen, die dann gemeinsam starten.
 6. **↶ Rückgängig** nimmt den letzten Strich zurück, bis zu 25 Striche. **↺ Neu beginnen** stellt die Startlandschaft wieder her und lässt sich ebenfalls rückgängig machen.
 7. Im **Menü** (Zahnrad) gibt es:
@@ -77,7 +79,7 @@ Im Level reichen Eimer und Hand nur an das, was zum Himmel offen ist: an Luft, G
 
 Die Bilder der Lösungswege liegen unter `docs/phase3/`, die Malskripte unter `tools/levels/`.
 
-In der App führt **Level** im Startbildschirm zur Auswahl. Sie zeigt jedes Level als Bild, mit Gebiet, Niveau, Ziel, Werkzeugen und der besten Medaille mit Zeit und Handgriffen. Alle Level sind offen. Ein Level beginnt mit der ganzen Welt im Bild, und es gibt nur seine Werkzeuge. Über der Welt stehen das Ziel mit Fortschrittsbalken, die Zeit, die Handgriffe und die drei Medaillengrenzen; eine Grenze, die schon überschritten ist, wird blass. Der Zielbereich ist gestrichelt auf der Welt eingezeichnet. Rückgängig nimmt Zeit und Handgriffe mit zurück, „Neu beginnen“ startet das Level frisch. Ist das Ziel zwei Sekunden lang erfüllt, erscheint die Medaille mit „Nochmal“, „Nächstes“ und „Ansehen“. Das beste Ergebnis jedes Levels wird gespeichert.
+In der App führt **Level** im Startbildschirm zur Auswahl. Sie zeigt jedes Level als Bild, mit Gebiet, Niveau, Ziel, Werkzeugen und der besten Medaille mit Zeit und Handgriffen. In der Testphase sind alle Level offen (`LevelGate.ALL_OPEN`); später sind immer die nächsten drei ungelösten Level offen, gesperrte erscheinen blass mit Schloss. Ein Level beginnt mit der ganzen Welt im Bild, und es gibt nur seine Werkzeuge. Über der Welt stehen das Ziel mit Fortschrittsbalken, die Zeit, die Handgriffe und die drei Medaillengrenzen; eine Grenze, die schon überschritten ist, wird blass. Der Zielbereich ist gestrichelt auf der Welt eingezeichnet. Rückgängig nimmt Zeit und Handgriffe mit zurück, „Neu beginnen“ startet das Level frisch. Ist das Ziel zwei Sekunden lang erfüllt, erscheint die Medaille mit „Nochmal“, „Nächstes“ und „Ansehen“. Das beste Ergebnis jedes Levels wird gespeichert.
 
 ## Simulation (`sim/`)
 
@@ -89,7 +91,8 @@ Das Modul ist reines Kotlin ohne Android. Es läuft identisch in den Tests auf d
   - `ShortArray` für die Lebensdauer (Brenndauer, Rauch, gespeicherte Verdampfungswärme).
 - **Reihenfolge:** Die Zeilen werden von unten nach oben abgearbeitet, jede Zeile in der Gegenrichtung der vorigen. Ein Stempel verhindert, dass ein Partikel im selben Schritt zweimal bewegt wird.
 - **Chunks zu 32 × 32:** Nur Chunks, in denen im Schritt davor etwas passiert ist, werden gerechnet; ruhende Bereiche schlafen.
-- **Wärme:** Jede Zelle tauscht pro Schritt Wärme mit ihren Nachbarn. Die Rate ist das geometrische Mittel beider Leitfähigkeiten, verteilt nach Wärmekapazität. Dabei bleibt die Wärmemenge erhalten, und der Austausch ist immer stabil. Offene Luft kühlt langsam auf die Umgebungstemperatur ab.
+- **Wärme:** Jede Zelle tauscht pro Schritt Wärme mit ihren Nachbarn. Die Rate ist das geometrische Mittel beider Leitfähigkeiten, verteilt nach Wärmekapazität. Dabei bleibt die Wärmemenge erhalten, und der Austausch ist immer stabil. Offene Luft kühlt langsam auf die Umgebungstemperatur ab; die oberste Zeile ist der Himmel und hat immer Umgebungstemperatur.
+- **Warme Luft (3b):** Warme Luft steigt: Ist die Luft unter einer Zelle wärmer als die darüber, tauschen beide mit einer festen, deterministischen Wahrscheinlichkeit von 0,1 pro Schritt ihre Temperatur. Unter einer festen Decke breitet sich warme Luft seitlich aus. Eingeschlossene Luft (kein Weg zum Himmel, dieselbe Raumerkennung wie für den Druck) kühlt nicht auf die Umgebung ab: Ein mit Stein oder Holz verschlossener Gang über Magma wird nach 30 s im Mittel 206 °C warm, der offene nur 110 °C.
 - **Phasenwechsel nur über Temperaturschwellen:**
   - Entzünden (`ignite_temp`), Schmelzen (`melt_temp`), Sieden (`boil_temp`), Erstarren, Gefrieren und Kondensieren (`freeze_temp`).
   - Sieden und Erstarren brauchen zusätzlich latente Wärme. Wasser kocht deshalb nicht in einem einzigen Schritt weg, und Lava bleibt eine Weile flüssig.

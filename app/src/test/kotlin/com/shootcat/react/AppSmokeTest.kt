@@ -211,7 +211,7 @@ class AppSmokeTest {
         compose.onNodeWithTag("material_Schöpfen").performClick()
         paint(100, 172, holdMillis = 400)
         compose.onNodeWithTag("material_Gießen").performClick()
-        paint(40, 95, holdMillis = 800)
+        paint(40, 95, holdMillis = 800, wiggle = true)
         run(1500)
         shot("16_eimer")
         compose.onNodeWithContentDescription("Menü").performClick()
@@ -314,10 +314,12 @@ class AppSmokeTest {
         // the level begins with all of it on screen; one bucket out of the middle of the earth in the window
         // of the rock wall (brush 3, the bucket is the first tool). Not its left edge: after a second and a
         // half the pool has seeped in there, and an empty bucket takes what lies under the finger, water.
+        // A short touch (3b): it scoops for as long as the finger was down; held still longer it would ask
+        // what is there instead.
         compose.onNodeWithTag("world").performTouchInput { down(levelCell(52, 46, 220, 140)) }
-        run(1200)
+        run(400)
         compose.onNodeWithTag("world").performTouchInput { up() }
-        run(300)
+        run(700)
         compose.onNodeWithTag("speed_Schnell").performClick()
         var waited = 0
         while (compose.onAllNodesWithTag("level_end").fetchSemanticsNodes().isEmpty() && waited < 120_000) {
@@ -358,6 +360,53 @@ class AppSmokeTest {
         run(700)
         compose.onNodeWithTag("notice").assertExists()
         shot("34_level3_quer_nicht_erreichbar")
+    }
+
+    /**
+     * Phase 3b: a finger held still asks what is there (and is no action), the heat picture over the whole
+     * world, with the hand everything it can take lights up, and zoomed far in the world stays in its box.
+     */
+    @Test
+    fun infoHeatAndHand(): Unit = ActivityScenario.launch(MainActivity::class.java).use {
+        compose.waitForIdle()
+        compose.onNodeWithText("Spielplatz").performClick()
+        run(1500)
+        // lava onto the bridge, so the heat picture has something to show
+        category("Hitze").performScrollTo().performClick()
+        compose.onNodeWithTag("material_Lava").performScrollTo().performClick()
+        paint(115, 125, holdMillis = 300)
+        run(1500)
+        // a finger held still on the pond
+        compose.onNodeWithTag("world").performTouchInput { down(cellToOffset(100, 172)) }
+        run(800)
+        compose.onNodeWithTag("info").assertExists()
+        shot("35_info_wasser")
+        compose.onNodeWithTag("world").performTouchInput { up() }
+        run(300)
+        compose.onNodeWithTag("world").performTouchInput { down(cellToOffset(115, 126)) }
+        run(800)
+        compose.onNodeWithTag("world").performTouchInput { up() }
+        run(200)
+        compose.onNodeWithTag("info").assertExists()
+        shot("36_info_lava")
+        compose.onNodeWithTag("thermal").performClick()
+        run(800)
+        shot("37_waermebild")
+        compose.onNodeWithTag("thermal").performClick()
+        run(300)
+        // only the bucket and the hand: with the hand, everything it can take lights up
+        compose.onNodeWithContentDescription("Menü").performClick()
+        compose.onNodeWithText("Modus: nur Beschaffen").performClick()
+        run(500)
+        category("Werkzeug").performScrollTo().performClick()
+        compose.onNodeWithTag("material_Hand").performClick()
+        run(1500)
+        shot("38_hand_greifbar")
+        // far in: the world stays in its box and never covers the controls
+        compose.onNodeWithTag("world").performTouchInput { pinch(cellToOffset(100, 170), 8f) }
+        run(800)
+        shot("39_zoom_im_rahmen")
+        compose.onNodeWithTag("material_bar").assertExists()
     }
 
     /**
@@ -415,9 +464,19 @@ class AppSmokeTest {
         compose.waitForIdle()
     }
 
-    /** Puts a finger down on cell (x, y) and keeps it there for a while: the brush keeps pouring. */
-    private fun paint(x: Int, y: Int, holdMillis: Long) {
-        compose.onNodeWithTag("world").performTouchInput { down(cellToOffset(x, y)) }
+    /**
+     * Puts a finger down on cell (x, y) for a while: the brush pours for as long. A finger held still longer
+     * than a moment asks what is there instead (3b.1), so for a long pour it [wiggle]s first: a stroke goes on
+     * pouring where the finger rests.
+     */
+    private fun paint(x: Int, y: Int, holdMillis: Long, wiggle: Boolean = false) {
+        compose.onNodeWithTag("world").performTouchInput {
+            down(cellToOffset(x, y))
+            if (wiggle) {
+                moveBy(Offset(0f, 40f))
+                moveBy(Offset(0f, -40f))
+            }
+        }
         run(holdMillis)
         compose.onNodeWithTag("world").performTouchInput { up() }
         run(100)

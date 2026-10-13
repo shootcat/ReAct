@@ -13,6 +13,9 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
     private val palette = IntArray(mt.count * SHADES)
     private val glow = IntArray(GLOW_STEPS)
 
+    /** Colours of the heat picture from HEAT_FROM to HEAT_TO degrees. */
+    private val heatRamp = IntArray(HEAT_STEPS)
+
     private val lava = mt.idOrNull("lava") ?: -1
     private val fire = mt.idOrNull("fire") ?: -1
     private val smoke = mt.idOrNull("smoke") ?: -1
@@ -34,6 +37,15 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
 
     /** Without lighting everything is drawn at full brightness (overviews of the materials). */
     var lit = true
+
+    /**
+     * The heat picture (3b.7): every cell, air too, in the colour of its temperature, from deep blue in the
+     * frost through green and yellow to red and white heat; the shapes of the materials show faintly.
+     */
+    var thermal = false
+
+    /** Cells to light up, pulsing (the objects the hand could take, 3b.3), or null. */
+    var highlight: BooleanArray? = null
 
     /** Brightness in total darkness; little scenes in the discovery book lift it so a dark cave still shows. */
     var ambient = AMBIENT
@@ -70,12 +82,41 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
                 palette[m * SHADES + k] = scale(c, f)
             }
         }
-        // incandescence from dark red to yellow-white, GLOW_FROM..GLOW_TO degrees
-        val stops = intArrayOf(0x3a0800, 0x8a1c04, 0xd84a0c, 0xff8a1e, 0xffc35a, 0xffeab0)
-        for (k in 0 until GLOW_STEPS) {
-            val p = k / (GLOW_STEPS - 1f) * (stops.size - 1)
-            val a = p.toInt().coerceAtMost(stops.size - 2)
-            glow[k] = mix(stops[a] or OPAQUE, stops[a + 1] or OPAQUE, p - a)
+        // incandescence (3b.7): dark red, red, orange, yellow, white, GLOW_FROM..GLOW_TO degrees
+        for (k in 0 until GLOW_STEPS) glow[k] = ramp(GLOW_FROM + k * (GLOW_TO - GLOW_FROM) / (GLOW_STEPS - 1), GLOW_T, GLOW_C)
+        for (k in 0 until HEAT_STEPS) heatRamp[k] = ramp(HEAT_FROM + k * (HEAT_TO - HEAT_FROM) / (HEAT_STEPS - 1), HEAT_T, HEAT_C)
+    }
+
+    /** The colour at [t] between the [colours] at the temperatures [at]. */
+    private fun ramp(t: Float, at: FloatArray, colours: IntArray): Int {
+        if (t <= at[0]) return colours[0] or OPAQUE
+        for (k in 1 until at.size) {
+            if (t <= at[k]) return mix(colours[k - 1] or OPAQUE, colours[k] or OPAQUE, (t - at[k - 1]) / (at[k] - at[k - 1]))
+        }
+        return colours.last() or OPAQUE
+    }
+
+    private fun heatColour(t: Float): Int = heatRamp[((t - HEAT_FROM) / (HEAT_TO - HEAT_FROM) * (HEAT_STEPS - 1)).toInt().coerceIn(0, HEAT_STEPS - 1)]
+
+    /** The heat picture into [out] (3b.7). */
+    private fun renderThermal(out: IntArray, x0: Int, y0: Int, x1: Int, y1: Int) {
+        val w = world.width
+        val mat = world.mat
+        val temp = world.temp
+        val variant = world.variant
+        for (y in y0..y1) for (x in x0..x1) {
+            val i = y * w + x
+            val m = mat[i].toInt()
+            val h = heatColour(temp[i])
+            out[i] = if (m == AIR || mt.kind[m] == Kind.GAS) {
+                darken(h, 0.78f)
+            } else {
+                // the material as a faint grey relief, so its shape stays readable
+                val c = palette[m * SHADES + ((variant[i].toInt() and 0xFF) and (SHADES - 1))]
+                val grey = (((c shr 16) and 0xFF) * 3 + ((c shr 8) and 0xFF) * 6 + (c and 0xFF)) / 10
+                val edge = x > 0 && mat[i - 1].toInt() != m || i >= w && mat[i - w].toInt() != m
+                mix(h, OPAQUE or (grey shl 16) or (grey shl 8) or grey, if (edge) 0.45f else 0.22f)
+            }
         }
     }
 
@@ -143,6 +184,10 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
         val flags = world.flags
         val variant = world.variant
         val life = world.life
+        if (thermal) {
+            renderThermal(out, x0, y0, x1, y1)
+            return
+        }
         computeShade(running, x0, y0, x1, y1)
         critterCount = 0
         // how deep in clear water the first row lies, for each column
@@ -210,9 +255,31 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
                     if (y % 5 == 4 || bx == 8) c = scale(c, 0.72f)
                 }
                 Pattern.SHEEN -> {
-                    // brushed metal: a soft diagonal shine
+                    // polished metal: a broad diagonal shine and a bright upper edge (3b.1)
                     val y = i / w
-                    c = scale(c, 0.9f + 0.25f * wave((x + y * 2) and 63))
+                    c = scale(c, 0.82f + 0.45f * wave((x + y * 2) and 63))
+                    if (i >= w && mat[i - w].toInt() != m) c = mix(c, 0xFFF4F8FF.toInt(), 0.45f)
+                }
+                Pattern.CRYSTAL -> {
+                    // crystals: facets of slightly different brightness, now and then one glitters (3b.1)
+                    c = scale(c, 0.9f + ((v shr 4) and 7) * 0.03f)
+                    if (((v * 37 + (frame shr 2) * 11 + x * 7) and 127) == 0) c = mix(c, 0xFFFFFFFF.toInt(), 0.9f)
+                    else if (((v * 37 + (frame shr 2) * 11 + x * 7) and 127) == 1) c = mix(c, 0xFFE8F4FF.toInt(), 0.5f)
+                }
+                Pattern.MATTE -> {
+                    // soft snow: bright on top, a faint blue shadow inside the drift (3b.1)
+                    var d = 0
+                    var j = i - w
+                    while (d < 4 && j >= 0 && mat[j].toInt() == m) {
+                        d++
+                        j -= w
+                    }
+                    c = if (d == 0) scale(c, 1.05f) else mix(c, 0xFFB8CCE4.toInt(), 0.05f * d)
+                }
+                Pattern.ICE -> {
+                    // glassy blue with streaks; its edges are drawn after the light (3b.8)
+                    val y = i / w
+                    if (((x + y) and 7) == 0 || ((x + y + 1) and 7) == 0) c = scale(c, 1.1f)
                 }
                 Pattern.PORES -> {
                     // porous basalt: gas bubbles of one to three cells, uneven tone; it goes with the cells
@@ -277,18 +344,42 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
                 val flick = ((v * 7 + frame * 3) and 31) / 31f
                 c = mix(glowAt(maxOf(t, 650f) + flick * 300f), scale(c, 0.35f), 0.08f + 0.4f * (1f - flick))
             } else if (t > GLOW_FROM && !glowingLiquid[m] && mt.kind[m] != Kind.GAS) {
-                val k = ((t - GLOW_FROM) / 650f).coerceIn(0f, 0.9f)
-                c = mix(glowAt(t), c, k)
+                // glowing by its heat: dark red, orange, yellow, white (3b.7)
+                val k = ((t - GLOW_FROM) / GLOW_FULL).coerceIn(0f, 0.95f)
+                c = mix(c, glowAt(t), k)
             }
             // light of its own (fire, embers, lava, glowing heat) is not darkened; the cut face of solid ground
-            // is always shown, darker away from the light, while air, water and glass show the real light
+            // is always shown, darker away from the light, while air, water and glass show the real light; ice
+            // stays clearly ice even in the shade of a cave (3b.8)
             if (s < 0.995f && mt.glow[m] == 0f && f and Flag.BURNING == 0 && t < GLOW_FROM) {
-                c = darken(c, if (mt.lightPass[m] == 0f && s < CUT_FACE) CUT_FACE else s)
+                val floor = if (mt.pattern[m] == Pattern.ICE) ICE_SHADE else if (mt.lightPass[m] == 0f) CUT_FACE else 0f
+                c = darken(c, maxOf(s, floor))
+            }
+            if (mt.pattern[m] == Pattern.ICE) {
+                // shining edges where the ice meets something else
+                val y = i / w
+                val edge = (x > 0 && mat[i - 1].toInt() != m) || (x < w - 1 && mat[i + 1].toInt() != m) ||
+                    (i >= w && mat[i - w].toInt() != m) || (i < size - w && mat[i + w].toInt() != m)
+                if (edge) c = mix(c, 0xFFF2FBFF.toInt(), if (((x - y) and 3) == 0) 0.75f else 0.45f)
             }
             val a = mt.opacity[m]
             out[i] = if (a >= 1f) c else if (m == glass && ((v and 15) == 0)) scale(mix(c, bg, 1f - a), 1.3f) else mix(c, bg, 1f - a)
         }
         drawCritters(out, frame)
+        highlight?.let { drawHighlight(out, it, frame, x0, y0, x1, y1) }
+    }
+
+    /** What the hand could take, lit up and pulsing, its outline brightest (3b.3). */
+    private fun drawHighlight(out: IntArray, mark: BooleanArray, frame: Int, x0: Int, y0: Int, x1: Int, y1: Int) {
+        if (mark.size != world.size) return
+        val w = world.width
+        val pulse = 0.5f + 0.5f * wave((frame * 2) and 63)
+        for (y in y0..y1) for (x in x0..x1) {
+            val i = y * w + x
+            if (!mark[i]) continue
+            val edge = (x == 0 || !mark[i - 1]) || (x == w - 1 || !mark[i + 1]) || (i < w || !mark[i - w]) || (i >= world.size - w || !mark[i + w])
+            out[i] = mix(out[i], HIGHLIGHT, if (edge) 0.45f + 0.3f * pulse else 0.12f + 0.12f * pulse)
+        }
     }
 
     /** A tail behind each fish, wings on each bird (flapping while it flies), drawn into the air or water around them. */
@@ -336,8 +427,14 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
      * as clouds, [light] the warm glow around fire, embers and lava. One pixel per block of cells.
      */
     fun renderLayers(haze: IntArray, light: IntArray) {
+        if (thermal) {
+            haze.fill(0)
+            light.fill(0)
+            return
+        }
         val w = world.width
         val mat = world.mat
+        val temp = world.temp
         val flags = world.flags
         val life = world.life
         smokeSum.fill(0f)
@@ -357,6 +454,8 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
                     // the warm glow of fire and heat; fireflies light up their surroundings through the light field only
                     if (e > 0f && !animal[m] && (!mt.flammable[m] || mt.kind[m] == Kind.GAS || flags[i].toInt() and Flag.BURNING != 0)) lightSum[b] += e
                     else if (flags[i].toInt() and Flag.BURNING != 0) lightSum[b] += 0.5f
+                    // glowing heat lights up its surroundings too (3b.7)
+                    else if (temp[i] > GLOW_HALO && mt.kind[m] != Kind.GAS) lightSum[b] += minOf(0.6f, (temp[i] - GLOW_HALO) / 1000f)
                 }
                 i++
             }
@@ -395,6 +494,10 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
      * embers below add to it. One pixel per block of [FLAME_BLOCK] × [FLAME_BLOCK] cells.
      */
     fun renderFlames(out: IntArray) {
+        if (thermal) {
+            out.fill(0)
+            return
+        }
         val w = world.width
         val mat = world.mat
         val flags = world.flags
@@ -471,7 +574,30 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
         const val FLAME_BLOCK = 2
         private const val GLOW_STEPS = 128
         private const val GLOW_FROM = 450f
-        private const val GLOW_TO = 1400f
+        private const val GLOW_TO = 1500f
+
+        /** Above GLOW_FROM by this much, a hot thing shows nothing but its glow. */
+        private const val GLOW_FULL = 350f
+
+        /** Hotter than this, a thing lights up its surroundings a little. */
+        private const val GLOW_HALO = 600f
+
+        /** Incandescence: temperatures and colours (3b.7). */
+        private val GLOW_T = floatArrayOf(450f, 600f, 750f, 900f, 1100f, 1300f, 1500f)
+        private val GLOW_C = intArrayOf(0x3a0800, 0x8a1c04, 0xd84a0c, 0xff8a1e, 0xffc35a, 0xffeab0, 0xfffaf2)
+
+        /** The heat picture: temperatures and colours from frost to white heat (3b.7). */
+        private const val HEAT_STEPS = 256
+        private const val HEAT_FROM = -30f
+        private const val HEAT_TO = 1400f
+        private val HEAT_T = floatArrayOf(-30f, 0f, 20f, 60f, 150f, 400f, 800f, 1400f)
+        private val HEAT_C = intArrayOf(0x1c1a6e, 0x2f6fd0, 0x1f8a8a, 0x3fae4a, 0xd6d03a, 0xf08a24, 0xe02a1a, 0xfff2e4)
+
+        /** Ice in the dark is never darker than this (3b.8). */
+        private const val ICE_SHADE = 0.72f
+
+        /** The colour things the hand could take are lit up in (3b.3). */
+        private const val HIGHLIGHT = 0xFFFFE27A.toInt()
         const val OPAQUE = 0xFF000000.toInt()
 
         /** [c] darkened to [f] (0..1) of its brightness. */

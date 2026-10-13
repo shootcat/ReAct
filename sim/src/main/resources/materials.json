@@ -14,7 +14,7 @@
       "salt_melt_temp": "Schmelzpunkt, solange Salziges (Salz, Salzwasser) daneben liegt: Salz lässt Eis und Schnee ohne Wärme schmelzen",
       "structure": "shock_product, shock_rate: spröde Stoffe springen, wenn ein abschreckender Nachbar (quenches: Wasser, Eis, Schnee) ihnen mehr als shock_rate Grad pro Schritt entzieht; permeable: Wahrscheinlichkeit pro Schritt, dass Wasser durch die Körnung hindurchfließt; avalanche: rutscht am Hang ab, wenn erwärmt oder erschüttert; compact_product, compact_load: wird unter so viel Last (Summe Dichte/1000 der Zellen darüber) dazu verdichtet",
       "pressure": "strength: Druck, dem eine Wand standhält (Vielfaches des Luftdrucks; ohne Angabe fest 5, Pulver und Flüssigkeit 2.5, am Boden eines Hohlraums gar nicht, Fels nie), break_product: was beim Bersten daraus wird; expansion: Gasmenge einer Zelle (Dampf ist stark ausgedehntes Wasser); explosive: entzündet sich bei ignite_temp, an Feuer oder Glut schlagartig; emits, emit_rate: tritt aus (Wahrscheinlichkeit pro Zufallstick); holds_temp: Gelände, das seine Temperatur (temp) hält, die Hitze aus der Tiefe unter der Welt",
-      "pattern": "Darstellung fester Stoffe: planks, brick, masonry, sheen, pores (Basalt); speckle_color und speckle für Einschlüsse (Erz)",
+      "pattern": "Darstellung der Oberfläche: planks, brick, masonry, sheen (Glanz von Metall), pores (Basalt), crystal (glitzernde Kristalle, Salz), matte (weich und matt, Schnee), ice (bläulich, glasig, Glanzkanten); speckle_color und speckle für Einschlüsse (Erz)",
       "light": "emits_light und light_pass 0 bis 1: eigenes Licht; Anteil des Lichts, den eine Zelle durchlässt (ohne Angabe 0 bei blocks_light, sonst 1)",
       "store": "split_into, split_yield: was ein gegriffenes Objekt im Lager ergibt (ein Stamm 3 Bretter je Zelle)",
       "life": "organism: Verhalten (grass, moss, vine, seed, tree, leaf, fish, firefly, worm, bird); light_need, light_max: Licht zum Wachsen; grow: Wahrscheinlichkeit pro Zufallstick (etwa einmal pro Sekunde und Zelle); move: Wahrscheinlichkeit pro Schritt, sich zu bewegen; dies_above: Temperatur, über der es stirbt"
@@ -175,7 +175,7 @@
       "dissolves_in": "water", "dissolved_product": "saltwater", "salty": true,
       "friction": 0.35,
       "bucketable": true, "grabbable": false, "emits_light": 0, "blocks_light": true,
-      "color": "#eceae4", "color_variance": 0.06, "cost": 1
+      "color": "#eceae4", "color_variance": 0.06, "pattern": "crystal", "cost": 1
     },
     {
       "id": "snow", "name": "Schnee", "kind": "powder", "density": 300, "anchored": false,
@@ -188,7 +188,7 @@
       "dissolves_in": null, "dissolved_product": null,
       "friction": 0.85, "temp": -5,
       "bucketable": true, "grabbable": false, "emits_light": 0, "blocks_light": true,
-      "color": "#f1f5f9", "color_variance": 0.04, "cost": 1
+      "color": "#f1f5f9", "color_variance": 0.04, "pattern": "matte", "cost": 1
     },
     {
       "id": "water", "name": "Wasser", "kind": "liquid", "density": 1000, "anchored": false,
@@ -226,7 +226,7 @@
       "dissolves_in": null, "dissolved_product": null,
       "temp": -10,
       "bucketable": false, "grabbable": true, "emits_light": 0, "blocks_light": false, "light_pass": 0.95,
-      "color": "#bde3f2", "color_variance": 0.05, "opacity": 0.8, "cost": 1
+      "color": "#a9d8f0", "color_variance": 0.05, "opacity": 0.85, "pattern": "ice", "cost": 1
     },
     {
       "id": "wood", "name": "Holz", "kind": "solid", "density": 650, "anchored": false,

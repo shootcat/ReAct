@@ -112,7 +112,8 @@ class SupplyTest {
         s.fill("trunk", 34, 54, 38, 55)
         s.fill("air", 28, 30, 31, 44)
         s.fill("earth", 28, 30, 31, 33)
-        s.reachLimited = true
+        // procuring: the reach is limited (a level, or the sandbox in „nur Beschaffen“)
+        s.begin(Session.Supply.PROCURE)
         s.tap(24, 53, Session.SCOOP, 3)
         assertEquals(0, s.bucketAmount, "the sand in the shut cave")
         assertEquals(Session.OUT_OF_REACH, s.notice)
@@ -256,5 +257,102 @@ class SupplyTest {
         assertEquals(a.world.hash(), b.world.hash())
         assertEquals(a.stock.toList(), b.stock.toList())
         assertEquals(a.bucketAmount, b.bucketAmount)
+    }
+
+    @Test
+    fun `one stroke with the bucket is one action, and the first touch decides what it takes`() {
+        val s = session { _, _ -> }
+        s.fill("sand", 2, 54, 28, 61)
+        s.fill("rock", 29, 50, 31, 61)
+        s.fill("water", 32, 52, 61, 61)
+        s.run(1f)
+        s.begin(Session.Supply.PROCURE)
+        s.bucketSize = 200
+        s.press(10, 54, Session.SCOOP, 3)
+        for (x in 12..58 step 3) s.drag(x, 54)
+        s.release()
+        assertEquals(materials.id("sand"), s.bucketMaterial, "the first touch was sand")
+        assertEquals(1, s.log.count { it is Session.Press }, "one stroke, one action")
+        // a new stroke starting on the water: the bucket still holds sand and says so
+        s.press(45, 55, Session.SCOOP, 3)
+        s.release()
+        assertTrue("Sand" in s.notice, s.notice)
+    }
+
+    @Test
+    fun `loose material from the bucket goes into the store and can be built with, liquid cannot`() {
+        val s = session { _, _ -> }
+        s.fill("clay", 2, 54, 20, 61)
+        s.fill("water", 40, 54, 61, 61)
+        s.begin(Session.Supply.PROCURE)
+        s.bucketSize = 40
+        s.press(10, 54, Session.SCOOP, 3)
+        s.run(0.5f)
+        s.release()
+        val got = s.bucketAmount
+        assertTrue(got > 10, "clay in the bucket: $got")
+        s.store()
+        val clay = materials.id("clay")
+        assertEquals(got, s.stock[clay], "all of it in the store")
+        assertEquals(0, s.bucketAmount)
+        assertTrue(s.canBuild(clay))
+        val before = s.count("clay")
+        s.shape(Session.ShapeKind.LINE, 25, 52, 35, 52, clay, 0)
+        assertEquals(before + 11, s.count("clay"), "a line of clay built from the store")
+        assertEquals(got - 11, s.stock[clay])
+        // water stays in the bucket
+        s.tap(50, 55, Session.SCOOP, 3)
+        val water = s.bucketAmount
+        s.store()
+        assertEquals(water, s.bucketAmount, "water does not go into the store")
+        assertTrue("Flüssig" in s.notice, s.notice)
+    }
+
+    @Test
+    fun `in the sandbox the reach is limited only while procuring`() {
+        val s = session { _, _ -> }
+        assertTrue(!s.reachLimited)
+        s.setSupply(Session.Supply.PROCURE)
+        assertTrue(s.reachLimited)
+        s.undo()
+        assertTrue(!s.reachLimited)
+    }
+
+    @Test
+    fun `holding a finger on a cell tells what it is and whether bucket and hand take it`() {
+        val s = session { _, _ -> }
+        s.fill("sand", 10, 58, 20, 61)
+        s.fill("stone", 30, 58, 33, 61, 400f)
+        s.fill("wood", 40, 59, 47, 61)
+        s.begin(Session.Supply.PROCURE)
+        val sand = s.inspect(15, 58)
+        assertEquals(materials.id("sand"), sand.material)
+        assertNull(sand.bucket, "the bucket takes sand")
+        assertEquals("Das lässt sich nicht greifen", sand.hand)
+        val stone = s.inspect(31, 58)
+        assertTrue(stone.temp > 300f, "the hot stone: ${stone.temp}")
+        assertEquals("Zu heiß zum Anfassen", stone.hand)
+        assertEquals("nimmt der Eimer nicht", stone.bucket)
+        val wood = s.inspect(43, 59)
+        assertNull(wood.hand, "the plank lies loose: ${wood.hand}")
+        val rock = s.inspect(5, 63)
+        assertEquals("Gelände", rock.hand)
+        assertTrue(rock.anchored)
+        assertEquals(0, s.log.size, "looking is no action")
+    }
+
+    @Test
+    fun `with the hand chosen every object it could take lights up`() {
+        val s = session { _, _ -> }
+        s.fill("wood", 10, 60, 17, 61)       // a loose plank on the floor
+        s.fill("stone", 30, 50, 40, 61)      // a big block: too heavy
+        s.fill("wood", 50, 58, 52, 61, 300f) // too hot
+        s.begin(Session.Supply.PROCURE)
+        val mask = BooleanArray(s.world.size)
+        val n = s.grabbable(mask)
+        assertEquals(16, n, "only the plank")
+        assertTrue(mask[s.world.index(12, 60)])
+        assertTrue(!mask[s.world.index(35, 55)])
+        assertTrue(!mask[s.world.index(51, 59)])
     }
 }

@@ -9,11 +9,11 @@
   "trees": [ {"x": 160, "y": 15} ],
   "heat": [ {"area": [[82, 46], [88, 46], [88, 75], [82, 75]], "temp": -0.5} ],
   "goals": [
-    {"type": "material", "text": "Bringe Glas in die tiefe Kammer", "area": [[56, 118], [114, 118], [114, 144], [56, 144]], "materials": ["glass", "glass_shards"], "amount": 5, "hold": 2}
+    {"type": "material", "text": "Bringe Glas in die tiefe Kammer", "area": [[52, 112], [116, 112], [116, 150], [52, 150]], "materials": ["glass", "glass_shards"], "amount": 5, "hold": 2}
   ],
   "rating": {
     "gold": {"seconds": 120, "actions": 10},
     "silver": {"seconds": 240, "actions": 16},
-    "bronze": {"seconds": 480, "actions": 40}
+    "bronze": {"seconds": 240, "actions": 40}
   }
 }

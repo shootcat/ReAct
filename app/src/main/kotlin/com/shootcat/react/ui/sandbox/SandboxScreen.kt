@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
@@ -42,6 +43,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -195,6 +197,27 @@ fun SandboxScreen(
             }
         }
     }
+
+    /** What a finger held on the world found (3b.1): shown while the finger stays and a little after. */
+    var info by remember(runner) { mutableStateOf<Session.CellInfo?>(null) }
+    var infoHeld by remember(runner) { mutableStateOf(false) }
+    var thermal by remember(runner) { mutableStateOf(runner.thermal) }
+    LaunchedEffect(runner) {
+        var seen = runner.inspectedCount
+        var after = 0
+        while (true) {
+            delay(80)
+            if (runner.inspectedCount != seen) {
+                seen = runner.inspectedCount
+                info = runner.inspected
+                after = 0
+            }
+            if (!infoHeld && info != null && ++after >= INFO_TICKS) info = null
+        }
+    }
+    // with the hand chosen, everything it could take lights up (3b.3)
+    LaunchedEffect(runner, tool) { runner.highlightGrabbable = tool == Session.HAND }
+    DisposableEffect(runner) { onDispose { runner.highlightGrabbable = false } }
 
     /** The end of the level, once it comes: the result (solved) or the goal that was not kept (lost). */
     var solved by remember { mutableStateOf<Result?>(null) }
@@ -388,8 +411,14 @@ fun SandboxScreen(
                 goalAreas = level?.play?.level?.spec?.goals?.map { it.area } ?: emptyList(),
                 // a level begins with all of it on screen: the player sees what there is before zooming in
                 fitOnStart = level != null,
+                onInspect = { x, y ->
+                    infoHeld = true
+                    runner.inspect(x, y)
+                },
+                onInspectDone = { infoHeld = false },
             )
-            if (level != null && hud) LevelHud(level.play, stats, Modifier.align(Alignment.TopStart).padding(8.dp).width(300.dp))
+            if (level != null && hud) LevelHud(level.play, stats, Modifier.align(Alignment.TopStart).padding(8.dp).width(300.dp).blockTouches())
+            info?.let { InfoCard(it, materials, stats.supply == Session.Supply.PROCURE, Modifier.align(Alignment.BottomStart).padding(8.dp).blockTouches()) }
             if (settings.performance) PerformanceOverlay(stats, Modifier.align(Alignment.TopStart).padding(8.dp))
             notice?.let { NoticeBanner(it, Modifier.align(Alignment.TopCenter).padding(top = 40.dp, start = 16.dp, end = 16.dp)) }
             // speed and the shape of the brush, small, in a corner of the world (4a.5)
@@ -403,6 +432,11 @@ fun SandboxScreen(
                 onMode = onMode,
                 brush = settings.brush,
                 onBrush = { onSettings(settings.copy(brush = it)) },
+                thermal = thermal,
+                onThermal = {
+                    thermal = it
+                    runner.thermal = it
+                },
                 modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
             )
         }
@@ -541,6 +575,8 @@ private fun WorldView(
     modifier: Modifier,
     goalAreas: List<List<List<Int>>> = emptyList(),
     fitOnStart: Boolean = false,
+    onInspect: (Int, Int) -> Unit = { _, _ -> },
+    onInspectDone: () -> Unit = {},
 ) {
     val w = runner.width
     val h = runner.height
@@ -581,12 +617,18 @@ private fun WorldView(
     val currentTool by rememberUpdatedState(tool)
     val currentRadius by rememberUpdatedState(radius)
     val currentMode by rememberUpdatedState(mode)
+    val currentInspect by rememberUpdatedState(onInspect)
+    val currentInspectDone by rememberUpdatedState(onInspectDone)
 
     /** The shape being built: start and end cell, shown before the finger lets go (4.1.5). */
     var preview by remember { mutableStateOf<Pair<Pair<Int, Int>, Pair<Int, Int>>?>(null) }
 
     /** Where the held object would be put down, while the finger is on the world. */
     var handAt by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+
+    /** Counts the strokes begun, so the late release of a short touch never ends a newer stroke. */
+    val strokes = remember { IntArray(1) }
+    val tapScope = rememberCoroutineScope()
 
     // the world fills the height of the view and is wider than it (4a.5); two fingers pan and zoom, out to the whole world
     fun base(): Float = if (view.height > 0) view.height / h.toFloat() else 1f
@@ -625,6 +667,8 @@ private fun WorldView(
 
     Canvas(
         modifier
+            // the world stays inside its own box, however far it is zoomed in (3b.4)
+            .clipToBounds()
             .onSizeChanged {
                 view = it
                 if (!fitted && it.width > 0 && it.height > 0) {
@@ -660,25 +704,70 @@ private fun WorldView(
                         e.changes.forEach { it.consume() }
                     }
 
-                    if (currentTool == Session.HAND) {
-                        // the hand acts where the finger lets go: picks up there, or puts down what it holds
+                    // a still finger held for a moment asks what is there (3b.1): no action, nothing changes;
+                    // a tap, a stroke or two fingers are told apart before anything is done
+                    if (currentTool == Session.HAND) handAt = cell(start)
+                    var held = 0L
+                    val first = withTimeoutOrNull(LONG_PRESS_MILLIS) {
+                        var kind = 0
+                        while (kind == 0) {
+                            val e = awaitPointerEvent()
+                            val pressed = e.changes.count { it.pressed }
+                            held = e.changes.first().uptimeMillis - down.uptimeMillis
+                            kind = when {
+                                pressed == 0 -> TAP
+                                pressed >= 2 -> TWO
+                                (e.changes.first().position - start).getDistance() > viewConfiguration.touchSlop -> MOVED
+                                else -> 0
+                            }
+                        }
+                        kind
+                    } ?: LONG
+                    if (first == LONG) {
+                        handAt = null
                         var at = cell(start)
-                        handAt = at
-                        var cancelled = false
+                        currentInspect(at.first, at.second)
+                        // the finger may wander on: what lies under it is shown; a second finger zooms
                         while (true) {
                             val e = awaitPointerEvent()
                             val pressed = e.changes.filter { it.pressed }
                             if (pressed.isEmpty()) break
                             if (pressed.size >= 2) {
-                                cancelled = true
-                                handAt = null
                                 transform(e)
                                 continue
                             }
-                            if (cancelled) continue
-                            at = cell(pressed.first().position)
-                            handAt = at
+                            val next = cell(pressed.first().position)
+                            if (next != at) {
+                                at = next
+                                currentInspect(at.first, at.second)
+                            }
                             pressed.first().consume()
+                        }
+                        currentInspectDone()
+                        return@awaitEachGesture
+                    }
+
+                    if (currentTool == Session.HAND) {
+                        // the hand acts where the finger lets go: picks up there, or puts down what it holds
+                        var at = cell(start)
+                        var cancelled = first == TWO
+                        if (cancelled) handAt = null
+                        if (first != TAP) {
+                            while (true) {
+                                val e = awaitPointerEvent()
+                                val pressed = e.changes.filter { it.pressed }
+                                if (pressed.isEmpty()) break
+                                if (pressed.size >= 2) {
+                                    cancelled = true
+                                    handAt = null
+                                    transform(e)
+                                    continue
+                                }
+                                if (cancelled) continue
+                                at = cell(pressed.first().position)
+                                handAt = at
+                                pressed.first().consume()
+                            }
                         }
                         handAt = null
                         if (!cancelled) {
@@ -696,20 +785,23 @@ private fun WorldView(
                         // a shape: drag from one corner (or end) to the other, see it, let go to build it
                         val from = cell(start)
                         preview = from to from
-                        var cancelled = false
-                        while (true) {
-                            val e = awaitPointerEvent()
-                            val pressed = e.changes.filter { it.pressed }
-                            if (pressed.isEmpty()) break
-                            if (pressed.size >= 2) {
-                                cancelled = true
-                                preview = null
-                                transform(e)
-                                continue
+                        var cancelled = first == TWO
+                        if (cancelled) preview = null
+                        if (first != TAP) {
+                            while (true) {
+                                val e = awaitPointerEvent()
+                                val pressed = e.changes.filter { it.pressed }
+                                if (pressed.isEmpty()) break
+                                if (pressed.size >= 2) {
+                                    cancelled = true
+                                    preview = null
+                                    transform(e)
+                                    continue
+                                }
+                                if (cancelled) continue
+                                preview = from to cell(pressed.first().position)
+                                pressed.first().consume()
                             }
-                            if (cancelled) continue
-                            preview = from to cell(pressed.first().position)
-                            pressed.first().consume()
                         }
                         val shape = preview
                         preview = null
@@ -730,6 +822,7 @@ private fun WorldView(
 
                     fun begin() {
                         painting = true
+                        strokes[0]++
                         val (x, y) = cell(start)
                         last = x to y
                         val t = currentTool
@@ -738,25 +831,19 @@ private fun WorldView(
                         strokeSound(sound, materials, t)
                     }
 
-                    // a short moment to tell a stroke from the start of a two-finger gesture
-                    val early = withTimeoutOrNull(STROKE_DELAY_MILLIS) {
-                        var kind = 0
-                        while (kind == 0) {
-                            val e = awaitPointerEvent()
-                            val pressed = e.changes.count { it.pressed }
-                            kind = when {
-                                pressed == 0 -> TAP
-                                pressed >= 2 -> TWO
-                                (e.changes.first().position - start).getDistance() > viewConfiguration.touchSlop -> MOVED
-                                else -> 0
-                            }
-                        }
-                        kind
-                    }
-                    when (early) {
+                    when (first) {
                         TAP -> {
+                            // a short touch paints for as long as the finger was down, as holding did before the
+                            // long press asked what is there; with the bucket it lasts a whole pass at the least:
+                            // a quick tap with brush 1 would pour only half a bucket (3b.6)
                             begin()
-                            runner.post { it.release() }
+                            val stroke = strokes[0]
+                            val bucket = currentTool == Session.SCOOP || currentTool == Session.POUR
+                            val hold = if (bucket) LONG_PRESS_MILLIS else held.coerceIn(0L, LONG_PRESS_MILLIS)
+                            tapScope.launch {
+                                delay(hold)
+                                if (strokes[0] == stroke) runner.post { it.release() }
+                            }
                             return@awaitEachGesture
                         }
                         TWO -> transforming = true
@@ -856,6 +943,14 @@ private fun ToolBar(materials: MaterialTable, stats: SimRunner.Stats, tool: Int,
             if (tools == null || tools.hand) {
                 MaterialChip("Hand", if (held != null) "${materials.spec(held.main).name} ${held.size}" else "leer", tool == Session.HAND, { onTool(Session.HAND) }) {
                     HandIcon(if (held != null) Color(materials.color[held.main]) else null)
+                }
+            }
+            // loose material from the bucket into the store, to build with (3b.5)
+            if (held == null && stats.supply == Session.Supply.PROCURE && stats.bucketAmount > 0 &&
+                materials.kind[stats.bucketMaterial] == Kind.POWDER && (tools == null || tools.build)
+            ) {
+                MaterialChip("Ins Lager", "aus dem Eimer", false, onStore) {
+                    Swatch(materials.color[stats.bucketMaterial], materials.colorVariance[stats.bucketMaterial], stats.bucketMaterial)
                 }
             }
             if (held != null && (tools == null || tools.build)) {
@@ -1033,12 +1128,14 @@ private fun CategoryTabs(names: List<String>, current: Int, modifier: Modifier, 
     }
 }
 
-private const val STROKE_DELAY_MILLIS = 70L
+/** A finger held still this long asks what lies under it instead of using the tool (3b.1). */
+private const val LONG_PRESS_MILLIS = 450L
 private val CHIP_WIDTH = 72.dp
 private const val POLL_MILLIS = 6L
 private const val TAP = 1
 private const val TWO = 2
 private const val MOVED = 3
+private const val LONG = 4
 private const val MAX_ZOOM = 6f
 
 /** Width of the column beside the world in landscape. */
@@ -1049,6 +1146,73 @@ private const val VIEW_MARGIN = 24
 
 /** How many polls of 120 ms a notice stays. */
 private const val NOTICE_TICKS = 21
+
+/** The material info stays this many ticks (of 80 ms) after the finger let go. */
+private const val INFO_TICKS = 40
+
+/** Touches on a control lying over the world never reach the world (3b.4). */
+fun Modifier.blockTouches(): Modifier = pointerInput(Unit) {
+    awaitPointerEventScope {
+        while (true) awaitPointerEvent().changes.forEach { it.consume() }
+    }
+}
+
+/** A thermometer: the heat picture. */
+@Composable
+private fun ThermometerIcon(tint: Color) {
+    Canvas(Modifier.size(16.dp)) {
+        val u = size.width
+        drawRoundRect(tint, Offset(u * 0.38f, u * 0.05f), Size(u * 0.24f, u * 0.62f), androidx.compose.ui.geometry.CornerRadius(u * 0.12f), style = Stroke(width = u * 0.08f))
+        drawCircle(tint, u * 0.2f, Offset(u * 0.5f, u * 0.76f))
+        drawRect(tint, Offset(u * 0.46f, u * 0.32f), Size(u * 0.08f, u * 0.4f))
+    }
+}
+
+/**
+ * What lies under a finger held on the world (3b.1): the material, its temperature, how it is (hot,
+ * glowing, frozen, wet, burning, anchored), and whether bucket and hand could take it.
+ */
+@Composable
+private fun InfoCard(info: Session.CellInfo, materials: MaterialTable, procuring: Boolean, modifier: Modifier) {
+    val states = buildList {
+        when {
+            info.temp > 500f -> add("glühend")
+            info.temp > Session.HAND_TEMP -> add("heiß")
+            info.temp < 0f -> add("unter null")
+        }
+        if (info.burning) add("brennt")
+        if (info.wet) add("nass")
+        if (info.anchored && materials.kind[info.material] != Kind.STATIC) add("verankert")
+        if (procuring && !info.reachable) add("außer Reichweite")
+    }
+    Column(
+        modifier
+            .widthIn(max = 260.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xEE141C28))
+            .border(1.dp, Palette.outline, RoundedCornerShape(12.dp))
+            .padding(horizontal = 10.dp, vertical = 8.dp)
+            .testTag("info"),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (info.material != MaterialTable.AIR) {
+                Swatch(materials.color[info.material], materials.colorVariance[info.material], info.material)
+                Spacer(Modifier.width(8.dp))
+            }
+            Column {
+                Text(materials.spec(info.material).name, color = Palette.text, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text(
+                    "%.0f °C".format(info.temp) + if (states.isEmpty()) "" else " · " + states.joinToString(", "),
+                    color = Palette.textDim,
+                    fontSize = 12.sp,
+                )
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        Text("Eimer: " + (info.bucket ?: "nimmt es"), color = if (info.bucket == null) Palette.success else Palette.textDim, fontSize = 12.sp)
+        Text("Hand: " + (info.hand ?: "nimmt es"), color = if (info.hand == null) Palette.success else Palette.textDim, fontSize = 12.sp)
+    }
+}
 
 private fun strokeSound(sound: SoundManager, materials: MaterialTable, tool: Int) {
     if (tool < 0) {
@@ -1093,6 +1257,8 @@ private fun CornerControls(
     onMode: (BuildMode) -> Unit,
     brush: Int,
     onBrush: (Int) -> Unit,
+    thermal: Boolean,
+    onThermal: (Boolean) -> Unit,
     modifier: Modifier,
 ) {
     var open by remember { mutableStateOf(false) }
@@ -1143,6 +1309,20 @@ private fun CornerControls(
             }
         }
         Spacer(Modifier.width(4.dp))
+        // the heat picture on and off (3b.7)
+        Box(
+            Modifier
+                .size(34.dp)
+                .clip(CircleShape)
+                .background(if (thermal) Palette.accent else Color.Transparent)
+                .clickable { onThermal(!thermal) }
+                .semantics { contentDescription = "Wärmebild" }
+                .testTag("thermal"),
+            contentAlignment = Alignment.Center,
+        ) {
+            ThermometerIcon(if (thermal) Palette.background else Palette.text)
+        }
+        Spacer(Modifier.width(2.dp))
         Box {
             Box(
                 Modifier

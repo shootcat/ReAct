@@ -48,7 +48,6 @@ class Play(val level: Level, val materials: MaterialTable) {
 
     init {
         session.bucketSize = tools.bucketSize
-        session.reachLimited = true
         val stock = IntArray(materials.count)
         for ((name, n) in level.spec.stock) stock[materials.id(name)] = n
         session.begin(Session.Supply.PROCURE, stock)

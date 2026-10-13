@@ -25,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
@@ -35,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.shootcat.react.data.LevelBest
+import com.shootcat.react.data.LevelGate
 import com.shootcat.react.level.Level
 import com.shootcat.react.level.Medal
 import com.shootcat.react.sim.Backdrop
@@ -51,7 +53,7 @@ import com.shootcat.react.ui.theme.Palette
 
 /**
  * The levels (Leitfaden V3, 5.4), in the order they are meant to be played: a picture of each, its region
- * and how hard it is, what it asks, and the best medal so far with its time and actions. All are open.
+ * and how hard it is, what it asks, and the best medal so far with its time and actions. Which are open: [LevelGate].
  */
 @Composable
 fun LevelsScreen(
@@ -82,14 +84,15 @@ fun LevelsScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             for ((k, level) in levels.withIndex()) {
-                LevelCard(k, level, pictures[k], best[level.spec.id]) { onPlay(k) }
+                val open = LevelGate.isOpen(k, levels.map { it.spec.id }, best.keys)
+                LevelCard(k, level, pictures[k], best[level.spec.id], open) { onPlay(k) }
             }
         }
     }
 }
 
 @Composable
-private fun LevelCard(index: Int, level: Level, picture: ImageBitmap?, best: LevelBest?, onClick: () -> Unit) {
+private fun LevelCard(index: Int, level: Level, picture: ImageBitmap?, best: LevelBest?, open: Boolean, onClick: () -> Unit) {
     val spec = level.spec
     Column(
         Modifier
@@ -98,7 +101,8 @@ private fun LevelCard(index: Int, level: Level, picture: ImageBitmap?, best: Lev
             .clip(RoundedCornerShape(16.dp))
             .background(Palette.surface)
             .border(1.dp, if (best != null) medalColor(best.medal).copy(alpha = 0.6f) else Palette.outline, RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick)
+            .clickable(enabled = open, onClick = onClick)
+            .alpha(if (open) 1f else 0.5f)
             .padding(10.dp)
             .testTag("level_${spec.id}"),
     ) {
@@ -120,7 +124,7 @@ private fun LevelCard(index: Int, level: Level, picture: ImageBitmap?, best: Lev
                 Text("${index + 1}. ${spec.name}", color = Palette.text, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 Text("${spec.area} · ${spec.tier}", color = Palette.textDim, fontSize = 12.sp)
             }
-            MedalBadge(best?.medal, size = 30.dp)
+            if (open) MedalBadge(best?.medal, size = 30.dp) else GlyphIcon(Glyph.LOCK, color = Palette.textDim, size = 24.dp)
         }
         Spacer(Modifier.height(6.dp))
         for (goal in spec.goals) {
@@ -139,7 +143,9 @@ private fun LevelCard(index: Int, level: Level, picture: ImageBitmap?, best: Lev
         Text("Werkzeug: ${tools.joinToString(", ").ifEmpty { "keines" }}", color = Palette.textDim, fontSize = 12.sp)
         Box(Modifier.fillMaxWidth().padding(top = 4.dp)) {
             Text(
-                if (best == null) {
+                if (!open) {
+                    "Gesperrt: erst ein früheres Level lösen"
+                } else if (best == null) {
                     "Noch nicht gelöst"
                 } else {
                     val medal = if (best.medal == Medal.NONE) "ohne Medaille" else best.medal.label

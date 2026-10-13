@@ -104,6 +104,22 @@ class MaterialBehaviorTest {
     }
 
     @Test
+    fun `warm salt melts ice as well`() {
+        // salt that lay in warm air (30 °C) brings the top of the ice to its melting point: it melts at once
+        // all the same, it does not wait for the heat to gather (found in Level 3 with warm air, 3b)
+        val lab = Lab()
+        lab.rect("ice", 4, 50, 27, 61, -0.5f)
+        lab.rect("ice", 36, 50, 59, 61, -0.5f)
+        lab.rect("salt", 10, 44, 21, 49, 30f)
+        lab.rect("sand", 42, 44, 53, 49, 30f)
+        lab.seconds(3f)
+        val salted = lab.countIn("ice", 0, 0, 31, 63)
+        val sanded = lab.countIn("ice", 32, 0, 63, 63)
+        println("warm salt on ice after 3 s: $salted of 288 ice left; under warm sand $sanded")
+        assertTrue(salted < sanded - 40, "warm salt melted the ice: $salted left, $sanded under warm sand")
+    }
+
+    @Test
     fun `clay holds a wall, softens when wet and fires to brick`() {
         val lab = Lab()
         lab.rect("clay", 28, 30, 35, 61)

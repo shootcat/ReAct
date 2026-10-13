@@ -52,11 +52,12 @@ class Session(
         private set
 
     /**
-     * In a level the bucket and the hand only reach what air or water connects to the open sky, and what
-     * lies right next to it: a chamber shut off by an ice plug cannot be reached until the plug is gone
-     * (Leitfaden V3, 5.4). The sandbox reaches everywhere.
+     * While procuring (a level, or the sandbox in „nur Beschaffen“) the bucket and the hand only reach what
+     * air or water connects to the open sky, and what lies right next to it: a chamber shut off by an ice
+     * plug cannot be reached until the plug is gone (Leitfaden V3, 5.4; 3b.5). With unlimited supply the
+     * sandbox reaches everywhere.
      */
-    var reachLimited = false
+    val reachLimited get() = supply == Supply.PROCURE
 
     /** The last thing worth telling the player (picked up, too heavy, …), and a counter that changes with it. */
     var notice = ""
@@ -181,8 +182,13 @@ class Session(
         bx = x
         by = y
         lastAnimal = NO_ANIMAL
+        strokeStart = true
         dab(x, y)
+        strokeStart = false
     }
+
+    /** The first dab of a stroke is being made. */
+    private var strokeStart = false
 
     /** The finger moves: paints along the way, so quick strokes stay closed lines. */
     fun drag(x: Int, y: Int) {
@@ -279,12 +285,20 @@ class Session(
     }
 
     /** Whether [m] can be built with now: anything with unlimited supply, only what is in store otherwise. */
-    fun canBuild(m: Int): Boolean = supply == Supply.UNLIMITED || (materials.kind[m] == Kind.SOLID && stock[m] > 0)
+    fun canBuild(m: Int): Boolean = supply == Supply.UNLIMITED || (storable(m) && stock[m] > 0)
+
+    /** What goes into the store: solid objects from the hand, loose material from the bucket (3b.5). */
+    private fun storable(m: Int) = materials.kind[m] == Kind.SOLID || materials.kind[m] == Kind.POWDER
 
     /** The bucket takes up loose or liquid material of one kind around (x, y), as much as fits. */
     private fun scoop(cx: Int, cy: Int) {
         val w = world
         if (bucketAmount >= bucketSize) return
+        if (bucketAmount > 0 && cx == bx && cy == by && strokeStart) {
+            // the first touch of a stroke on something else than the bucket holds: say so
+            val i = if (w.inside(cx, cy)) w.index(cx, cy) else -1
+            if (i >= 0 && w.mat[i].toInt() != bucketMaterial && bucketable(i)) tell("Im Eimer ist schon ${materials.spec(bucketMaterial).name}")
+        }
         val r2 = radius * radius + radius
         // an empty bucket takes what is under the finger, or else the first thing it can take nearby
         if (bucketAmount == 0) {
@@ -425,14 +439,9 @@ class Session(
             }
         }
         if (at < 0) return tell(if (shut) OUT_OF_REACH else "Hier ist nichts zum Greifen")
-        val piece = w.pieceAt(at, LUMP, MAX_CELLS)
-        if (piece == null || piece.cells.any { !materials.grabbable[w.mat[it].toInt()] }) return tell("Das lässt sich nicht greifen")
-        if (piece.tooBig) return tell("Zu groß zum Greifen")
-        if (piece.anchored || piece.cells.any { (w.flags[it].toInt() and Flag.ANCHORED) != 0 }) return tell("Das ist fest verankert")
-        var load = 0f
-        for (c in piece.cells) load += materials.density[w.mat[c].toInt()] / 1000f
-        if (load > MAX_LOAD) return tell("Zu schwer")
-        if (piece.cells.any { w.temp[it] > HAND_TEMP || (w.flags[it].toInt() and Flag.BURNING) != 0 }) return tell("Zu heiß zum Anfassen")
+        val found = w.pieceAt(at, LUMP, MAX_CELLS)
+        refusal(found)?.let { return tell(it) }
+        val piece = found ?: return
         val n = piece.cells.size
         val h = Held(
             IntArray(n) { piece.cells[it] % width - x },
@@ -444,6 +453,80 @@ class Session(
         for (c in piece.cells) w.clear(c % width, c / width, c)
         held = h
         tell("In der Hand: ${materials.spec(h.main).name}, $n Zellen")
+    }
+
+    /** Why the hand cannot take [piece], or null if it can: loose, not too big, heavy or hot. */
+    private fun refusal(piece: World.Piece?): String? {
+        val w = world
+        if (piece == null || piece.cells.any { !materials.grabbable[w.mat[it].toInt()] }) return "Das lässt sich nicht greifen"
+        if (piece.tooBig) return "Zu groß zum Greifen"
+        if (piece.anchored || piece.cells.any { (w.flags[it].toInt() and Flag.ANCHORED) != 0 }) return "Das ist fest verankert"
+        var load = 0f
+        for (c in piece.cells) load += materials.density[w.mat[c].toInt()] / 1000f
+        if (load > MAX_LOAD) return "Zu schwer"
+        if (piece.cells.any { w.temp[it] > HAND_TEMP || (w.flags[it].toInt() and Flag.BURNING) != 0 }) return "Zu heiß zum Anfassen"
+        return null
+    }
+
+    /** What holding a finger on a cell tells the player (3b.1). [bucket] and [hand] are null if the tool takes it, else why not. */
+    class CellInfo(
+        val x: Int,
+        val y: Int,
+        val material: Int,
+        val temp: Float,
+        val burning: Boolean,
+        val wet: Boolean,
+        val anchored: Boolean,
+        val reachable: Boolean,
+        val bucket: String?,
+        val hand: String?,
+    )
+
+    /** What is at (x, y), and whether the bucket and the hand could take it. Not an action: nothing changes. */
+    fun inspect(x: Int, y: Int): CellInfo {
+        val w = world
+        val i = w.index(x.coerceIn(0, width - 1), y.coerceIn(0, height - 1))
+        val m = w.mat[i].toInt()
+        val f = w.flags[i].toInt()
+        val kind = materials.kind[m]
+        val burning = (f and Flag.BURNING) != 0 || materials.spawnBurning[m]
+        val anchored = materials.anchored[m] || (f and Flag.ANCHORED) != 0
+        val reachable = touchable(i)
+        val bucket = when {
+            kind != Kind.POWDER && kind != Kind.LIQUID || !materials.bucketable[m] -> "nimmt der Eimer nicht"
+            burning -> "brennt"
+            anchored -> "fest verankert"
+            !reachable -> OUT_OF_REACH
+            else -> null
+        }
+        val hand = when {
+            kind == Kind.GAS || kind == Kind.LIQUID -> "nicht zu greifen"
+            kind == Kind.STATIC -> "Gelände"
+            !reachable -> OUT_OF_REACH
+            else -> refusal(w.pieceAt(i, LUMP, MAX_CELLS))
+        }
+        return CellInfo(i % width, i / width, m, w.temp[i], burning, (f and Flag.WET) != 0, anchored, reachable, bucket, hand)
+    }
+
+    /**
+     * Marks in [into] every cell of an object the hand could take right now (3b.3): loose, light, cool, in
+     * reach. Returns how many cells that is.
+     */
+    fun grabbable(into: BooleanArray): Int {
+        val w = world
+        into.fill(false)
+        val seen = BooleanArray(w.size)
+        var n = 0
+        for (i in 0 until w.size) {
+            val m = w.mat[i].toInt()
+            if (seen[i] || !materials.grabbable[m] || materials.kind[m] == Kind.GAS || materials.kind[m] == Kind.LIQUID) continue
+            val piece = w.pieceAt(i, LUMP, MAX_CELLS) ?: continue
+            for (c in piece.cells) seen[c] = true
+            if (refusal(piece) != null || piece.cells.none { touchable(it) }) continue
+            for (c in piece.cells) into[c] = true
+            n += piece.cells.size
+        }
+        return n
     }
 
     /** Puts the held object down at (x, y), where it was held from; there must be room for all of it. */
@@ -466,9 +549,24 @@ class Session(
         tell("Abgelegt")
     }
 
-    /** The object in the hand goes into the store, to build with: a log gives planks. Solids only. */
+    /**
+     * What the player carries goes into the store, to build with: the object in the hand (solids only; a log
+     * gives planks), or else what is in the bucket, if it is loose material (sand, earth, clay, salt …, 3b.5).
+     */
     fun store() {
-        val h = held ?: return
+        val h = held
+        if (h == null) {
+            if (bucketAmount == 0) return
+            if (!storable(bucketMaterial)) return tell("Flüssiges kommt nicht ins Lager")
+            if (down) release()
+            pushUndo()
+            log += Store(world.step)
+            stock[bucketMaterial] += bucketAmount
+            tell("Ins Lager: $bucketAmount × ${materials.spec(bucketMaterial).name}")
+            bucketAmount = 0
+            bucketMaterial = MaterialTable.AIR
+            return
+        }
         if ((0 until h.size).any { materials.kind[h.mat[it].toInt()] != Kind.SOLID }) return tell("Das kommt nicht ins Lager")
         if (down) release()
         pushUndo()

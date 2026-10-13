@@ -69,6 +69,11 @@ object Pattern {
     const val MASONRY = 3
     const val SHEEN = 4
     const val PORES = 5
+
+    /** Glittering crystals (salt), soft and matte (snow), bluish glass with shining edges (ice): 3b.1, 3b.8. */
+    const val CRYSTAL = 6
+    const val MATTE = 7
+    const val ICE = 8
 }
 
 /** One entry of `materials.json`, exactly as written there. */
@@ -264,6 +269,9 @@ class MaterialTable(val specs: List<MaterialSpec>, val ambient: Float) {
             "masonry" -> Pattern.MASONRY
             "sheen" -> Pattern.SHEEN
             "pores" -> Pattern.PORES
+            "crystal" -> Pattern.CRYSTAL
+            "matte" -> Pattern.MATTE
+            "ice" -> Pattern.ICE
             else -> error("${specs[it].id}: unknown pattern ${specs[it].pattern}")
         }
     }

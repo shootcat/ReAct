@@ -69,7 +69,8 @@ class SignalfeuerTest {
 
     @Test
     fun `into the sea - the snow carried off in four loads, then one load of hot sand, silver`() {
-        val snow = listOf(145 to 14, 138 to 20, 152 to 20, 145 to 18).joinToString("") { (x, y) -> "scoop $x $y 6 20\npour 86 60 3 20\n" }
+        // the hood in three loads, the last of the snow on the right slope in the fourth
+        val snow = listOf(145 to 14, 138 to 20, 152 to 20, 158 to 26).joinToString("") { (x, y) -> "scoop $x $y 6 20\npour 86 60 3 20\n" }
         val (play, r) = solve("ins_meer", "wait 60\n" + snow + hotSand(137, 18))
         val result = assertNotNull(r)
         assertEquals(Medal.SILVER, result.medal)

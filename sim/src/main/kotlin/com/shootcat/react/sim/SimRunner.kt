@@ -52,6 +52,46 @@ class SimRunner(val session: Session, backdrop: IntArray) {
             if (speed == Speed.PAUSE) thread?.let { LockSupport.unpark(it) }
         }
 
+    /** The heat picture instead of the materials (3b.7); switching redraws at once, also in the pause. */
+    @Volatile
+    var thermal = false
+        set(value) {
+            if (field == value) return
+            field = value
+            redraw = true
+            thread?.let { LockSupport.unpark(it) }
+        }
+
+    /** Light up every object the hand could take (3b.3), while the hand is the tool. */
+    @Volatile
+    var highlightGrabbable = false
+        set(value) {
+            if (field == value) return
+            field = value
+            redraw = true
+            thread?.let { LockSupport.unpark(it) }
+        }
+
+    @Volatile
+    private var redraw = false
+    private val grabbableMask = BooleanArray(session.world.size)
+    private var highlightAge = Int.MAX_VALUE
+
+    /** What a finger held on the world found out (3b.1), and a counter that changes with each answer. */
+    @Volatile
+    var inspected: Session.CellInfo? = null
+        private set
+
+    @Volatile
+    var inspectedCount = 0
+        private set
+
+    /** Looks at cell (x, y) between two steps, without it being an action; the answer comes in [inspected]. */
+    fun inspect(x: Int, y: Int) = post { s ->
+        inspected = s.inspect(x, y)
+        inspectedCount++
+    }
+
     private val lock = Any()
     val flameWidth get() = renderer.flameWidth
     val flameHeight get() = renderer.flameHeight
@@ -188,6 +228,7 @@ class SimRunner(val session: Session, backdrop: IntArray) {
                 val command = inbox.poll() ?: break
                 command(session)
                 dirty = true
+                highlightAge = Int.MAX_VALUE
             }
 
             val sps = speed.stepsPerSecond
@@ -220,6 +261,23 @@ class SimRunner(val session: Session, backdrop: IntArray) {
 
             val view = viewport
             if (view !== shown) dirty = true
+            if (redraw) {
+                redraw = false
+                dirty = true
+                highlightAge = Int.MAX_VALUE
+            }
+            renderer.thermal = thermal
+            if (highlightGrabbable) {
+                // what the hand could take changes slowly: worked out about twice a second, or after input
+                if (dirty && highlightAge >= HIGHLIGHT_EVERY) {
+                    session.grabbable(grabbableMask)
+                    highlightAge = 0
+                }
+                highlightAge++
+                renderer.highlight = grabbableMask
+            } else {
+                renderer.highlight = null
+            }
             val after = System.nanoTime()
             if (dirty && after - lastRender >= FRAME_NANOS) {
                 shown = view
@@ -287,6 +345,9 @@ class SimRunner(val session: Session, backdrop: IntArray) {
 
     private companion object {
         const val MAX_STEPS_PER_LOOP = 4
+
+        /** Loops between two looks at what the hand could take. */
+        const val HIGHLIGHT_EVERY = 30
         const val WATCH_EVERY = 30
         const val FRAME_NANOS = 16_000_000L
     }
