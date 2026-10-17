@@ -494,11 +494,12 @@ class Session(
         val w = world
         if (piece == null || piece.cells.any { !materials.grabbable[w.mat[it].toInt()] }) return "Das lässt sich nicht greifen"
         if (piece.tooBig) return "Zu groß zum Greifen"
+        // what burns the hand is felt first, before whether it would come loose
+        if (piece.cells.any { w.temp[it] > HAND_TEMP || (w.flags[it].toInt() and Flag.BURNING) != 0 }) return "Zu heiß zum Anfassen"
         if (piece.anchored || piece.cells.any { (w.flags[it].toInt() and Flag.ANCHORED) != 0 }) return "Das ist fest verankert"
         var load = 0f
         for (c in piece.cells) load += materials.density[w.mat[c].toInt()] / 1000f
         if (load > MAX_LOAD) return "Zu schwer"
-        if (piece.cells.any { w.temp[it] > HAND_TEMP || (w.flags[it].toInt() and Flag.BURNING) != 0 }) return "Zu heiß zum Anfassen"
         return null
     }
 
@@ -573,11 +574,21 @@ class Session(
             if (!w.inside(px, py) || !free(w.index(px, py))) return tell("Kein Platz zum Ablegen")
             if (!open(w.index(px, py))) return tell(OUT_OF_REACH)
         }
-        for (k in 0 until h.size) {
-            val px = x + h.dx[k]
-            val py = y + h.dy[k]
-            w.set(px, py, h.mat[k].toInt(), h.temp[k])
-            w.variant[w.index(px, py)] = h.variant[k]
+        if ((0 until h.size).all { materials.kind[h.mat[it].toInt()] == Kind.SOLID }) {
+            // a solid object is put down as a body (Phase 4): it falls or tips if nothing holds it
+            w.placeBody(
+                IntArray(h.size) { w.index(x + h.dx[it], y + h.dy[it]) },
+                IntArray(h.size) { h.mat[it].toInt() },
+                h.temp.copyOf(),
+                h.variant.copyOf(),
+            )
+        } else {
+            for (k in 0 until h.size) {
+                val px = x + h.dx[k]
+                val py = y + h.dy[k]
+                w.set(px, py, h.mat[k].toInt(), h.temp[k])
+                w.variant[w.index(px, py)] = h.variant[k]
+            }
         }
         held = null
         tell("Abgelegt")

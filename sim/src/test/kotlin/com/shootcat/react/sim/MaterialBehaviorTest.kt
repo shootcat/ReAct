@@ -146,7 +146,8 @@ class MaterialBehaviorTest {
             lab.seconds(1f)
             molten = maxOf(molten, lab.count("molten_metal"))
         }
-        assertTrue(molten > 5, "molten metal: $molten")
+        // the crust the lava forms at its top (bodies since Phase 4) decides how much sinks in before it sets
+        assertTrue(molten > 0 && molten + lab.count("metal") > 15, "molten metal: $molten, set to metal: ${lab.count("metal")}")
         val cool = Lab()
         cool.rect("molten_metal", 25, 55, 38, 61, 1100f)
         cool.rect("water", 2, 40, 61, 50)

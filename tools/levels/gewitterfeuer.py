@@ -5,9 +5,10 @@ ridge of rock, then a hill with a tall tree, the highest thing under the cloud: 
 In the middle a lake. On the right a plateau of rock with the woodpile; at its left end an overhang, and
 under it, out of the lightning's way, old fence posts of metal: one long, three short.
 
-There is no fire in the level. A post stood on the woodpile is the highest metal under the cloud: the stroke
-runs down it and goes to ground in the wood. A post stood in the rock beside the pile takes it away; one in
-the heap of sand at the end of the plateau makes glass.
+There is no fire in the level. A post stood in the slot on top of the woodpile is the highest metal under the
+cloud: the stroke runs down it and goes to ground in the wood. A post stood in the old post hole in the rock
+beside the pile takes it away; one put on the heap of sand at the end of the plateau falls over and makes glass
+where it lies.
 """
 import sys, os, math
 sys.path.insert(0, os.path.dirname(__file__))
@@ -27,6 +28,10 @@ LONG = (142, 15)       # the long post: column, length
 SHORT = [145, 148, 151]  # the short posts' columns
 SHORT_LEN = 7
 PILE = 162             # left end of the woodpile's bottom row
+SOCKET = 172           # the slot between the two logs on top of the pile
+DRAIN = (157,)         # the crack in the plateau: column
+CAVE = (142, 196, 96, 114)  # the cave under the plateau the crack drains into: x from..to, rows from..to
+HOLE = (185, 6)        # the post hole in the rock beside the pile: column, depth (a post in it stands lower than one on the pile)
 DUNE = (187, 197, 5)   # a heap of sand at the right end of the plateau: x from..to, height
 
 def surface(x):
@@ -58,19 +63,29 @@ for x in range(SHELTER[0], SHELTER[1] + 1):
     rough = int((fbm(x / 3, 4.5, 17) - 0.5) * 2)
     for y in range(SHELTER[2] - 3 + rough, SHELTER[2] + 1):
         c.put(x, y, 'rock', True)
+# a crack in the plateau between the posts and the pile, down into a cave under it: the rain runs off instead
+# of flooding the plateau (a wooden pile floats, Phase 4; the posts under the overhang dam the water on that
+# side, and the lake itself rises in the storm)
+c.rect(DRAIN[0], PLATEAU[2], DRAIN[0] + 1, CAVE[2], 'air', False)
+c.rect(CAVE[0], CAVE[2], CAVE[1], CAVE[3], 'air', False)
 # the posts under it, each on its own, a cell of air around it
 c.rect(LONG[0], PLATEAU[2] - LONG[1], LONG[0], PLATEAU[2] - 1, 'metal', False)
 for x in SHORT:
     c.rect(x, PLATEAU[2] - SHORT_LEN, x, PLATEAU[2] - 1, 'metal', False)
-# the woodpile: logs stacked as a pyramid with gaps between them (as in level 2)
+# the woodpile: logs stacked as a pyramid with gaps between them (as in level 2); the two logs on top leave a
+# slot one cell wide between them, two deep, a socket a post stands in (Phase 4: a post stood on a single
+# cell of a log falls over)
 logs = []
 for row, n in enumerate([4, 3, 2]):
     y = PLATEAU[2] - 2 - row * 2
     x0 = PILE + row * 3
     for k in range(n):
         logs.append((x0 + k * 6, x0 + k * 6 + 3, y))
+logs[-1] = (SOCKET + 1, SOCKET + 4, logs[-1][2])
 for x0, x1, y in logs:
     c.rect(x0, y, x1, y + 1, 'wood', False)
+# an old post hole in the rock beside the pile, one cell wide
+c.rect(HOLE[0], PLATEAU[2], HOLE[0], PLATEAU[2] + HOLE[1] - 1, 'air', False)
 # a heap of sand blown up against the right end of the plateau
 mid = (DUNE[0] + DUNE[1]) / 2
 for x in range(DUNE[0], DUNE[1] + 1):

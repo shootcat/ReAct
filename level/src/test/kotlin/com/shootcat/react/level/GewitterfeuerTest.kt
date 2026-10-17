@@ -14,9 +14,14 @@ import kotlin.test.assertTrue
  * stroke sets the tree alight, then the lightning goes to the ridge. Under an overhang at the end of the
  * plateau old fence posts of metal, one long, three short. Only the hand.
  *
- * Lightning seeks metal and runs down it to its foot (3c.4): a post stood on the woodpile kindles it; a post
- * stood in the rock beside it takes the lightning away and keeps it, too hot to touch; one in the sand
- * makes glass. The storm lasts a little over two minutes, its rain wets the wood.
+ * Lightning seeks metal and runs down it to its foot (3c.4): a post stood in the slot on top of the woodpile
+ * kindles it; a post stood in the old post hole in the rock beside it takes the lightning away and keeps it, too
+ * hot to touch; one put on the heap of sand falls over and makes glass. The storm lasts a little over two
+ * minutes, its rain wets the wood.
+ *
+ * Phase 4: the posts are bodies. Stood on a single cell a post falls over, so the pile has a slot one cell wide
+ * between its top logs and the rock an old post hole; the plateau drains through a crack into a cave below
+ * (flooded, the pile of wood would float).
  */
 class GewitterfeuerTest {
     private val mt = MaterialTable.load()
@@ -90,12 +95,13 @@ class GewitterfeuerTest {
     }
 
     @Test
-    fun `the long post stood in the rock beside the pile takes the lightning, then two short ones stacked on the pile reach higher, silver`() {
-        val script = "wait 30\nhand 142 79\nhand 185 79\nwait 300\nhand 145 79\nhand 172 72\nhand 148 79\nhand 172 62"
+    fun `the long post stood in the post hole takes the lightning, a short one in the slot of the pile stands higher, silver`() {
+        // two posts stacked end on end no longer stand (Phase 4); the long post sits deep in its hole instead
+        val script = "wait 30\nhand 142 79\nhand 185 79\nwait 600\nhand 145 79\nhand 172 72"
         val (_, r, strikes) = solve("geerdet_dann_hoeher", script)
         val result = assertNotNull(r)
         assertEquals(Medal.SILVER, result.medal)
-        assertEquals(6, result.actions)
+        assertEquals(4, result.actions)
         assertTrue(strikes.take(3).count { it.x == 185 } >= 1, "first the post in the rock: ${strikes.map { it.x }}")
     }
 
@@ -131,18 +137,22 @@ class GewitterfeuerTest {
     }
 
     @Test
-    fun `too late the rain has soaked the woodpile, the lightning goes into the post and the wet wood only chars`() {
-        val (play, r) = lateOnPile(100, 160)
+    fun `a post stood on the pile even later, as long as the storm lasts, bronze`() {
+        // the plateau drains into the cave (Phase 4): the rain wets the wood only on top, it still burns
+        val (_, r) = lateOnPile(130, 180)
+        assertEquals(Medal.BRONZE, assertNotNull(r).medal)
+    }
+
+    @Test
+    fun `too late the storm has passed, a post on the pile gets no stroke`() {
+        val (play, r) = lateOnPile(170, 240)
         assertNull(r, "it never burns")
-        val charred = count(play, "charcoal", 158, 66, 188, 80)
-        println("too late: ${count(play, "wood")} wood left, $charred charcoal")
-        assertTrue(charred > 0, "around the foot of the post the wood chars")
-        assertTrue(count(play, "wood") > 36, "most of the pile is still there")
+        assertEquals(72, count(play, "wood"), "the pile is untouched")
     }
 
     @Test
     fun `a post in the rock beside the pile takes every stroke, and is too hot to take back`() {
-        val (play, r, strikes) = solve("geerdet", "wait 30\nhand 142 79\nhand 185 79\nwait 900\nhand 185 70")
+        val (play, r, strikes) = solve("geerdet", "wait 30\nhand 142 79\nhand 185 79\nwait 900\nhand 185 75")
         assertNull(r)
         assertEquals(72, count(play, "wood"), "nothing burnt")
         assertTrue(strikes.count { it.x == 185 } > 10, "the lightning goes into the post: ${strikes.map { it.x }}")
@@ -150,26 +160,28 @@ class GewitterfeuerTest {
     }
 
     @Test
-    fun `a post in the heap of sand makes glass, and kindles nothing`() {
-        val (play, r, strikes) = solve("sand", "wait 30\nhand 142 79\nhand 192 74")
+    fun `a short post put on the heap of sand falls over there and makes glass, and kindles nothing`() {
+        val (play, r, strikes) = solve("sand", "wait 30\nhand 145 79\nhand 192 74")
         assertNull(r)
-        assertTrue(strikes.count { it.x == 192 } > 10, "the lightning goes into the post: ${strikes.map { it.x }}")
-        assertTrue(count(play, "glass", 186, 70, 198, 90) >= 3, "a fulgurite under it")
+        assertTrue(strikes.count { it.material == "metal" && it.x in 186..199 } > 10, "the lightning goes into the post: ${strikes.map { it.x }}")
+        assertTrue(count(play, "glass", 186, 70, 199, 90) >= 3, "a fulgurite under it")
         assertEquals(72, count(play, "wood"))
     }
 
     @Test
     fun `a post on the ridge is a lightning rod up there, the woodpile stays cold`() {
+        // it falls over on the ridge (Phase 4) and lies there; the lightning finds it all the same
         val (play, r, strikes) = solve("grat", "wait 30\nhand 142 79\nhand 16 44")
         assertNull(r)
-        assertTrue(strikes.drop(1).all { it.x in 10..22 }, "${strikes.map { it.x }}")
+        assertTrue(strikes.count { it.material == "metal" && it.x < 30 } > 10, "${strikes.map { it.x }}")
+        assertTrue(strikes.all { it.x < 100 }, "nothing on the plateau: ${strikes.map { it.x }}")
         assertEquals(72, count(play, "wood"))
     }
 
     @Test
     fun `the same actions bring the same strokes in the same places`() {
-        val a = solve("gleich_a", "wait 30\nhand 145 79\nhand 172 72\nhand 148 79\nhand 172 62").third
-        val b = solve("gleich_b", "wait 30\nhand 145 79\nhand 172 72\nhand 148 79\nhand 172 62").third
+        val a = solve("gleich_a", "wait 30\nhand 142 79\nhand 185 79\nwait 300\nhand 145 79\nhand 172 72").third
+        val b = solve("gleich_b", "wait 30\nhand 142 79\nhand 185 79\nwait 300\nhand 145 79\nhand 172 72").third
         assertEquals(a.map { Triple(it.second, it.x, it.y) }, b.map { Triple(it.second, it.x, it.y) })
     }
 

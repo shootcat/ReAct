@@ -83,7 +83,10 @@ class StructureTest {
         lab.rect("stone", 40, 20, 46, 24)
         lab.seconds(4f)
         val wood = shape(lab, "wood")
-        assertEquals(39, wood.maxOf { it.second }, "the raft lies on the water")
+        // the raft floats in the water by its weight (Phase 4): of its three rows of wood two are under the surface
+        val surface = (50..61).maxOf { x -> (0 until lab.height).firstOrNull { lab.at(x, it) == "water" } ?: lab.height }
+        assertTrue(wood.maxOf { it.second } in surface..surface + 1, "the raft floats, its bottom row in the water, whose surface is at $surface: ${wood.maxOf { it.second }}")
+        assertTrue(wood.minOf { it.second } < surface, "its top row out of the water")
         assertEquals(61, shape(lab, "stone").maxOf { it.second }, "the stone lies on the bottom")
         val soaked = (0 until lab.world.size).count { lab.world.flags[it].toInt() and Flag.WET != 0 }
         assertEquals(22 * 60, lab.count("water") + soaked, "the stone pushed the water aside; only what the wood soaked up is gone")
@@ -139,7 +142,8 @@ class StructureTest {
 
     @Test
     fun `a block painted in the air lies on the ground after a few steps`() {
-        // Leitfaden V3, 4a.1.1: painted with the brush while the world runs, as in the sandbox
+        // Leitfaden V3, 4a.1.1: painted with the brush while the world runs, as in the sandbox; brittle glass,
+        // ice and brick low enough not to break when they land (Phase 4)
         for (name in listOf("metal", "glass", "ice", "brick", "stone", "wood")) {
             val m = Lab.materials.id(name)
             val session = Session(Lab.materials, 64, 64, 5L) { w ->
@@ -147,8 +151,9 @@ class StructureTest {
                 for (y in 62..63) for (x in 0..63) w.set(x, y, rock)
                 for (y in 0..61) for (x in listOf(0, 1, 62, 63)) w.set(x, y, rock)
             }
-            session.press(30, 12, m, 3)
-            session.drag(36, 12)
+            val y = if (name == "glass") 54 else if (name == "ice" || name == "brick") 46 else 12
+            session.press(30, y, m, 3)
+            session.drag(36, y)
             session.release()
             repeat(45) { session.tick() }
             var lowest = 0
@@ -202,8 +207,10 @@ class StructureTest {
         lab.rect("deadwood", 20, 40, 27, 61)
         lab.rect("metal", 22, 39, 41, 39)
         lab.seconds(3f)
-        assertEquals(0, hanging(lab, "metal"), "nothing of it hangs in the air")
-        assertTrue(shape(lab, "metal").maxOf { it.second } > 50, "it came down beside the platform")
+        lab.picture("plank_tipped")
+        // it turns over the edge and comes down (Phase 4); the heavy bar leaning on the light platform may push it over
+        assertTrue(shape(lab, "metal").maxOf { it.second } == 61, "it came down beside the platform onto the floor")
+        assertTrue(lab.world.bodyStates().all { it.asleep }, "and everything lies still: ${lab.world.bodyStates().map { it.asleep }}")
     }
 
     @Test

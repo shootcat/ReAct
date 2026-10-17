@@ -89,13 +89,18 @@ object Seen {
     const val BLOWN = 37
     const val LIGHTNING = 38
     const val FULGURITE = 39
-    const val COUNT = 40
+
+    /** Bodies (Phase 4): broken on impact, tipped over, rolled down a slope. */
+    const val SHATTER = 40
+    const val TOPPLE = 41
+    const val ROLL = 42
+    const val COUNT = 43
 
     val NAMES = listOf(
         "ignite", "burn_out", "douse", "suffocate", "char", "melt", "salt_melt", "boil", "residue", "set", "condense",
         "dissolve", "soak", "erode", "seep", "grow", "die_heat", "die_salt", "die_dry", "flee", "dig", "fall",
         "hold_heat", "glow", "float", "conduct", "shine", "wet_no_fire", "crack", "permeate", "compact", "avalanche",
-        "burst", "explode", "cloud", "rain", "snowfall", "blown", "lightning", "fulgurite",
+        "burst", "explode", "cloud", "rain", "snowfall", "blown", "lightning", "fulgurite", "shatter", "topple", "roll",
     )
 
     fun parse(name: String): Int = NAMES.indexOf(name).also { require(it >= 0) { "unknown observation '$name'" } }
@@ -288,25 +293,50 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     internal val light = Light(this)
     private val living = Life(this)
 
-    // structures (3.1): which structure a solid cell belongs to (number + 1), and the loose ones
+    // structures (3.1): which standing structure a solid cell belongs to (number + 1)
     private val owner = IntArray(size)
-    private var structuresDirty = true
-    private val loose = ArrayList<IntArray>()
-    private var looseDensity = FloatArray(64)
-    /** Loose structures held by roots: plants with leaves or vines do not tip over. */
-    private var looseRooted = BooleanArray(64)
+    internal var structuresDirty = true
     /** The cells of the standing structures of the last search, and whether [owner] may hold anything else (after an undo). */
     private var standing = IntArray(1024)
     private var standingCount = 0
     private var ownerUnknown = true
-    /** Loose structures to leave alone until the next search: a falling block has torn part of them off. */
-    private var skip = BooleanArray(64)
-    /** For each structure number: its place in [loose], or -1 if it stands. */
-    private val looseOf = IntArray(size + 2)
     private val fillStack = IntArray(size)
     private var fillCells = IntArray(256)
     private var fillTop = 0
     private var fillAnchored = false
+    private var fillTouch = IntArray(8)
+    private var fillTouches = 0
+
+    /**
+     * Plants that stand by their roots (Phase 4): the cells their roots hold on by, per plant from
+     * [rootStart]. Once none of a plant's roots holds any more (the earth washed away, the trunk burnt
+     * through), the structures are looked at again and it falls as a body.
+     */
+    private var roots = IntArray(64)
+    private var rootStart = IntArray(17)
+    private var rootPlants = 0
+
+    /** The bodies (Phase 4): every loose structure falls, tips, turns and rolls as a rigid body. */
+    internal val bodies = Bodies(this)
+    internal val bodyAt = bodies.bodyAt
+
+    /** How many bodies there are, and how many moved in the last step. */
+    val bodyCount get() = bodies.count
+    val awakeBodies get() = bodies.awakeCount
+
+    /** A body as seen from outside (tests, the report): where its centre is, how far it is turned (degrees), how fast. */
+    class BodyState(val id: Int, val cells: Int, val material: Int, val x: Float, val y: Float, val angle: Float, val vx: Float, val vy: Float, val spin: Float, val asleep: Boolean)
+
+    fun bodyStates(): List<BodyState> {
+        val out = ArrayList<BodyState>()
+        bodies.each { b ->
+            out += BodyState(b.id, b.n, b.main, b.px, b.py, Math.toDegrees(Math.atan2(b.sn.toDouble(), b.cs.toDouble())).toFloat(), b.vx, b.vy, b.w, b.asleep)
+        }
+        return out
+    }
+
+    /** The body cell [i] belongs to (its id), 0 for none. */
+    fun bodyOf(i: Int) = bodyAt[i]
 
     // pressure (4a.4): which gas region each cell of gas belongs to, and the cells of the closed ones
     private val region = IntArray(size)
@@ -340,8 +370,8 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     var pressureNanos = 0L
         private set
 
-    /** How many structures are not anchored (they fall, or lie on something that holds them). */
-    val looseStructures: Int get() = loose.size
+    /** How many structures are not anchored: since Phase 4 each of them is a body. */
+    val looseStructures: Int get() = bodies.count
 
     init {
         temp.fill(ambient)
@@ -524,6 +554,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             life[i] = 0
             flags[i] = 0
         }
+        bodies.clear()
         pending.fill(true)
         heatPending.fill(true)
         structuresDirty = true
@@ -539,6 +570,9 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         val m = mat[i].toInt()
         val solid = kindOf[m] == Kind.SOLID
         if (!solid && kindOf[m] != Kind.POWDER) return null
+        // a body (Phase 4) is one object, however its cells lie in the grid
+        val b = if (solid) bodies.body(bodyAt[i]) else null
+        if (b != null) return Piece(b.at.copyOf(minOf(b.n, max)), false, b.n > max)
         val seen = HashSet<Int>()
         val stack = ArrayDeque<Int>()
         val cells = ArrayList<Int>()
@@ -551,7 +585,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             cells += c
             val x = c % width
             for (n in intArrayOf(if (x > 0) c - 1 else -1, if (x < width - 1) c + 1 else -1, c - width, c + width)) {
-                if (n < 0 || n >= size || n in seen) continue
+                if (n < 0 || n >= size || n in seen || bodyAt[n] != 0) continue
                 val q = mat[n].toInt()
                 // like structures: a log leaning on a bridge is a piece of its own
                 if (solid && kindOf[q] == Kind.SOLID && plantOf[q] == plantOf[m] || !solid && q == m) {
@@ -609,8 +643,9 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         heat()
         if (n > 0) update()
         living.randomTicks()
+        if (!structuresDirty) checkRoots()
         if (structuresDirty) findStructures()
-        dropLoose()
+        bodies.step()
         if (step % WEATHER_EVERY == 0 && (cloudBase >= 0 || randomWeather || storm > 0)) weather()
         if (storm > 0) storm--
         if (step % PRESSURE_EVERY == 0) {
@@ -906,7 +941,8 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         // brittle material cracks when water, ice or snow cools it suddenly (4a.2)
         if (mt.shockProduct[m] >= 0 && temp[i] > SHOCK_FROM && shocked(x, y, i, m)) {
             note(Seen.CRACK, m)
-            change(x, y, i, mt.shockProduct[m])
+            // a hot piece of glass (a body, Phase 4) splashed with water springs apart along cracks
+            if (bodyAt[i] != 0) bodies.crack(i, m) else change(x, y, i, mt.shockProduct[m])
             return
         }
 
@@ -1227,7 +1263,8 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     }
 
     internal fun spawn(x: Int, y: Int, i: Int, m: Int, t: Float) {
-        if (kindOf[m] == Kind.SOLID || kindOf[mat[i].toInt()] == Kind.SOLID) structuresDirty = true
+        if (bodyAt[i] != 0) bodies.changed(i, -1)
+        if (shapes(m) || shapes(mat[i].toInt()) || flags[i].toInt() and Flag.ANCHORED != 0) structuresDirty = true
         if ((kindOf[m] == Kind.GAS) != (kindOf[mat[i].toInt()] == Kind.GAS)) gasDirty = true
         mat[i] = m.toByte()
         temp[i] = t
@@ -1244,7 +1281,8 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     }
 
     internal fun clear(x: Int, y: Int, i: Int) {
-        if (kindOf[mat[i].toInt()] == Kind.SOLID) structuresDirty = true
+        if (bodyAt[i] != 0) bodies.changed(i, -1)
+        if (shapes(mat[i].toInt()) || flags[i].toInt() and Flag.ANCHORED != 0) structuresDirty = true
         mat[i] = AIR.toByte()
         temp[i] = ambient
         life[i] = 0
@@ -1254,7 +1292,8 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
 
     /** The cell turns into [product] and keeps its temperature. */
     internal fun change(x: Int, y: Int, i: Int, product: Int) {
-        if (kindOf[product] == Kind.SOLID || kindOf[mat[i].toInt()] == Kind.SOLID) structuresDirty = true
+        if (bodyAt[i] != 0) bodies.changed(i, product)
+        if (shapes(product) || shapes(mat[i].toInt())) structuresDirty = true
         if ((kindOf[product] == Kind.GAS) != (kindOf[mat[i].toInt()] == Kind.GAS)) gasDirty = true
         mat[i] = product.toByte()
         life[i] = initLife(product).toShort()
@@ -1263,6 +1302,9 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         stamp[i] = mark
         wakeHeat(x, y)
     }
+
+    /** Solid cells make up structures, and rock (or what the level anchored) holds them: a change there means looking again. */
+    private fun shapes(m: Int) = kindOf[m] == Kind.SOLID || kindOf[m] == Kind.STATIC
 
     internal fun swap(i: Int, j: Int, x: Int, y: Int, x2: Int, y2: Int) {
         val m = mat[i]; mat[i] = mat[j]; mat[j] = m
@@ -2343,6 +2385,8 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             if (mt.avalanche[m] && flags[i].toInt() and Flag.MARK == 0) loosen(i, x, y)
             wakeHeat(x, y)
         }
+        // bodies are thrown away from it
+        bodies.blast(cx, cy, force, r)
         // the throw: loose and liquid material flies outwards, the outermost first
         var n = 0
         for (y in maxOf(0, cy - r)..minOf(height - 1, cy + r)) for (x in maxOf(0, cx - r)..minOf(w - 1, cx + r)) {
@@ -2469,278 +2513,245 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     // ------------------------------------------------------------------ structures (3.1)
 
     /**
-     * Finds every structure: a 4-connected group of solid cells. One that touches anchored ground stands;
-     * the others are loose. Plants (trunk, leaves, vine) and built material never form one structure: a
-     * block that touches a crown is not carried by the tree. Runs only when solid cells were added,
-     * removed, changed or moved.
+     * Finds every structure: a 4-connected group of solid cells that is not a body. One that is anchored
+     * stands: held by anchored ground beside it or above it (built into rock, wedged in a shaft, hanging from
+     * a ceiling), or containing ground the level anchored. Lying on rock does not hold anything: a bar laid
+     * slanting on the rock floor falls over. A living tree or vine stands by its roots ([rootHold]). Every
+     * other structure becomes a body (Phase 4); what was built onto a sleeping body becomes part of it.
+     * Plants (trunk, leaves, vine) and built material never form one structure. Runs only when solid cells
+     * (or the ground holding them) were added, removed or changed.
      */
     private fun findStructures() {
         structuresDirty = false
-        // forget the last search: only the cells it gave an owner to (they may have moved with their structure)
+        // forget the last search: only the cells it gave an owner to
         if (ownerUnknown) {
             owner.fill(0)
             ownerUnknown = false
         } else {
             for (k in 0 until standingCount) owner[standing[k]] = 0
-            for (cells in loose) for (c in cells) owner[c] = 0
         }
         standingCount = 0
-        loose.clear()
+        rootPlants = 0
+        rootStart[0] = 0
         val w = width
         var id = 0
         for (i in 0 until size) {
             val m0 = mat[i].toInt()
-            if (kindOf[m0] != Kind.SOLID || owner[i] != 0) continue
+            if (kindOf[m0] != Kind.SOLID || owner[i] != 0 || bodyAt[i] != 0) continue
             id++
-            looseOf[id] = -1
             val plant = plantOf[m0]
             var count = 0
-            var falling = false
-            var rooted = false
-            var mass = 0f
+            var rootFrom = rootStart[rootPlants]
             fillTop = 0
             fillAnchored = false
+            fillTouches = 0
             fillStack[fillTop++] = i
             owner[i] = id
             while (fillTop > 0) {
                 val c = fillStack[--fillTop]
                 if (count == fillCells.size) fillCells = fillCells.copyOf(count * 2)
                 fillCells[count++] = c
-                val fc = flags[c].toInt()
-                if (fc and Flag.ANCHORED != 0) fillAnchored = true
-                if (fc and Flag.FALLING != 0) falling = true
+                if (flags[c].toInt() and Flag.ANCHORED != 0) fillAnchored = true
                 val mc = mat[c].toInt()
-                if (softOf[mc]) rooted = true
-                mass += densityOf[mc]
+                if (plant && rootsAt(c, mc)) {
+                    if (rootFrom == roots.size) roots = roots.copyOf(rootFrom * 2)
+                    roots[rootFrom++] = c
+                }
                 val x = c % w
-                if (x > 0) visit(c - 1, id, plant)
-                if (x < w - 1) visit(c + 1, id, plant)
-                if (c >= w) visit(c - w, id, plant)
-                if (c < size - w) visit(c + w, id, plant)
+                if (x > 0) visit(c - 1, id, plant, c)
+                if (x < w - 1) visit(c + 1, id, plant, c)
+                if (c >= w) visit(c - w, id, plant, c)
+                if (c < size - w) visit(c + w, id, plant, c)
             }
-            if (fillAnchored && !falling) {
+            val rooted = rootFrom > rootStart[rootPlants]
+            if (fillAnchored || rooted) {
                 // a standing structure: remember its cells, to forget their owner at the next search
                 if (standingCount + count > standing.size) standing = standing.copyOf(maxOf(standing.size * 2, standingCount + count))
                 fillCells.copyInto(standing, standingCount, 0, count)
                 standingCount += count
-            } else {
-                val cells = fillCells.copyOf(count)
-                // bottom cells first, so each falls into the place the one below has just left
-                cells.sort()
-                cells.reverse()
-                val li = loose.size
-                if (li == looseDensity.size) {
-                    looseDensity = looseDensity.copyOf(li * 2)
-                    looseRooted = looseRooted.copyOf(li * 2)
+                if (rooted && !fillAnchored) {
+                    if (rootPlants + 2 > rootStart.size) rootStart = rootStart.copyOf(rootStart.size * 2)
+                    rootPlants++
+                    rootStart[rootPlants] = rootFrom
                 }
-                looseOf[id] = li
-                loose += cells
-                looseDensity[li] = mass / count
-                looseRooted[li] = rooted
+            } else {
+                for (k in 0 until count) owner[fillCells[k]] = 0
+                looseFound(count)
             }
         }
-        if (skip.size < loose.size) skip = BooleanArray(loose.size * 2) else skip.fill(false)
     }
 
-    /** A neighbour in the flood fill: solid ones of the same sort (plant or not) join, anchored ground anchors. */
-    private fun visit(n: Int, id: Int, plant: Boolean) {
+    /**
+     * A loose structure of [count] cells in [fillCells]: a body of its own, or, if it was built onto bodies (or
+     * water froze onto a floe), part of them, moving on as they moved.
+     */
+    private fun looseFound(count: Int) {
+        var n = count
+        var cells = fillCells
+        if (fillTouches > 0) {
+            var extra = 0
+            for (t in 0 until fillTouches) extra += bodies.body(fillTouch[t])?.n ?: 0
+            cells = fillCells.copyOf(count + extra)
+            var px = 0f
+            var py = 0f
+            var m = 0f
+            for (t in 0 until fillTouches) {
+                val b = bodies.body(fillTouch[t]) ?: continue
+                b.at.copyInto(cells, n, 0, b.n)
+                n += b.n
+                px += b.vx * b.mass
+                py += b.vy * b.mass
+                m += b.mass
+                bodies.forget(b)
+            }
+            cells.sort(0, n)
+            val total = m + count * 0.5f
+            bodies.create(cells, n, px / total, py / total)
+            return
+        }
+        bodies.create(cells, n)
+    }
+
+    /** A neighbour [n] of [c] in the flood fill: solid ones of the same sort (plant or not) join, anchored ground that holds [c] ([holds]) anchors. */
+    private fun visit(n: Int, id: Int, plant: Boolean, c: Int) {
         val mn = mat[n].toInt()
+        val b = bodyAt[n]
+        if (b != 0) {
+            // built onto a body (or frozen onto ice): they become one
+            if (kindOf[mn] == Kind.SOLID && plantOf[mn] == plant) {
+                var known = false
+                for (t in 0 until fillTouches) if (fillTouch[t] == b) known = true
+                if (!known) {
+                    if (fillTouches == fillTouch.size) fillTouch = fillTouch.copyOf(fillTouches * 2)
+                    fillTouch[fillTouches++] = b
+                }
+            }
+            return
+        }
         if (kindOf[mn] == Kind.SOLID && plantOf[mn] == plant) {
             if (owner[n] == 0) {
                 owner[n] = id
                 fillStack[fillTop++] = n
             }
-        } else if (materials.anchored[mn] || (flags[n].toInt() and Flag.ANCHORED) != 0) {
+        } else if (holds(c, n)) {
             fillAnchored = true
         }
     }
 
     /**
-     * Every loose structure falls as a whole, without turning, as long as there is room below it: air, gas,
-     * a liquid lighter than the structure (a wooden raft rests on water, a stone sinks), or leaves and vines,
-     * which a falling block tears through. One that lies on something but has its weight beside what holds
-     * it slides off over the edge ([tip]).
+     * Anchored ground at [n] holds the solid cell [c] next to it: from above (hanging from a ceiling, wedged
+     * under an overhang), or from the side if it is a wall there, rising above that cell (built into a cliff,
+     * stuck in a shaft). Ground below holds nothing, and neither does the corner of a step that the cell
+     * merely rests on: a boulder lying on a stepped slope rolls (Phase 4).
      */
-    private fun dropLoose() {
-        if (loose.isEmpty()) return
-        var moved = false
-        for ((s, cells) in loose.withIndex()) {
-            if (skip[s]) continue
-            val plant = plantOf[mat[cells[0]].toInt()]
-            val speed = (flags[cells[0]].toInt() and Flag.VEL_MASK) shr Flag.VEL_SHIFT
-            val steps = 1 + speed / 3
-            var fell = 0
-            while (fell < steps && canMove(cells, width, looseDensity[s], plant)) {
-                shift(cells, width)
-                fell++
-            }
-            if (fell > 0) {
-                if (speed == 0) note(Seen.FALL, mat[cells[0]].toInt())
-                moved = true
-                val f = Flag.FALLING or (minOf(7, speed + 1) shl Flag.VEL_SHIFT)
-                for (c in cells) flags[c] = ((flags[c].toInt() and (Flag.FALLING or Flag.VEL_MASK).inv()) or f).toByte()
-            } else if (speed > 0 || flags[cells[0]].toInt() and Flag.FALLING != 0) {
-                // landed: from now on it may catch hold of anchored ground it touches
-                for (c in cells) flags[c] = (flags[c].toInt() and (Flag.FALLING or Flag.VEL_MASK).inv()).toByte()
-                moved = true
-                if (speed >= SHAKE_SPEED) landed(cells)
-            } else if (!looseRooted[s] && tip(cells, looseDensity[s], plant)) {
-                moved = true
-            }
-        }
-        // what moved may now touch other structures or anchored ground
-        if (moved) structuresDirty = true
+    private fun holds(c: Int, n: Int): Boolean {
+        if (!anchorAt(n)) return false
+        val w = width
+        if (n == c - w) return true
+        if (n == c + w) return false
+        if (n >= w && !anchorAt(n - w)) return false
+        return c + w >= size || !anchorAt(c + w)
     }
 
-    /** A block that hit the ground hard shakes it where it landed. */
-    private fun landed(cells: IntArray) {
-        val w = width
-        var k = 0
-        for (c in cells) {
-            val b = c + w
-            if (b < size && owner[b] == owner[c]) continue
-            if (k++ % SHAKE_RADIUS == 0) shake(c % w, c / w + 1, SHAKE_RADIUS)
-        }
-    }
+    /** Anchored ground: rock, or anything the level anchored. */
+    private fun anchorAt(n: Int) = materials.anchored[mat[n].toInt()] || (flags[n].toInt() and Flag.ANCHORED) != 0
 
     /**
-     * A structure that lies still: if its centre of weight is beside the cells it rests on, it tips over the
-     * edge. Without turning (that comes with real body physics), it slides one cell down and to that side,
-     * or only to the side, if that soon brings it over an edge. Plants with leaves or vines are held by their roots.
+     * Ground roots hold on in (Phase 4): rock and anchored ground, and firm soil (earth, grass, sand, gravel,
+     * clay), not ash, snow or withered leaves.
      */
-    private fun tip(cells: IntArray, density: Float, plant: Boolean): Boolean {
-        val w = width
-        var weight = 0f
-        var moment = 0f
-        var left = Int.MAX_VALUE
-        var right = Int.MIN_VALUE
-        for (c in cells) {
-            val x = c % w
-            val d = densityOf[mat[c].toInt()]
-            weight += d
-            moment += d * x
-            if (rests(c, density, plant)) {
-                if (x < left) left = x
-                if (x > right) right = x
-            }
-        }
-        if (left > right) return false
-        val centre = moment / weight
-        val side = when {
-            centre < left - TIP_MARGIN -> -1
-            centre > right + TIP_MARGIN -> 1
-            else -> return false
-        }
-        if (canMove(cells, w + side, density, plant)) {
-            shift(cells, w + side)
-            note(Seen.FALL, mat[cells[0]].toInt())
-            return true
-        }
-        // only to the side if that brings it over an edge within the width it rests on: on flat ground it would
-        // slide on and on (a slanted bar raced across the meadow); there it stays, until bodies can turn (Phase 4)
-        if (canMove(cells, side, density, plant) && dropsWithin(cells, side, right - left + 2, density, plant)) {
-            shift(cells, side)
-            note(Seen.FALL, mat[cells[0]].toInt())
-            return true
-        }
-        return false
-    }
-
-    /** Whether the structure, slid up to [reach] cells to [side] through room it may pass, could then fall a cell. */
-    private fun dropsWithin(cells: IntArray, side: Int, reach: Int, density: Float, plant: Boolean): Boolean {
-        for (k in 1..reach) {
-            if (!canShift(cells, k * side, 0, density, plant)) return false
-            if (canShift(cells, k * side, 1, density, plant)) return true
-        }
-        return false
-    }
-
-    /** The structure could stand [dx] columns and [dy] rows from where it is: every cell in its own place or one it may pass. */
-    private fun canShift(cells: IntArray, dx: Int, dy: Int, density: Float, plant: Boolean): Boolean {
-        val w = width
-        for (c in cells) {
-            val tx = c % w + dx
-            val ty = c / w + dy
-            if (tx < 0 || tx >= w || ty < 0 || ty >= height) return false
-            val t = ty * w + tx
-            if (owner[t] == owner[c] && owner[t] != 0) continue
-            if (!passable(t, density, plant)) return false
-        }
-        return true
-    }
-
-    /** The structure (cells [cells]) can move by [o] cells: every cell lands in its own place or in one it may pass. */
-    private fun canMove(cells: IntArray, o: Int, density: Float, plant: Boolean): Boolean {
-        val w = width
-        for (c in cells) {
-            val t = c + o
-            if (t < 0 || t >= size) return false
-            val dx = t % w - c % w
-            if (dx > 1 || dx < -1) return false
-            if (owner[t] == owner[c] && owner[t] != 0) continue
-            if (!passable(t, density, plant)) return false
-        }
-        return true
-    }
-
-    /** Cell [c] of a structure lies on something below it. */
-    private fun rests(c: Int, density: Float, plant: Boolean): Boolean {
-        val b = c + width
-        if (b >= size) return true
-        if (owner[b] == owner[c] && owner[b] != 0) return false
-        return !passable(b, density, plant)
-    }
-
-    /** A structure of [density] may move into cell [t]: air, gas, a lighter liquid or animal, or leaves and vines for built material. */
-    private fun passable(t: Int, density: Float, plant: Boolean): Boolean {
-        val q = mat[t].toInt()
-        if (q == AIR) return true
+    private fun rootHold(n: Int): Boolean {
+        val q = mat[n].toInt()
         val k = kindOf[q]
-        if (k == Kind.GAS) return true
-        if ((k == Kind.LIQUID || materials.animal[q]) && densityOf[q] < density) return true
-        return !plant && softOf[q] && densityOf[q] < density && (flags[t].toInt() and Flag.ANCHORED) == 0
+        return k == Kind.STATIC || (flags[n].toInt() and Flag.ANCHORED) != 0 || (k == Kind.POWDER && densityOf[q] >= ROOT_SOIL)
     }
 
     /**
-     * Moves the structure by [o] cells (down, sideways or both); whatever was in the way goes to the place
-     * the structure left. Leaves and vines in the way are torn off and fall as dead plant matter.
+     * Cell [c] (of [m]) is a root that holds: a living trunk standing on firm ground, or a vine touching firm
+     * ground or a built wall.
      */
-    private fun shift(cells: IntArray, o: Int) {
+    private fun rootsAt(c: Int, m: Int): Boolean {
+        val org = materials.organism[m]
         val w = width
-        // the cell furthest ahead moves first, into the place it may pass; the rest follow into places just left
-        val n = cells.size
-        for (k0 in 0 until n) {
-            val k = if (o > 0) k0 else n - 1 - k0
-            val c = cells[k]
-            val b = c + o
-            if (owner[b] != owner[c] && softOf[mat[b].toInt()]) tear(b)
-            val m = mat[c]; mat[c] = mat[b]; mat[b] = m
-            val t = temp[c]; temp[c] = temp[b]; temp[b] = t
-            val l = life[c]; life[c] = life[b]; life[b] = l
-            val v = variant[c]; variant[c] = variant[b]; variant[b] = v
-            val f = flags[c]; flags[c] = flags[b]; flags[b] = f
-            val ow = owner[c]; owner[c] = owner[b]; owner[b] = ow
-            cells[k] = b
-            wakeHeat(c % w, c / w)
-            wakeHeat(b % w, b / w)
+        if (org == Organism.TREE) return c + w < size && bodyAt[c + w] == 0 && rootHold(c + w)
+        if (org != Organism.VINE) return false
+        val x = c % w
+        fun firm(n: Int) = bodyAt[n] == 0 && (rootHold(n) || (kindOf[mat[n].toInt()] == Kind.SOLID && !plantOf[mat[n].toInt()]))
+        return (x > 0 && firm(c - 1)) || (x < w - 1 && firm(c + 1)) || (c >= w && firm(c - w)) || (c + w < size && firm(c + w))
+    }
+
+    /** A plant standing by its roots whose roots all let go is looked at again (it falls). */
+    private fun checkRoots() {
+        for (p in 0 until rootPlants) {
+            var holds = false
+            for (k in rootStart[p] until rootStart[p + 1]) {
+                val c = roots[k]
+                if (rootsAt(c, mat[c].toInt())) {
+                    holds = true
+                    break
+                }
+            }
+            if (!holds) {
+                structuresDirty = true
+                return
+            }
         }
     }
 
-    /** A falling block tears through a leaf or vine at [i]: it becomes dead plant matter; the plant it belonged to waits for the next search. */
-    private fun tear(i: Int) {
-        val id = owner[i]
-        if (id != 0 && looseOf[id] >= 0) skip[looseOf[id]] = true
-        owner[i] = 0
-        mat[i] = deadPlantId.toByte()
-        life[i] = 0
-        flags[i] = 0
+    /** A body at rest is anchored, as a structure would be: anchored ground holds one of its cells ([holds]). */
+    internal fun anchoredBody(b: Body): Boolean {
+        val w = width
+        val id = b.id
+        for (k in 0 until b.n) {
+            val c = b.at[k]
+            if (flags[c].toInt() and Flag.ANCHORED != 0) return true
+            val x = c % w
+            if (x > 0 && bodyAt[c - 1] != id && holds(c, c - 1)) return true
+            if (x < w - 1 && bodyAt[c + 1] != id && holds(c, c + 1)) return true
+            if (c >= w && bodyAt[c - w] != id && holds(c, c - w)) return true
+        }
+        return false
+    }
+
+    /** A plant body at rest has taken root: a trunk on firm ground, a vine on a wall. */
+    internal fun rootedBody(b: Body): Boolean {
+        for (k in 0 until b.n) {
+            val c = b.at[k]
+            if (rootsAt(c, mat[c].toInt())) return true
+        }
+        return false
+    }
+
+    /**
+     * Puts down a solid object the hand held (Phase 4): its cells at [cells] (world cells, all free), with
+     * material, temperature and look; it is a body at once, so it falls or tips if nothing holds it, and is not
+     * stuck onto what it touches.
+     */
+    fun placeBody(cells: IntArray, mats: IntArray, temps: FloatArray, looks: ByteArray) {
+        val w = width
+        for (k in cells.indices) {
+            val c = cells[k]
+            spawn(c % w, c / w, c, mats[k], temps[k])
+            variant[c] = looks[k]
+        }
+        bodies.create(cells.copyOf(), cells.size)
+    }
+
+    internal fun gasMoved() {
+        gasDirty = true
+    }
+
+    internal fun structuresMoved() {
         structuresDirty = true
     }
+
+    /** Whether chunk (cx, cy) was updated in the last step: something moved or changed there. */
+    internal fun updated(cx: Int, cy: Int) = awake[cy * chunksX + cx]
 
     /**
      * A plant grows a new solid cell [j] (at x, y) out of cell [p] (2b). It belongs to the same structure at
      * once: a growing tree needs no new search for structures, unless it grows into anchored ground or into
-     * another structure.
+     * another structure. Bodies do not grow (a fallen tree).
      */
     internal fun growSolid(p: Int, x: Int, y: Int, j: Int, m: Int) {
         mat[j] = m.toByte()
@@ -2751,7 +2762,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         wakeHeat(x, y)
         if (structuresDirty) return
         val id = owner[p]
-        if (id == 0 || kindOf[mat[p].toInt()] != Kind.SOLID) {
+        if (id == 0 || bodyAt[p] != 0 || kindOf[mat[p].toInt()] != Kind.SOLID) {
             structuresDirty = true
             return
         }
@@ -2762,30 +2773,14 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             structuresDirty = true
             return
         }
-        val li = looseOf[id]
-        if (li < 0) {
-            if (standingCount == standing.size) standing = standing.copyOf(standingCount * 2)
-            standing[standingCount++] = j
-            return
-        }
-        // the cells of a loose structure stay ordered bottom first, the way it falls
-        val cells = loose[li]
-        val n = cells.size
-        var k = 0
-        while (k < n && cells[k] > j) k++
-        val grown = IntArray(n + 1)
-        cells.copyInto(grown, 0, 0, k)
-        grown[k] = j
-        cells.copyInto(grown, k + 1, k, n)
-        loose[li] = grown
-        looseDensity[li] = (looseDensity[li] * n + densityOf[m]) / (n + 1)
-        if (softOf[m]) looseRooted[li] = true
+        if (standingCount == standing.size) standing = standing.copyOf(standingCount * 2)
+        standing[standingCount++] = j
     }
 
-    /** Cell [n] is anchored ground or part of another structure of the same sort (plant or not) than [id]. */
+    /** Cell [n] is anchored ground, a body, or part of another structure of the same sort (plant or not) than [id]. */
     private fun joins(n: Int, id: Int, plant: Boolean): Boolean {
         val q = mat[n].toInt()
-        return (kindOf[q] == Kind.SOLID && owner[n] != id && plantOf[q] == plant) || materials.anchored[q] || (flags[n].toInt() and Flag.ANCHORED) != 0
+        return bodyAt[n] != 0 || (kindOf[q] == Kind.SOLID && owner[n] != id && plantOf[q] == plant) || materials.anchored[q] || (flags[n].toInt() and Flag.ANCHORED) != 0
     }
 
     // ------------------------------------------------------------------ snapshots (undo, 4.7)
@@ -2806,6 +2801,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         /** cloud base, gust steps, random weather (0/1), storm, last strike; wind, gust, ambient. */
         internal val weatherInts: IntArray,
         internal val weatherFloats: FloatArray,
+        internal val bodies: Bodies.Saved,
     ) {
         val bytes: Int get() = mat.size * 9 + light.size * 4
     }
@@ -2814,6 +2810,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         step, mat.copyOf(), temp.copyOf(), life.copyOf(), variant.copyOf(), flags.copyOf(), rng, pending.copyOf(),
         heatPending.copyOf(), placed.copyOf(), light.level.copyOf(), closedBits.copyOf(),
         intArrayOf(cloudBase, gustSteps, if (randomWeather) 1 else 0, storm, lastStrike), floatArrayOf(wind, gust, ambient, cloudDrift),
+        bodies.save(),
     )
 
     fun restore(s: Snapshot) {
@@ -2836,6 +2833,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         gust = s.weatherFloats[1]
         ambient = s.weatherFloats[2]
         cloudDrift = s.weatherFloats[3]
+        bodies.restore(s.bodies)
         boltAge = 0
         flash = 0
         stamp.fill(0)
@@ -2859,6 +2857,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             mix(variant[i].toInt())
             mix(flags[i].toInt())
         }
+        bodies.hash(::mix)
         mix(rng)
         mix(step)
         return h
@@ -2984,9 +2983,8 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         private const val AVALANCHE_SPREAD = 0.6f
         private const val AVALANCHE_SETTLE = 0.04f
 
-        /** A landing block shakes the ground this far when it falls at least [SHAKE_SPEED]. */
-        private const val SHAKE_RADIUS = 3
-        private const val SHAKE_SPEED = 2
+        /** Roots hold in loose ground at least this dense (earth, sand, gravel, clay; not ash or snow). */
+        private const val ROOT_SOIL = 1200f
 
         /** The load on snow is summed up to this many cells above it; chance per random tick to be pressed into ice. */
         private const val COMPACT_REACH = 24
@@ -3017,8 +3015,6 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         /** How far around the finger an animal looks for where it lives (or for air). */
         const val ANIMAL_REACH = 3
 
-        /** A structure tips when its centre of weight is this far (cells) beyond the edge of what it rests on. */
-        private const val TIP_MARGIN = 0.5f
         private const val SEEP = 0.08f
         private const val SEEPING = Flag.WET or Flag.MARK
 

@@ -114,7 +114,9 @@ class SignalfeuerTest {
         val snow = listOf(145 to 14, 138 to 20).joinToString("") { (x, y) -> "scoop $x $y 6 20\npour 29 60 3 20\n" }
         val (play, r) = solve("krater", "wait 60\n" + snow + "wait 1800\n" + hotSand(136, 18) + "wait 300\n" + hotSand(136, 18), limit = 90)
         assertNull(r)
-        assertTrue(count(play, "basalt", 14, 60, 44, 76) > 150, "a crust of basalt over the lake: ${count(play, "basalt", 14, 60, 44, 76)}")
+        // since Phase 4 pieces of the crust are bodies and sink into the lava still liquid (basalt is heavier):
+        // 149 cells of basalt in the lake instead of 166, 100 of lava instead of 83
+        assertTrue(count(play, "basalt", 14, 60, 44, 76) > 120, "a crust of basalt over the lake: ${count(play, "basalt", 14, 60, 44, 76)}")
         assertEquals(80, count(play, "wood"))
     }
 
