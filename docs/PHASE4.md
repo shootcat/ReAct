@@ -32,7 +32,7 @@ Was der eigene Löser schlechter kann als jbox2d (ehrlich):
   - **Reibung** steht pro Material in `materials.json` (`friction`). Fels, Stein, Basalt und Ziegel 0,7; Holz, Stamm und Totholz 0,6; Metall 0,35; Glas 0,3; Eis 0,05. Es zählt die kleinere der beiden Reibungen.
   - **Rückprall:** ab 1,2 Zellen pro Schritt mit einem Fünftel der Geschwindigkeit.
 - **Was ein Körper durchquert oder verdrängt:**
-  - Luft, Gas und Flüssigkeit: wird verdrängt.
+  - Luft, Gas und Flüssigkeit: Sie werden verdrängt.
   - Tiere.
   - Laub und Ranken, außer für Pflanzenkörper.
   - Leichter Schutt (Asche, Holzkohle, Glut, totes Laub), wenn der Körper mindestens dreimal so dicht ist. Ein Felsbrocken schiebt so die Holzkohle eines verbrannten Baums beiseite und rollt weiter.
@@ -63,7 +63,7 @@ Was der eigene Löser schlechter kann als jbox2d (ehrlich):
 
 ## 4. Zerbrechen
 
-- **Der Körper selbst** bricht, wenn die halbe Aufprallgeschwindigkeit zum Quadrat größer ist als 0,25 × Festigkeit². Die Festigkeit (`strength`) gibt es seit 2d für den Druck: Glas 2, Eis 4, Ziegel 6, Stein und Basalt 9.
+- **Der Körper selbst** bricht, wenn ½ · Aufprallgeschwindigkeit² größer ist als 0,25 × Festigkeit². Die Festigkeit (`strength`) gibt es seit 2d für den Druck: Glas 2, Eis 4, Ziegel 6, Stein und Basalt 9.
   - Daraus folgt: Glas bricht ab etwa 5 Zellen Fallhöhe, Eis ab etwa 20, Ziegel ab etwa 45.
   - Stein und Basalt brechen beim Fallen nie: Die Höchstgeschwindigkeit von 6 Zellen pro Schritt reicht nicht.
   - Holz und Metall haben kein Bruchprodukt und zerbrechen nicht.
@@ -72,11 +72,11 @@ Was der eigene Löser schlechter kann als jbox2d (ehrlich):
   - Um den Aufschlag wird ein Kern zum Bruchprodukt: Glas zu Glasscherben, Eis zu Schnee (zerstoßenes Eis), Stein, Basalt und Ziegel zu Geröll.
   - Dazu kommen bis zu vier Risse; was zwischen ihnen liegt, wird zu eigenen Körpern.
   - Kleine Körper zerbrechen ganz.
-- **Thermoschock (2d):** Heißes Glas, das abgeschreckt wird, springt jetzt auch durch einen Glaskörper als Riss, nicht nur an der berührten Zelle. Ohne das schwamm Glas in Level 3 auf der Lava, statt zu Scherben zu werden.
+- **Thermoschock (2d):** Heißes Glas, das abgeschreckt wird, springt jetzt auch durch einen Glaskörper als Riss, nicht nur an der berührten Zelle. Ohne das blieb das Glas in Level 3 ganz und schwamm in der Lava, statt zu Scherben zu werden.
 - **Eine harte Landung** erschüttert den Boden: Schnee am Hang löst sich (Lawine aus 2d).
 - **Gemessen** (`BodyTest`):
   - Glas aus gut 50 Zellen Höhe zerspringt (32 Zellen werden zu mindestens 30 Zellen Scherben); aus zwei Zellen Höhe abgesetzt, bleibt es ganz.
-  - Stein (48 Zellen) übersteht denselben Fall ganz. Eis zerbricht in mindestens zwei Körper und etwas Schnee.
+  - Stein (48 Zellen) übersteht einen ebenso hohen Fall ganz. Eis zerbricht in mindestens zwei Körper und etwas Schnee.
   - Ein Felsbrocken (Radius 5) bricht die zwei Zellen dicke Eisdecke eines Teichs und geht unter; ein Kiesel (Radius 1) bleibt auf dem Eis liegen.
 
 ## 5. Die Hand
@@ -99,7 +99,7 @@ Was der eigene Löser schlechter kann als jbox2d (ehrlich):
 
 ## 7. Level 1 bis 5
 
-Alle Lösungswege aller fünf Level funktionieren. **Zwei Level sind geändert, ein Weg ist neu, Medaillengrenzen sind unverändert.** Gemessen mit den Lösungstests, vorher auf dem Stand 3c (`c3aa5c8`), nachher mit Phase 4:
+Alle Lösungswege aller fünf Level funktionieren. **Ein Level ist geändert (Level 4); dort sind der Silberweg und ein späterer Bronzeweg neu. Die Medaillengrenzen aller Level sind unverändert.** Gemessen mit den Lösungstests, vorher auf dem Stand 3c (`c3aa5c8`), nachher mit Phase 4:
 
 | Level, Weg | 3c | Phase 4 | Medaille |
 |---|---|---|---|
@@ -124,20 +124,19 @@ Alle Lösungswege aller fünf Level funktionieren. **Zwei Level sind geändert, 
 | L5 sechs Eimer | 37,8 s · 12 | 37,8 s · 12 | Silber |
 | L5 heißer Tuff | 240,5 s · 6 | 240,5 s · 6 | Bronze |
 
-Alle Fallen halten weiterhin; Level 5 ist Zelle für Zelle unverändert.
+Alle übrigen Fallen halten weiterhin (zu Level 4 siehe unten); Level 5 läuft mit denselben Zahlen wie in 3c.
 
 **Level 1 „Trockener Teich“:** keine Änderung. Der Feuerweg ist 2,5 s langsamer, der Grabweg ebenso; die Medaillen bleiben. Der verkeilte Stamm über der Glut bleibt fest, die Hand kann ihn weiter nicht heben.
 
-**Level 2 „Signalfeuer“:** keine Änderung am Level. **Eine Testschwelle ist gesenkt**, im Fallentest „Schnee in den Krater erstickt die Lava“:
-- Verlangt waren mehr als 150 Zellen Basaltkruste, jetzt mehr als 120.
-- Gemessen: 149 Zellen Basalt statt 166 und 100 Zellen Lava statt 83. Stücke der Kruste sind jetzt Körper, und Basalt (2900) ist schwerer als Lava (2600). Sie sinken in die noch flüssige Lava, statt oben liegen zu bleiben.
-- Die Falle hält trotzdem: Der Holzstoß bleibt unberührt (80 Zellen Holz).
+**Level 2 „Signalfeuer“:** keine Änderung, auch an keinem Test.
+- Im Fallentest „Schnee in den Krater erstickt die Lava“ ist die Kruste dünner: 153 Zellen Basalt statt 166, 96 Zellen Lava statt 83. Stücke der Kruste sind jetzt Körper, und Basalt (2900) ist schwerer als Lava (2600); einige sinken in die noch flüssige Lava.
+- Die Schwelle des Tests (mehr als 150 Zellen) hält, der Holzstoß bleibt unberührt. Während des Umbaus lag der Wert zeitweise bei 149; die Schwelle war dafür auf 120 gesenkt und ist jetzt wieder auf 150.
 
 **Level 3 „Tiefe Schmelze“:** keine Änderung am Level.
 - Der Scherbenweg brauchte den Thermoschock durch den Glaskörper (Abschnitt 4).
 - Der Erzweg ist deutlich langsamer: 113,8 s statt 49,2 s, bei gleichen Griffen und gleicher Medaille (Silber, Grenze 240 s und 16 Griffe; für Gold fehlen ohnehin Griffe).
   - Was dort auf der Lava erstarrt, Basaltkruste und Metall, ist jetzt ein Körper und liegt nach seiner Dichte. Dadurch erreicht das flüssige Metall den Sand später. Den genauen Ablauf habe ich nicht weiter zerlegt, weil die Medaille gleich bleibt.
-  - Dazu ist im Materialtest „Erz schmilzt auf Lava“ die Schwelle angepasst: Verlangt waren mehr als 5 Zellen flüssiges Metall zugleich. Jetzt wird mindestens eine Zelle flüssiges Metall verlangt und mehr als 15 Zellen flüssiges und erstarrtes Metall zusammen.
+  - Der Materialtest „Erz schmilzt auf Lava“ ist unverändert (gemessen: höchstens 11 Zellen flüssiges Metall zugleich, verlangt sind mehr als 5).
 
 **Level 4 „Gewitterfeuer“: das Level ist geändert** (`tools/levels/gewitterfeuer.py`, neu gemalt). Ohne die Änderungen waren der Silberweg und zwei Fallen nicht mehr spielbar:
 1. **Steckfuge im Holzstoß.** Die zwei obersten Scheite lassen eine Lücke, eine Zelle breit und zwei tief.
@@ -267,7 +266,8 @@ Beobachtet werden sie über drei neue Ereignisse: Körper rollt, Körper ist umg
   - Das Floß liegt jetzt *im* Wasser, mit der unteren Reihe unter der Oberfläche, statt auf ihm.
   - Gemalte Glas-, Eis- und Ziegelblöcke werden tiefer gemalt, damit sie beim Landen nicht zerbrechen.
   - Die Planke über der Kante kippt jetzt und liegt danach am Boden.
-- `MaterialBehaviorTest` (Erz auf Lava), `SignalfeuerTest` (Basaltkruste) und `GewitterfeuerTest` (Silberweg, Fallen Sand, Grat und „zu spät“): siehe Abschnitt 7.
+- `GewitterfeuerTest` (Silberweg, Fallen Sand, Grat und „zu spät“): siehe Abschnitt 7.
+- `SignalfeuerTest` gibt im Kratertest die gemessene Kruste aus; die Schwelle ist dieselbe wie in 3c.
 - App-Test `templatesAndFoldedBar`: neuer Screenshot `45_wald_am_hang`.
 
 ## Bilder
