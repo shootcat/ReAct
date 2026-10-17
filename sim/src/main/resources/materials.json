@@ -8,7 +8,7 @@
       "latent_heat": "Wärme des Phasenwechsels in Grad des Materials selbst: beim Sieden zusätzlich aufzunehmen, beim Erstarren zusätzlich abzugeben, bei Eis und Schnee zum Schmelzen zusätzlich aufzunehmen",
       "hardness": "0 bis 1, 1 heißt unzerstörbar",
       "absorbs": "Wahrscheinlichkeit pro Schritt und berührender Wasserzelle, sie aufzusaugen",
-      "chances": "flame, smoke, residue, boil_residue_share, friction, viscosity, speckle: Wahrscheinlichkeiten oder Anteile 0 bis 1",
+      "chances": "flame, smoke, residue, boil_residue_share, friction, viscosity, speckle: Wahrscheinlichkeiten oder Anteile 0 bis 1; friction fester Stoffe: Reibung von Körpern (Phase 4), die kleinere der beiden Seiten gilt",
       "burn_heat": "Wärme, die eine brennende Zelle pro Schritt abgibt (Grad bei Wärmekapazität 1)",
       "lifetime": "Rauch verfliegt nach oben aus der Welt; im geschlossenen Raum hält er sich lange, so erstickt dort das Feuer",
       "salt_melt_temp": "Schmelzpunkt, solange Salziges (Salz, Salzwasser) daneben liegt: Salz lässt Eis und Schnee ohne Wärme schmelzen",
@@ -37,7 +37,7 @@
       "wet_blocks_burning": false, "absorbs": 0,
       "conductivity": 0.35, "heat_capacity": 2.0, "hardness": 1.0, "erodes_in_water": false,
       "dissolves_in": null, "dissolved_product": null,
-      "bucketable": false, "grabbable": false, "emits_light": 0, "blocks_light": true,
+      "friction": 0.7, "bucketable": false, "grabbable": false, "emits_light": 0, "blocks_light": true,
       "color": "#5f5852", "color_variance": 0.22, "cost": 0
     },
     {
@@ -47,7 +47,7 @@
       "melt_temp": 1100, "melt_product": "molten_metal",
       "conductivity": 0.45, "heat_capacity": 2.2, "hardness": 0.95, "erodes_in_water": false,
       "dissolves_in": null, "dissolved_product": null,
-      "bucketable": false, "grabbable": false, "emits_light": 0, "blocks_light": true,
+      "friction": 0.7, "bucketable": false, "grabbable": false, "emits_light": 0, "blocks_light": true,
       "color": "#55504b", "color_variance": 0.16, "speckle_color": "#e0a04c", "speckle": 0.2, "cost": 0
     },
     {
@@ -57,7 +57,7 @@
       "conductivity": 0.35, "heat_capacity": 2.0, "hardness": 1.0, "erodes_in_water": false,
       "emits": "firedamp", "emit_rate": 0.4,
       "dissolves_in": null, "dissolved_product": null,
-      "bucketable": false, "grabbable": false, "emits_light": 0, "blocks_light": true,
+      "friction": 0.7, "bucketable": false, "grabbable": false, "emits_light": 0, "blocks_light": true,
       "color": "#57514b", "color_variance": 0.22, "speckle_color": "#24201d", "speckle": 0.35, "cost": 0
     },
     {
@@ -67,7 +67,7 @@
       "conductivity": 0.35, "heat_capacity": 2.0, "hardness": 1.0, "erodes_in_water": false,
       "emits": "water", "emit_rate": 1.0,
       "dissolves_in": null, "dissolved_product": null,
-      "bucketable": false, "grabbable": false, "emits_light": 0, "blocks_light": true,
+      "friction": 0.7, "bucketable": false, "grabbable": false, "emits_light": 0, "blocks_light": true,
       "color": "#4b6470", "color_variance": 0.16, "speckle_color": "#8cc4e6", "speckle": 0.3, "cost": 0
     },
     {
@@ -77,7 +77,7 @@
       "conductivity": 0.35, "heat_capacity": 2.0, "hardness": 1.0, "erodes_in_water": false,
       "dissolves_in": null, "dissolved_product": null,
       "temp": 1250, "holds_temp": true,
-      "bucketable": false, "grabbable": false, "emits_light": 0.7, "blocks_light": true,
+      "friction": 0.7, "bucketable": false, "grabbable": false, "emits_light": 0.7, "blocks_light": true,
       "color": "#9c3416", "color_variance": 0.18, "speckle_color": "#ffb04a", "speckle": 0.3, "cost": 0
     },
     {
@@ -88,7 +88,7 @@
       "conductivity": 0.3, "heat_capacity": 2.0, "hardness": 0.9, "erodes_in_water": false,
       "strength": 9, "break_product": "rubble",
       "dissolves_in": null, "dissolved_product": null,
-      "bucketable": false, "grabbable": true, "emits_light": 0, "blocks_light": true,
+      "friction": 0.7, "bucketable": false, "grabbable": true, "emits_light": 0, "blocks_light": true,
       "color": "#8c8781", "color_variance": 0.12, "pattern": "masonry", "cost": 2
     },
     {
@@ -99,7 +99,7 @@
       "conductivity": 0.3, "heat_capacity": 2.0, "hardness": 0.9, "erodes_in_water": false,
       "strength": 9, "break_product": "rubble",
       "dissolves_in": null, "dissolved_product": null,
-      "bucketable": false, "grabbable": true, "emits_light": 0, "blocks_light": true,
+      "friction": 0.7, "bucketable": false, "grabbable": true, "emits_light": 0, "blocks_light": true,
       "color": "#46423f", "color_variance": 0.22, "pattern": "pores", "cost": 2
     },
     {
@@ -226,7 +226,7 @@
       "strength": 4, "break_product": "snow",
       "dissolves_in": null, "dissolved_product": null,
       "temp": -10,
-      "bucketable": false, "grabbable": true, "emits_light": 0, "blocks_light": false, "light_pass": 0.95,
+      "friction": 0.05, "bucketable": false, "grabbable": true, "emits_light": 0, "blocks_light": false, "light_pass": 0.95,
       "color": "#a9d8f0", "color_variance": 0.05, "opacity": 0.85, "pattern": "ice", "cost": 1
     },
     {
@@ -236,7 +236,7 @@
       "conductivity": 0.08, "heat_capacity": 1.2, "hardness": 0.5, "erodes_in_water": false,
       "strength": 5,
       "dissolves_in": null, "dissolved_product": null,
-      "bucketable": false, "grabbable": true, "emits_light": 0, "blocks_light": true,
+      "friction": 0.6, "bucketable": false, "grabbable": true, "emits_light": 0, "blocks_light": true,
       "color": "#8a5a2c", "color_variance": 0.12, "pattern": "planks", "cost": 2
     },
     {
@@ -247,7 +247,7 @@
       "conductivity": 0.12, "heat_capacity": 1.7, "hardness": 0.85, "erodes_in_water": false,
       "strength": 6, "break_product": "rubble",
       "dissolves_in": null, "dissolved_product": null,
-      "bucketable": false, "grabbable": true, "emits_light": 0, "blocks_light": true,
+      "friction": 0.7, "bucketable": false, "grabbable": true, "emits_light": 0, "blocks_light": true,
       "color": "#a3492f", "color_variance": 0.1, "pattern": "brick", "cost": 2
     },
     {
@@ -258,7 +258,7 @@
       "shock_product": "glass_shards", "shock_rate": 20,
       "strength": 2, "break_product": "glass_shards",
       "dissolves_in": null, "dissolved_product": null,
-      "bucketable": false, "grabbable": true, "emits_light": 0, "blocks_light": false, "light_pass": 0.99,
+      "friction": 0.3, "bucketable": false, "grabbable": true, "emits_light": 0, "blocks_light": false, "light_pass": 0.99,
       "color": "#bfe3ea", "color_variance": 0.04, "opacity": 0.4, "cost": 3
     },
     {
@@ -281,7 +281,7 @@
       "conductivity": 1.0, "heat_capacity": 3.5, "hardness": 0.95, "erodes_in_water": false,
       "strength": 14,
       "dissolves_in": null, "dissolved_product": null,
-      "bucketable": false, "grabbable": true, "emits_light": 0, "blocks_light": true,
+      "friction": 0.35, "bucketable": false, "grabbable": true, "emits_light": 0, "blocks_light": true,
       "color": "#8e99a5", "color_variance": 0.05, "pattern": "sheen", "cost": 4
     },
     {
@@ -420,7 +420,7 @@
       "dissolves_in": null, "dissolved_product": null,
       "organism": "vine", "light_need": 0.25, "grow": 0.8, "grow_size": 64,
       "dies_above": 70, "dies_in_salt": true, "death_product": "dead_plant", "roots": true,
-      "bucketable": false, "grabbable": false, "emits_light": 0, "blocks_light": false, "light_pass": 0.6,
+      "friction": 0.7, "bucketable": false, "grabbable": false, "emits_light": 0, "blocks_light": false, "light_pass": 0.6,
       "color": "#3c7a2b", "color_variance": 0.16, "speckle_color": "#74b04e", "speckle": 0.25, "cost": 2
     },
     {
@@ -443,7 +443,7 @@
       "dissolves_in": null, "dissolved_product": null,
       "organism": "tree", "light_need": 0.3, "grow": 0.6,
       "dies_above": 150, "dies_in_salt": true, "death_product": "deadwood", "roots": true,
-      "bucketable": false, "grabbable": true, "split_into": "wood", "split_yield": 3, "emits_light": 0, "blocks_light": true,
+      "friction": 0.6, "bucketable": false, "grabbable": true, "split_into": "wood", "split_yield": 3, "emits_light": 0, "blocks_light": true,
       "color": "#5f4229", "color_variance": 0.14, "speckle_color": "#3b281a", "speckle": 0.22, "cost": 2
     },
     {
@@ -453,7 +453,7 @@
       "conductivity": 0.08, "heat_capacity": 1.2, "hardness": 0.5, "erodes_in_water": false,
       "dissolves_in": null, "dissolved_product": null,
       "roots": true,
-      "bucketable": false, "grabbable": true, "split_into": "wood", "split_yield": 2, "emits_light": 0, "blocks_light": true,
+      "friction": 0.6, "bucketable": false, "grabbable": true, "split_into": "wood", "split_yield": 2, "emits_light": 0, "blocks_light": true,
       "color": "#7d7064", "color_variance": 0.14, "speckle_color": "#5b5047", "speckle": 0.2, "cost": 2
     },
     {
@@ -464,7 +464,7 @@
       "dissolves_in": null, "dissolved_product": null,
       "organism": "leaf",
       "dies_above": 70, "dies_in_salt": true, "death_product": "dead_plant",
-      "bucketable": false, "grabbable": false, "emits_light": 0, "blocks_light": false, "light_pass": 0.75,
+      "friction": 0.8, "bucketable": false, "grabbable": false, "emits_light": 0, "blocks_light": false, "light_pass": 0.75,
       "color": "#3a7c2e", "color_variance": 0.24, "speckle_color": "#62a646", "speckle": 0.3, "cost": 1
     },
     {

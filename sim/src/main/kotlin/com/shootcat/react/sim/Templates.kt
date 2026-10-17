@@ -21,6 +21,7 @@ enum class Template(val label: String) {
     MOUNTAIN("Berg mit Schnee"),
     VOLCANO("Vulkan"),
     CAVES("Höhlensystem"),
+    FOREST("Wald am Hang"),
     ;
 
     /** Builds the landscape into [world], whatever its size. */
@@ -33,6 +34,7 @@ enum class Template(val label: String) {
             MOUNTAIN -> Templates.mountain(world, seed)
             VOLCANO -> Templates.volcano(world, seed)
             CAVES -> Templates.caves(world, seed)
+            FOREST -> Templates.forest(world, seed)
         }
         // clouds form above the landscape (3c.1): high over the meadow, lower round the snowy mountain, where
         // its peaks reach into them; no wind to begin with
@@ -450,4 +452,90 @@ internal object Templates {
 
     /** The air of the snowy mountain. */
     const val COLD = -6f
+
+    /**
+     * A wooded slope down to a lake (Phase 4), to try out the bodies: boulders lie against the trees on the
+     * slope (burn a tree or take it away and its boulder rolls down into the lake), one rests on a ledge of
+     * rock at the top, logs lie in the grass at the shore, a raft floats on the lake.
+     */
+    fun forest(world: World, seed: Long) {
+        val k = Kit(world, seed)
+        val w = k.w
+        val h = k.h
+        val shore = w * 0.52f
+        val level = (h * 0.64f).toInt()
+        val top = h * 0.2f
+        val ledge = (w * 0.07f).toInt()
+        val surface = IntArray(w) { x ->
+            val fx = x.toFloat()
+            val y = when {
+                // a flat ledge at the top, then the slope, a little hollowed, down to the lake
+                fx < ledge -> top
+                fx < shore -> {
+                    val u = (fx - ledge) / (shore - ledge)
+                    top + (level + 2 - top) * (u * 0.8f + u * u * 0.2f) + (k.n.fbm(fx / 18f, 5.3f, 3) - 0.5f) * h * 0.03f
+                }
+                fx < w * 0.92f -> {
+                    val u = (fx - shore) / (w * 0.4f)
+                    level + 2 + h * 0.18f * sqrt(sin01(u))
+                }
+                else -> level - h * 0.04f - (fx - w * 0.92f) * 0.8f
+            }
+            y.toInt()
+        }
+        val earth = k.id("earth")
+        val sand = k.id("sand")
+        k.ground(surface) { x, d ->
+            when {
+                x < ledge + 2 -> null
+                x > shore * 0.97f && x < w * 0.93f -> sand
+                d < 6 -> earth
+                else -> null
+            }
+        }
+        k.flood(k.id("water"), level, (shore * 0.95f).toInt(), (w * 0.95f).toInt())
+        k.grass(surface)
+        // trees on the slope; against every other one, uphill, a boulder
+        val stone = k.id("stone")
+        fun boulder(cx: Int, r: Int) {
+            var cy = Int.MAX_VALUE
+            for (x in cx - r..cx + r) if (x in 0 until w) cy = min(cy, surface[x])
+            cy -= r + 1
+            for (y in cy - r..cy + r) for (x in cx - r..cx + r) {
+                if ((x - cx) * (x - cx) + (y - cy) * (y - cy) <= r * r + r && k.at(x, y) == k.air) k.put(x, y, stone)
+            }
+        }
+        val grass = k.id("grass")
+        var x = ledge + (w * 0.05f).toInt()
+        var n = 0
+        while (x < shore * 0.92f) {
+            if (k.at(x, surface[x]) == grass && k.at(x, surface[x] - 1) == k.air) {
+                world.plantTree(x, surface[x] - 1, tree = true)
+                if (n % 2 == 0) {
+                    val r = 4 + n % 3
+                    boulder(x - r - 1, r)
+                }
+                n++
+            }
+            x += (w * 0.05f * (0.8f + 0.4f * k.n.hash(x, 23))).toInt()
+        }
+        // a boulder on the ledge at the top, back from its edge
+        boulder(ledge / 2, 5)
+        // logs at the shore, a raft on the lake
+        val deadwood = k.id("deadwood")
+        for ((x0, len) in listOf((shore * 0.84f).toInt() to 12, (shore * 0.9f).toInt() to 9)) {
+            val y = surface[x0 + len / 2] - 3
+            for (yy in y..y + 1) for (xx in x0 until x0 + len) if (k.at(xx, yy) == k.air) k.put(xx, yy, deadwood)
+        }
+        val wood = k.id("wood")
+        val rx = (w * 0.72f).toInt()
+        for (yy in level - 2..level - 1) for (xx in rx until rx + 16) k.put(xx, yy, wood)
+        k.birds(listOf((w * 0.3f).toInt(), (w * 0.45f).toInt()))
+    }
+
+    /** A bowl from 0 to 1 and back to 0 over [u] in 0..1. */
+    private fun sin01(u: Float): Float {
+        val c = u.coerceIn(0f, 1f)
+        return 4f * c * (1f - c)
+    }
 }

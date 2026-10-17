@@ -65,6 +65,9 @@ internal class Body(val id: Int) {
     var ow = 0
     var oh = 0
 
+    /** How far it has turned (radians, either way) since it last lay still: for noticing that it fell over. */
+    var turned = 0f
+
     /** The last step it lay on the ground (or on a body lying on the ground): it carries what rests on it. */
     var ground = -100
 
@@ -105,6 +108,7 @@ internal class Bodies(private val world: World) {
     private val organism = mt.organism
     private val strength = mt.strength
     private val breakProduct = mt.breakProduct
+    private val compacts = mt.compactProduct
     private val deadPlant = mt.idOrNull("dead_plant") ?: AIR
 
     /** Which body each cell belongs to (its id), 0 for none. */
@@ -582,6 +586,10 @@ internal class Bodies(private val world: World) {
         }
         if (contact) b.w *= ROLL
         if (moved && !b.asleep && b.vy > FALL_NOTE && b.still == 0 && b.stuck == 0) world.note(Seen.FALL, b.main)
+        b.turned += if (b.w < 0f) -b.w else b.w
+        // rolling: turning along the ground while it moves along it
+        if (contact && moved && b.radius >= ROLL_RADIUS && (if (b.w < 0f) -b.w else b.w) * b.radius > ROLL_NOTE &&
+            (if (b.vx < 0f) -b.vx else b.vx) > ROLL_NOTE) world.note(Seen.ROLL, b.main)
         if (impacts > 0) impact(b)
         if (slots[b.id - 1] !== b) return
         // rest
@@ -714,8 +722,8 @@ internal class Bodies(private val world: World) {
 
     /**
      * A cell of [b] may go into cell [g]: air, gas, any liquid (it floats or sinks by its density), animals,
-     * leaves and vines a non-plant body tears through, and light loose stuff a much heavier body sinks into
-     * (snow, ash, withered leaves).
+     * leaves and vines a non-plant body tears through, and light debris a much heavier body pushes aside (ash,
+     * charcoal, embers, withered leaves; snow only where it floats or hangs loose).
      */
     private fun passable(b: Body, g: Int): Boolean {
         val q = mat[g].toInt()
@@ -724,7 +732,8 @@ internal class Bodies(private val world: World) {
         if (k == Kind.GAS || k == Kind.LIQUID || animalOf[q]) return true
         if (flags[g].toInt() and Flag.ANCHORED != 0) return false
         if (softOf[q]) return !b.plant
-        return k == Kind.POWDER && dens[q] <= LIGHT_POWDER && b.mass > dens[q] * SINK_INTO * b.n && adrift(g)
+        // snow packs under a load (it is pressed into ice); other light debris a heavy body pushes aside
+        return k == Kind.POWDER && dens[q] <= LIGHT_POWDER && b.mass > dens[q] * SINK_INTO * b.n && (compacts[q] < 0 || adrift(g))
     }
 
     /**
@@ -744,6 +753,16 @@ internal class Bodies(private val world: World) {
             n++
         }
         return false
+    }
+
+    /**
+     * Ground: rock, what the level anchored, and firm loose ground (earth, sand, gravel, clay); not light
+     * debris such as embers, ash or snow heaped against a body.
+     */
+    private fun ground(c: Int): Boolean {
+        val q = mat[c].toInt()
+        val k = kind[q]
+        return k == Kind.STATIC || flags[c].toInt() and Flag.ANCHORED != 0 || (k == Kind.POWDER && dens[q] >= FIRM_GROUND)
     }
 
     /** Neither the body's own cell nor one it may pass: something it hits. */
@@ -799,16 +818,21 @@ internal class Bodies(private val world: World) {
                     else -> sy = -1f
                 }
             } else {
-                // the surface faces away from where the obstacle is: its hard cells around (only its own, a body
-                // lying next to the foot of another must not tilt the ground under it)
+                // the surface faces away from where the obstacle is: its hard cells around, only its own (a body
+                // lying next to the foot of another must not tilt the ground under it); of light debris only what
+                // is on the far side from where the cell comes from (embers heaped beside a post are not the ground
+                // it stands on), of the ground all of it (the steps of a slope)
                 val gx = g % w
                 val gy = g / w
+                val ax = b.at[k] % w - gx
+                val ay = b.at[k] / w - gy
                 val owner = bodyAt[g]
                 for (dy in -1..1) for (dx in -1..1) {
                     if (dx == 0 && dy == 0) continue
                     val x = gx + dx
                     val y = gy + dy
-                    val solid = x < 0 || y < 0 || x >= w || y >= height || (bodyAt[y * w + x] == owner && hard(b, y * w + x))
+                    val solid = x < 0 || y < 0 || x >= w || y >= height ||
+                        (bodyAt[y * w + x] == owner && hard(b, y * w + x) && (dx * ax + dy * ay <= 0 || ground(y * w + x)))
                     if (solid) {
                         sx -= dx
                         sy -= dy
@@ -1423,6 +1447,9 @@ internal class Bodies(private val world: World) {
                 return
             }
         }
+        // it fell over on its way here: turned by about a quarter, not rolled on and on
+        if (b.turned in TOPPLE_FROM..TOPPLE_TO) world.note(Seen.TOPPLE, b.main)
+        b.turned = 0f
         square(b)
         if (world.anchoredBody(b) || (b.plant && world.rootedBody(b))) {
             dissolve(b)
@@ -1540,7 +1567,7 @@ internal class Bodies(private val world: World) {
             }
             floats += b.comX; floats += b.comY; floats += b.mass; floats += b.inertia; floats += b.radius
             floats += b.px; floats += b.py; floats += b.cs; floats += b.sn
-            floats += b.vx; floats += b.vy; floats += b.w
+            floats += b.vx; floats += b.vy; floats += b.w; floats += b.turned
             longs += b.support
         }
         return Saved(ints.toIntArray(), floats.toFloatArray(), longs.toLongArray())
@@ -1574,7 +1601,7 @@ internal class Bodies(private val world: World) {
             }
             b.comX = s.floats[f++]; b.comY = s.floats[f++]; b.mass = s.floats[f++]; b.inertia = s.floats[f++]; b.radius = s.floats[f++]
             b.px = s.floats[f++]; b.py = s.floats[f++]; b.cs = s.floats[f++]; b.sn = s.floats[f++]
-            b.vx = s.floats[f++]; b.vy = s.floats[f++]; b.w = s.floats[f++]
+            b.vx = s.floats[f++]; b.vy = s.floats[f++]; b.w = s.floats[f++]; b.turned = s.floats[f++]
             b.support = s.longs[l++]
             slots[b.id - 1] = b
             count++
@@ -1635,6 +1662,8 @@ internal class Bodies(private val world: World) {
         /** Light loose stuff a body sinks into: at most this dense (snow, ash, withered leaves), the body at least so many times as dense. */
         private const val LIGHT_POWDER = 0.6f
         private const val SINK_INTO = 3f
+        /** Loose ground at least this dense is ground for the way a surface faces (earth, sand, gravel, clay). */
+        private const val FIRM_GROUND = 1.2f
         private const val ADRIFT_DEPTH = 16
 
         /** Lying still and slow so many steps, a body sleeps; not moving a single cell so many, it sleeps anyway. */
@@ -1647,6 +1676,12 @@ internal class Bodies(private val world: World) {
 
         /** Falling faster than this (cells per step) counts as falling for the discovery book. */
         private const val FALL_NOTE = 0.5f
+        /** Rolling for the book: a body at least this big, its rim and itself this fast (cells per step). */
+        private const val ROLL_RADIUS = 2f
+        private const val ROLL_NOTE = 0.25f
+        /** Fallen over for the book: turned by this much (radians) before it came to rest. */
+        private const val TOPPLE_FROM = 0.6f
+        private const val TOPPLE_TO = 2.6f
 
         // breaking (5)
         /** Impacts slower than this break nothing. */

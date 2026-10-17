@@ -27,6 +27,7 @@ class TemplatesTest {
                 Template.MOUNTAIN -> assertTrue(world.has("snow") > 200 && world.has("ice") > 20, what)
                 Template.VOLCANO -> assertTrue(world.has("lava") > 300 && world.has("basalt") > 300 && world.has("saltwater") > 500, what)
                 Template.CAVES -> assertTrue(world.has("gas_vent") > 0 && world.has("firedamp") > 20 && world.has("firefly") > 0 && world.has("water") > 100, what)
+                Template.FOREST -> assertTrue(world.has("water") > world.size / 30 && world.has("trunk") > 30 && world.has("stone") > 100 && world.has("deadwood") > 0 && world.has("wood") > 0, what)
             }
         }
     }
@@ -58,5 +59,45 @@ class TemplatesTest {
         for (x in mid - 40..mid + 40) for (y in 0 until size.height) if (world.material(x, y) == materials.id("water")) water++
         assertTrue(water > 200, "the pond in the middle: $water")
         assertTrue(world.has("trunk") > 60, "trees on the hills to the left as well: ${world.has("trunk")}")
+    }
+
+    @Test
+    fun `on the wooded slope the boulders lie against the trees, a burnt tree lets its boulder roll into the lake`() {
+        val size = WorldSize.MEDIUM
+        val world = World(size.width, size.height, materials, Terrain.SEED)
+        Template.FOREST.build(world)
+        world.run(600)
+        val stone = materials.id("stone")
+        val boulders = world.bodyStates().filter { it.material == stone && it.cells > 20 }
+        Pictures.write(world, Backdrop.of(world), "template_forest_still", scale = 2)
+        assertTrue(boulders.size >= 3, "boulders on the slope: ${boulders.size}")
+        // they lie still (one wedged between slope and trunk may wake now and then when the leaves change, it does not move)
+        world.run(300)
+        val later = world.bodyStates().filter { it.material == stone && it.cells > 20 }
+        assertEquals(boulders.map { it.x.toInt() to it.y.toInt() }, later.map { it.x.toInt() to it.y.toInt() }, "they lie still")
+        assertTrue(world.bodyStates().any { it.material == materials.id("wood") && it.asleep }, "the raft floats still")
+        // fire to the trunk below the lowest boulder that leans on a tree
+        val b = boulders.filter { it.x > size.width * 0.15f }.maxBy { it.x }
+        val trunk = materials.id("trunk")
+        var tx = -1
+        var ty = -1
+        for (x in b.x.toInt() + 1..b.x.toInt() + 10) {
+            for (y in 0 until size.height) if (world.material(x, y) == trunk) { tx = x; ty = y }
+            if (tx >= 0) break
+        }
+        assertTrue(tx >= 0, "a tree below the boulder at ${b.x}")
+        // the whole tree set alight
+        for (y in ty - 30..ty) for (x in tx - 6..tx + 6) {
+            val m = world.material(x, y)
+            if (m == trunk || m == materials.id("leaves")) world.setTemperature(x, y, 500f)
+        }
+        val startX = b.x
+        var furthest = startX
+        repeat(1800) {
+            world.step()
+            world.bodyStates().filter { it.material == stone && it.cells > 20 }.forEach { if (it.x < startX + 60) furthest = maxOf(furthest, it.x) }
+        }
+        Pictures.write(world, Backdrop.of(world), "template_forest_rolled", scale = 2)
+        assertTrue(furthest > startX + 15, "the boulder rolled on down: from ${startX} to $furthest")
     }
 }
