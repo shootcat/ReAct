@@ -66,10 +66,12 @@ class TemplatesTest {
         val size = WorldSize.MEDIUM
         val world = World(size.width, size.height, materials, Terrain.SEED)
         Template.FOREST.build(world)
+        // the scenery behind, made once as the app does (made later, a raindrop would count as ground)
+        val backdrop = Backdrop.of(world)
         world.run(600)
         val stone = materials.id("stone")
         val boulders = world.bodyStates().filter { it.material == stone && it.cells > 20 }
-        Pictures.write(world, Backdrop.of(world), "template_forest_still", scale = 2)
+        Pictures.write(world, backdrop, "template_forest_still", scale = 2)
         assertTrue(boulders.size >= 3, "boulders on the slope: ${boulders.size}")
         // they lie still (one wedged between slope and trunk may wake now and then when the leaves change, it does not move)
         world.run(300)
@@ -97,7 +99,7 @@ class TemplatesTest {
             world.step()
             world.bodyStates().filter { it.material == stone && it.cells > 20 }.forEach { if (it.x < startX + 60) furthest = maxOf(furthest, it.x) }
         }
-        Pictures.write(world, Backdrop.of(world), "template_forest_rolled", scale = 2)
+        Pictures.write(world, backdrop, "template_forest_rolled", scale = 2)
         assertTrue(furthest > startX + 15, "the boulder rolled on down: from ${startX} to $furthest")
     }
 }

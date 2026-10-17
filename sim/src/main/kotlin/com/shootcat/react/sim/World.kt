@@ -370,6 +370,10 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     var pressureNanos = 0L
         private set
 
+    /** Time spent on structures and bodies so far (Phase 4), for the benchmark. */
+    var bodyNanos = 0L
+        private set
+
     /** How many structures are not anchored: since Phase 4 each of them is a body. */
     val looseStructures: Int get() = bodies.count
 
@@ -643,9 +647,11 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         heat()
         if (n > 0) update()
         living.randomTicks()
+        val tb = System.nanoTime()
         if (!structuresDirty) checkRoots()
         if (structuresDirty) findStructures()
         bodies.step()
+        bodyNanos += System.nanoTime() - tb
         if (step % WEATHER_EVERY == 0 && (cloudBase >= 0 || randomWeather || storm > 0)) weather()
         if (storm > 0) storm--
         if (step % PRESSURE_EVERY == 0) {

@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
  *
  * Lightning seeks metal and runs down it to its foot (3c.4): a post stood in the slot on top of the woodpile
  * kindles it; a post stood in the old post hole in the rock beside it takes the lightning away and keeps it, too
- * hot to touch; one put on the heap of sand falls over and makes glass. The storm lasts a little over two
+ * hot to touch; one stood on the heap of sand makes glass under it. The storm lasts a little over two
  * minutes, its rain wets the wood.
  *
  * Phase 4: the posts are bodies. Stood on a single cell a post falls over, so the pile has a slot one cell wide
@@ -160,7 +160,7 @@ class GewitterfeuerTest {
     }
 
     @Test
-    fun `a short post put on the heap of sand falls over there and makes glass, and kindles nothing`() {
+    fun `a short post stood on the heap of sand makes glass under it, and kindles nothing`() {
         val (play, r, strikes) = solve("sand", "wait 30\nhand 145 79\nhand 192 74")
         assertNull(r)
         assertTrue(strikes.count { it.material == "metal" && it.x in 186..199 } > 10, "the lightning goes into the post: ${strikes.map { it.x }}")

@@ -1,7 +1,8 @@
 # Elemente: Vorschläge, die noch nicht umgesetzt sind
 
 Hier stehen Materialien und Regeln, die erwogen, aber bewusst (noch) nicht gebaut wurden, jeweils mit
-Begründung. Grundlage ist der Leitfaden V3 (Abschnitt 2: Eigenschaften statt Rezepte).
+Begründung: Schwarzpulver (2d) und was der Körperphysik aus Phase 4 noch fehlt. Grundlage ist der Leitfaden V3
+(Abschnitt 2: Eigenschaften statt Rezepte).
 
 ## Schwarzpulver (Leitfaden V3, 4a.4.6)
 
@@ -39,3 +40,52 @@ Zur Einordnung: Grubengas (`firedamp`) ist leichter als Luft, sammelt sich unter
 (die Luft darüber flimmert leicht) und zündet an Feuer, Glut oder ab 580 °C als Ganzes. Die Stärke der
 Explosion folgt der Größe der Gaswolke. Die Gasspalte (`gas_vent`) ist Levelgelände wie Fels und gibt in
 Minenleveln ab und zu Grubengas ab.
+
+## Körperphysik: was in Phase 4 bewusst fehlt
+
+**Stand: nicht umgesetzt, nur Vorschläge.** Phase 4 („schlanke Fassung“) macht lose Strukturen zu starren
+Körpern (`Bodies.kt`, Bericht in [`PHASE4.md`](PHASE4.md)). Die folgenden Punkte waren ausdrücklich nicht Teil
+der Phase. Hier steht, wie sie sich auf den bestehenden Löser setzen ließen.
+
+### Brücken, die sich biegen und unter Last einstürzen
+
+- *Heute:* Eine Brücke, die Fels berührt, ist verankert und trägt jede Last. Ein Körper darauf ist nur Last,
+  er biegt nichts.
+- *Vorschlag:* Jede verankerte Struktur bekommt eine Tragfähigkeit aus der Festigkeit (`strength`) ihrer Zellen
+  und der Spannweite zwischen zwei Auflagen. Liegt mehr Gewicht darauf (Summe der ruhenden Körper und des Pulvers
+  darüber), bricht sie an ihrer dünnsten Stelle. Dafür gibt es schon das Zerbrechen aus Phase 4 (Kern und Risse).
+  Die Teile werden Körper und fallen. Biegen wäre nur eine Darstellung: Die Zellen sinken um eine Zelle in der
+  Mitte, bevor es bricht.
+- *Kosten:* eine Summe über die ruhenden Körper je Struktur, nur wenn sich etwas ändert.
+
+### Gelenke, Seile, Hebel
+
+- *Heute:* Körper hängen nicht aneinander; was sich berührt und ruht, wird ein Körper.
+- *Vorschlag:*
+  - Ein Gelenk ist ein Punkt, den zwei Körper (oder ein Körper und der Fels) teilen. Im Impulslöser ist das eine
+    weitere Bedingung neben den Kontakten: gleiche Geschwindigkeit an diesem Punkt.
+  - Ein Hebel ist ein Balken mit einem Gelenk am Fels.
+  - Ein Seil ist eine Kette kurzer Glieder mit Gelenken, gezeichnet als Zellen eines neuen Materials („Seil“,
+    brennbar).
+- *Kosten:* eine Bedingung mehr je Gelenk in jeder der acht Runden des Lösers. Mehr Sorgfalt braucht das
+  Rastern, damit Glieder sich nicht gegenseitig verdrängen.
+- *Spielidee:* Ein Seil durchbrennen lassen, und die Last fällt; mit einem Hebel einen Felsbrocken anheben.
+
+### Wasserströmung, die Körper mitträgt
+
+- *Heute:* Ein Körper im Wasser bekommt Auftrieb und Widerstand, aber das fließende Wasser schiebt ihn nicht.
+  Ein Floß auf einem Fluss bleibt liegen.
+- *Vorschlag:* Der Widerstand wirkt gegen die Geschwindigkeit des Körpers *relativ zum Wasser*. Die Strömung
+  ließe sich je Zeile aus der Bewegung der Wasserzellen im letzten Schritt schätzen (wie viele Zellen sich nach
+  links oder rechts bewegt haben). Dann treibt ein Floß mit, und ein Stamm verkeilt sich an einer Engstelle.
+- *Kosten:* ein Zähler je Wasserzelle, die sich bewegt, gesammelt nur entlang der Körper.
+
+### Pfosten stapeln
+
+- *Heute:* Zwei Pfosten von einer Zelle Breite stehen nicht übereinander, und ein Pfosten steht nicht auf einer
+  einzelnen Zelle. Das ist physikalisch nicht falsch (labiles Gleichgewicht), auf dem Raster aber strenger als in
+  Wirklichkeit, weil die Auflage nie genau mittig ist. Level 4 hat deshalb eine Steckfuge im Holzstoß und ein
+  Pfostenloch im Fels.
+- *Vorschlag:* Ein schmaler Körper, der senkrecht auf einer Fläche gleicher Breite ruht, wird mit ihr verbunden
+  (wie beim Verschmelzen ruhender Körper in Phase 4), solange nichts ihn anstößt. Er kippt erst bei einem Stoß
+  oder wenn sein Schwerpunkt deutlich neben der Auflage liegt.

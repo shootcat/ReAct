@@ -7,8 +7,7 @@ under it, out of the lightning's way, old fence posts of metal: one long, three 
 
 There is no fire in the level. A post stood in the slot on top of the woodpile is the highest metal under the
 cloud: the stroke runs down it and goes to ground in the wood. A post stood in the old post hole in the rock
-beside the pile takes it away; one put on the heap of sand at the end of the plateau falls over and makes glass
-where it lies.
+beside the pile takes it away; one stood on the heap of sand at the end of the plateau makes glass under it.
 """
 import sys, os, math
 sys.path.insert(0, os.path.dirname(__file__))

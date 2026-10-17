@@ -6,7 +6,7 @@ REACT wird ein Physik-Puzzle mit fein simulierter Materie, im Stil von Noita ode
 - Sand rieselt, Wasser fließt, Holz brennt, Lava erstarrt, Dampf steigt auf.
 - Was passiert, ergibt sich aus den **Eigenschaften** der Materialien (Dichte, Zündpunkt, Wärmeleitung …), nicht aus Rezepten.
 
-**Stand: Phase 3c (Atmosphäre und Wetter) ist fertig: Wolken, Regen und Schnee, Wind, Gewitter mit Blitzen, Wetterregler im Spielplatz. Phase 4 ist nicht begonnen.** Berichte: [`docs/PHASE1.md`](docs/PHASE1.md), [`docs/PHASE2.md`](docs/PHASE2.md), [`docs/PHASE3.md`](docs/PHASE3.md), [`docs/PHASE3B.md`](docs/PHASE3B.md), [`docs/PHASE3C.md`](docs/PHASE3C.md).
+**Stand: Phase 4 (Körperphysik, schlanke Fassung) ist fertig: Lose Strukturen sind starre Körper, sie fallen, kippen, rollen, schwimmen und zerbrechen; neue Vorlage „Wald am Hang“. Phase 5 (Bewohner) ist nicht begonnen.** Berichte: [`docs/PHASE1.md`](docs/PHASE1.md), [`docs/PHASE2.md`](docs/PHASE2.md), [`docs/PHASE3.md`](docs/PHASE3.md), [`docs/PHASE3B.md`](docs/PHASE3B.md), [`docs/PHASE3C.md`](docs/PHASE3C.md), [`docs/PHASE4.md`](docs/PHASE4.md).
 
 Die Raster-Version mit Leveln (Leitfaden V1 und V2) ist nicht mehr Teil dieses Branches. Sie liegt hier:
 - Commit `a7fc414` (Tag `grid-legacy`),
@@ -34,7 +34,8 @@ Alle Builds sind mit demselben Schlüssel signiert und installieren sich als Upd
      - **Küste** mit Steilküste und Strand;
      - **Berg mit Schnee** in kalter Luft, mit gefrorenem Teich;
      - **Vulkan** mit Krater, Schlot, Magmakammer und Meer;
-     - **Höhlensystem** mit Gängen, Kammern, Teichen, einer Gasspalte voll Grubengas und einer versiegelten Lavatasche.
+     - **Höhlensystem** mit Gängen, Kammern, Teichen, einer Gasspalte voll Grubengas und einer versiegelten Lavatasche;
+     - **Wald am Hang** (Phase 4): Bäume an einem langen Hang, an jedem zweiten lehnt ein Felsbrocken; unten ein See mit Floß. Brennt ein Baum, rollt sein Brocken in den See.
 2. **Material wählen** in der Leiste unten. Ausgeklappt hat sie zwei Zeilen: oben die Kategorien, darunter die Materialien oder Werkzeuge. Der Pfeil klappt sie auf eine schmale Zeile ein. Jede Karte zeigt die Körnung des Materials, den Vorrat (hier ∞) und die Kosten pro Einheit.
    - **Lose:** Sand, Erde, Kies, Lehm, Salz, Schnee, Geröll, Erzgeröll, Glasscherben, Holzkohle, Asche.
    - **Flüssig:** Wasser, Salzwasser, Lava, flüssiges Metall, Dampf, Wolke, Rauch, Grubengas.
@@ -46,7 +47,7 @@ Alle Builds sind mit demselben Schlüssel signiert und installieren sich als Upd
    - **Bauwerkzeuge** (Pinselform in der Ecke): Pinsel, Linie, Rechteck und Rahmen. Beim Ziehen zeigt eine halbtransparente Vorschau, was entsteht; Loslassen baut es. Das geht auch in der Pause.
    - **Werkzeug:**
      - Eimer: schöpft eine Sorte loses oder flüssiges Material, gießt es mit seiner Temperatur wieder aus, auch in Rauch oder Dampf, nicht in Feuer. Die erste Berührung legt die Sorte fest; beim Wischen wird nur diese geschöpft, und ein durchgehendes Wischen ist ein Handgriff. Ein kurzes Tippen mit dem Eimer dauert mindestens einen ganzen Zug (0,45 s), damit auch Pinsel 1 den Eimer ganz leert.
-     - Hand: trägt lose Objekte, nicht zu schwer, nicht zu heiß, nicht in Fels verankert; legt sie in Luft, Rauch oder Dampf ab. Ist die Hand gewählt, leuchtet alles auf, was sie gerade nehmen kann.
+     - Hand: trägt lose Objekte, nicht zu schwer, nicht zu heiß, nicht in Fels verankert; legt sie in Luft, Rauch oder Dampf ab. Feste Gegenstände legt sie als Körper ab: Sie fallen und kippen, wenn nichts sie hält (Phase 4). Ist die Hand gewählt, leuchtet alles auf, was sie gerade nehmen kann.
      - „Zu Brettern“ / „Ins Lager“: ein Stamm ergibt 3 Bretter pro Zelle. Loses aus dem Eimer (auch Lehm) kommt mit „Ins Lager“ ebenfalls ins Lager, Flüssiges nicht.
    - **Modus „nur Beschaffen“** (Menü): keine unendliche Leiste mehr, nur Eimer, Hand und das Lager. Gebaut wird mit dem, was beschafft wurde. Wie im Level reichen Eimer und Hand dann nur an das, was zum Himmel offen ist.
    - **Langes Drücken** (ein Finger, 0,45 s still): eine Karte zeigt Name, Temperatur, Zustand (heiß, brennt, nass, verankert) und ob Eimer und Hand es nehmen können, und wenn nicht, warum. Der Finger kann weiterwandern. Das ist kein Handgriff und verändert nichts.
@@ -89,7 +90,7 @@ Im Level reichen Eimer und Hand nur an das, was zum Himmel offen ist: an Luft, G
 | Trockener Teich | Wald, leicht | Fülle den Teich mit Wasser | Ast auf die Glut, der Stamm brennt durch (Gold); Erde aus dem Fenster schöpfen (Gold); Fenster anspülen (Silber); Rinne aufschütten (Silber); eimerweise tragen (Bronze) |
 | Signalfeuer | Vulkan, Kernniveau | Entzünde den Holzstoß auf dem Gipfel | Sand vom Strand auf dem Lavasee erhitzen und zweimal seitlich an den Holzstoß gießen: die erste Ladung taut, die zweite zündet (Gold); Schnee ins Meer räumen, dann heißer Sand (Silber); Salzwasser aus dem Meer taut den Schnee, dann heißer Sand (Silber) |
 | Tiefe Schmelze | Mine, Obergrenze | Bringe Glas in die tiefe Kammer | Salz taut das Eis, Sand auf dem Schlot zu Glas, mit Wasser abgeschreckt zu Scherben (Gold); Erdpfropf graben, Lava läuft aus, Sand darauf (Silber); Erzgeröll schmilzt zur Wärmebrücke (Silber) |
-| Gewitterfeuer | Hochland, Kernniveau | Entzünde den Holzstoß auf dem Plateau | Ein Gewitter, aber kein Feuer im Level: einen Metallpfosten auf den Holzstoß stellen, der Blitz läuft hinein (Gold); ein geerdeter Pfosten fängt die Blitze ab, zwei kurze übereinander auf dem Stoß überragen ihn (Silber); spät, wenn der Regen das Holz schon nässt (Bronze); noch später ist es zu nass |
+| Gewitterfeuer | Hochland, Kernniveau | Entzünde den Holzstoß auf dem Plateau | Ein Gewitter, aber kein Feuer im Level: einen Metallpfosten in die Steckfuge oben im Holzstoß stellen, der Blitz läuft hinein (Gold); ein Pfosten im Pfostenloch neben dem Stoß fängt die Blitze ab, ein kurzer in der Fuge überragt ihn (Silber); spät, solange das Gewitter dauert (Bronze); danach trifft kein Blitz mehr |
 | Regenmacher | Küste, Kernniveau | Bring das trockene Feld zum Grünen | Nur Salzwasser, und Salz tötet die Pflanzen: drei Eimer ins heiße Becken, der Dampf wird Wolke, der Wind treibt sie an die Steilwand, dort regnet sie Süßwasser aufs Feld (Gold); sechs Eimer (Silber); Salzwasser auf den heißen Tuff, langsamer (Bronze) |
 
 Die Bilder der Lösungswege liegen unter `docs/phase3/`, die Malskripte unter `tools/levels/`.
@@ -125,9 +126,15 @@ Das Modul ist reines Kotlin ohne Android. Es läuft identisch in den Tests auf d
   - Fließendes Wasser trägt lose Körner mit.
   - Dampf kondensiert beim Abkühlen zu Wasser, im Freien mit Kondensationshöhe zu Wolken (3c).
 - **Gase** steigen nach ihrer Dichte auf und verlassen die Welt nach oben. Unter Überhängen sammeln sie sich. Der Wind trägt sie seitlich mit und weht sie am Rand aus der Welt.
-- **Strukturen:** Zusammenhängende feste Zellen bilden eine Struktur. Berührt sie verankertes Gelände (Fels), steht sie, sonst fällt sie als Ganzes.
+- **Strukturen:** Zusammenhängende feste Zellen bilden eine Struktur. Hält sie verankertes Gelände (Fels als Decke oder als Wand, die höher reicht, nicht als Boden darunter), steht sie. Lebende Stämme und Ranken stehen durch ihre Wurzeln in festem Boden.
   - Pflanzen und Gebautes sind getrennte Strukturen; Laub und Ranken tragen nichts Schweres.
-  - Liegt der Schwerpunkt einer losen Struktur neben ihrer Auflage, rutscht sie über die Kante ab. Auf flachem Boden bleibt sie liegen, wie sie gelandet ist; echtes Umkippen (Drehen) kommt mit der Körperphysik in Phase 4.
+- **Körper (Phase 4, `Bodies.kt`):** Jede lose Struktur ist ein starrer Körper mit Lage, Drehung, Geschwindigkeit und Drehgeschwindigkeit, Masse und Trägheit aus ihren Zellen.
+  - Sie fällt, kippt, dreht sich und rollt; Reibung pro Material (`friction`), etwas Rückprall.
+  - Ihre Zellen bleiben Zellen der Welt: Sie brennen, schmelzen und gefrieren wie alle anderen. Ein durchgebrannter Stamm kippt um, ein Teil, das sich löst, wird ein eigener Körper.
+  - Sie schwimmt oder sinkt nach ihrer Dichte, Zeile für Zeile nach der Flüssigkeit daneben: Holz und Eis schwimmen, Stein und Metall sinken, ein Floß trägt eine kleine Last.
+  - Sie zerbricht bei einem harten Stoß nach Festigkeit und Aufprallenergie: Glas zu Scherben, Eis zu Stücken und zerstoßenem Eis; ein fallender Felsbrocken bricht eine Eisdecke.
+  - Ruht sie, schläft sie und kostet fast nichts; hält sie dann der Fels, wird sie wieder ein fester Teil der Welt.
+  - Ein eigener Löser auf dem Raster statt jbox2d (Begründung im Bericht), ohne Zufall und mit Undo.
 - **Druck und Explosionen:** Jeder geschlossene Gasbereich hat einen Druck (Gasmenge mal Temperatur, Dampf sechsfach). Übersteigt er die Festigkeit der schwächsten Wand (Glas 2 bis Metall 14, Fels nie), birst sie. Eine Explosion zerbricht Schwaches, entzündet Brennbares, löst Schnee und schleudert Pulver und Flüssigkeit fort. Wasser an Lava verdampft schlagartig.
 - **Licht** (`Light.kt`): ein Lichtfeld in Blöcken zu 2 × 2 Zellen, alle 8 Schritte neu.
   - Tageslicht fällt von oben ein und streut, Feuer, Glut, Lava, Glühendes und Glühwürmchen leuchten selbst.
@@ -164,18 +171,18 @@ Die Einheiten stehen in der Datei.
 | Material | Art | Verhalten (aus den Werten) |
 |---|---|---|
 | Fels | Gelände | unzerstörbar, verankert Strukturen, nicht in der Leiste |
-| Stein | fest (Struktur) | steht, wenn er Fels berührt, sonst fällt er als Ganzes; schmilzt bei 1150 °C zu Lava |
+| Stein | fest (Struktur) | steht, wenn Fels ihn hält; lose ist er ein Körper, der fällt, kippt und rollt, jeden Fall übersteht und in Wasser sinkt; schmilzt bei 1150 °C zu Lava |
 | Geröll | Pulver | schwer, rutscht kaum, schmilzt bei 1150 °C zu Lava |
 | Sand | Pulver | rieselt flach, sinkt in Wasser, saugt etwas Wasser auf, wird bei 1000 °C zu Glas |
 | Erde | Pulver | hält steile Hänge, nass rutscht sie, wird weggespült; ein Pfropf, dünn wie ein Korn, gibt dem Wasser nach |
 | Wasser | flüssig | fließt, kocht bei 100 °C (mit Verdampfungswärme), löscht |
-| Holz | fest (Struktur) | zündet bei 280 °C an der Luft, brennt mit Flammen über Glut, gelöscht zu Holzkohle, abgebrannt zu etwas Asche; als Floß bleibt es auf dem Wasser |
+| Holz | fest (Struktur) | zündet bei 280 °C an der Luft, brennt mit Flammen über Glut, gelöscht zu Holzkohle, abgebrannt zu etwas Asche; schwimmt, ein Floß trägt eine kleine Last |
 | Feuer | Gas | brennende Flamme, steigt, heizt stark, braucht Luft |
 | Rauch | Gas | steigt langsam, verdrängt Luft, verweht nach oben |
 | Dampf | Gas | steigt schnell, kondensiert unter 90 °C zu Wasser |
 | Lava | flüssig | zäh, 1250 °C, erstarrt unter 850 °C (mit Erstarrungswärme) zu Basalt |
 | Basalt | fest (Struktur) | dunkel und porös; erkaltete Lava; schmilzt zu Lava, zerbricht zu Geröll |
-| Glas | fest (Struktur) | durchsichtig; heiß mit Wasser, Eis oder Schnee abgeschreckt springt es zu Glasscherben, gibt unter Druck als Erstes nach |
+| Glas | fest (Struktur) | durchsichtig; heiß mit Wasser, Eis oder Schnee abgeschreckt springt es zu Glasscherben, ebenso bei einem Fall ab etwa 5 Zellen; gibt unter Druck als Erstes nach |
 | Glasscherben | Pulver | lassen Wasser durch, schmelzen bei 1000 °C wieder zu Glas |
 | Kies | Pulver | lässt Wasser durch (durch Dämme, in Höhlen darunter); Sand bleibt darauf liegen |
 | Lehm | Pulver | wasserdicht, nass weich, wird in großer Hitze zu Ziegel |
@@ -209,8 +216,9 @@ sim/                        Partikelsimulation, reines Kotlin (ohne Android)
   SimRunner.kt              eigener Thread, feste Schrittweite, fertige Bilder, Leistungswerte
   Renderer.kt               Pixelbild, Dunst- und Glühschicht, Hintergrund
   Terrain.kt                Wiese mit Teich (Startlandschaft), Rauschen nur aus Ganzzahl-Hashes
-  Templates.kt              Weltgrößen und die übrigen Vorlagen: Leeres Feld, Insel, Küste, Berg, Vulkan, Höhlen
-  Benchmark.kt              Schritte pro Sekunde: leere, voll aktive und belebte Welt, größte Welt
+  Templates.kt              Weltgrößen und die übrigen Vorlagen: Leeres Feld, Insel, Küste, Berg, Vulkan, Höhlen, Wald am Hang
+  Bodies.kt                 Körperphysik (Phase 4): starre Körper auf dem Zellraster, Stöße, Schwimmen, Zerbrechen, Schlafen
+  Benchmark.kt              Schritte pro Sekunde: leere, voll aktive und belebte Welt, größte Welt, dazu 150 Körper
 level/                      Level (Phase 3), reines Kotlin auf sim/
   Png.kt                    PNG-Leser ohne Android und AWT
   LevelSpec.kt, Level.kt    level.json, Boden aus terrain.png (Farbe = Material), Anker aus anchor.png
@@ -231,7 +239,9 @@ docs/PHASE1.md              Bericht zu Phase 1: Zusammenfassung, Abweichungen, M
 docs/PHASE2.md              Bericht zu Phase 1b und 2 (bis 2d): Zusammenfassung, Abweichungen, Messwerte
 docs/PHASE3.md              Bericht zu Phase 3: Level, Abweichungen, Messwerte, offene Fragen zur Freigabe
 docs/phase3/                Bilder der Lösungswege je Level
-docs/ELEMENTE.md            Vorschläge, die noch nicht umgesetzt sind (Schwarzpulver)
+docs/PHASE3B.md, PHASE3C.md Berichte zu 3b (Bedienung, Glühen, warme Luft) und 3c (Wetter, Level 4 und 5)
+docs/PHASE4.md              Bericht zu Phase 4: Körperphysik, geänderte Level, Leistung
+docs/ELEMENTE.md            Vorschläge, die noch nicht umgesetzt sind (Schwarzpulver; Brücken, Gelenke, Seile, Strömung)
 docs/v2/                    Unterlagen der Raster-Version (Leitfaden V2)
 ```
 

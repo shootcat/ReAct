@@ -15,6 +15,10 @@ object Benchmark {
         val msPerStep: Double,
         val awakeChunks: Int,
         val chunks: Int,
+        /** Of that, structures and bodies (Phase 4); how many bodies there were on average, how many moved. */
+        val bodyMs: Double = 0.0,
+        val bodies: Int = 0,
+        val movingBodies: Int = 0,
     )
 
     fun emptyWorld(materials: MaterialTable, width: Int, height: Int): World = World(width, height, materials, 1L)
@@ -99,18 +103,50 @@ object Benchmark {
         return world
     }
 
+    /**
+     * Like [livingWorld], every chunk awake, and on top [count] loose things (Phase 4): boulders, planks, logs,
+     * bars of metal, panes of glass, blocks of ice, dropped from the upper half into the churning world below,
+     * where they fall, tip, roll, float, sink, burn and break.
+     */
+    fun bodyWorld(materials: MaterialTable, width: Int, height: Int, count: Int = 150): World {
+        val world = livingWorld(materials, width, height)
+        val n = Noise(6L)
+        val kinds = listOf("stone", "wood", "deadwood", "metal", "glass", "ice", "brick")
+        for (k in 0 until count) {
+            val m = materials.id(kinds[k % kinds.size])
+            val cx = 6 + (n.hash(k, 1) * (width - 12)).toInt()
+            val cy = 6 + (n.hash(k, 2) * (height / 2 - 12)).toInt()
+            val big = 2 + (n.hash(k, 3) * 4).toInt()
+            if (k % 3 == 0) {
+                for (y in cy - big..cy + big) for (x in cx - big..cx + big) if ((x - cx) * (x - cx) + (y - cy) * (y - cy) <= big * big + big) world.set(x, y, m)
+            } else {
+                for (y in cy until cy + 2) for (x in cx - big * 2..cx + big * 2) world.set(x, y, m)
+            }
+        }
+        world.keepAllAwake = true
+        return world
+    }
+
     /** Measures [steps] steps after [warmup] steps, so the just-in-time compiler has settled (on the phone as well). */
     fun measure(name: String, world: World, steps: Int, warmup: Int = 300): Result {
         world.run(warmup)
         var awake = 0
+        var bodies = 0L
+        var moving = 0L
+        val b0 = world.bodyNanos
         val t0 = System.nanoTime()
         repeat(steps) {
             world.step()
             awake += world.awakeChunks
+            bodies += world.bodyCount
+            moving += world.awakeBodies
         }
         val ns = System.nanoTime() - t0
         val secs = ns / 1e9
-        return Result(name, steps, steps / secs, ns / 1e6 / steps, awake / steps, world.chunksX * world.chunksY)
+        return Result(
+            name, steps, steps / secs, ns / 1e6 / steps, awake / steps, world.chunksX * world.chunksY,
+            (world.bodyNanos - b0) / 1e6 / steps, (bodies / steps).toInt(), (moving / steps).toInt(),
+        )
     }
 
     /**
@@ -147,6 +183,7 @@ object Benchmark {
             measure("Größte Welt $size, voll aktiv mit Pflanzen, Tieren und Licht", livingWorld(materials, big.width, big.height), steps),
             measure("Größte Welt $size, Wiese mit Feuer, Sand und Wasser", sandboxWorld(materials, big.width, big.height), steps),
             measure("Größte Welt $size, dieselbe Wiese mit Wind, Wolken und Gewitter", weatherWorld(materials, big.width, big.height), steps),
+            measure("Größte Welt $size, voll aktiv belebt, dazu 150 Körper", bodyWorld(materials, big.width, big.height), steps),
         )
     }
 
@@ -162,8 +199,8 @@ object Benchmark {
         appendLine("Gerät: $device")
         for (r in results) {
             appendLine(
-                "%s: %.0f Schritte/s (%.2f ms pro Schritt, %d von %d Chunks wach, %d Schritte gemessen)"
-                    .format(r.name, r.stepsPerSecond, r.msPerStep, r.awakeChunks, r.chunks, r.steps),
+                "%s: %.0f Schritte/s (%.2f ms pro Schritt, %d von %d Chunks wach, %d Schritte gemessen; Körper %.2f ms, %d Körper, %d bewegt)"
+                    .format(r.name, r.stepsPerSecond, r.msPerStep, r.awakeChunks, r.chunks, r.steps, r.bodyMs, r.bodies, r.movingBodies),
             )
         }
         if (renderMs != null) appendLine("Bild erzeugen: %.2f ms".format(renderMs))

@@ -274,13 +274,16 @@ class AppSmokeTest {
         restoreDefaults()
     }
 
-    /** Portrait (4a.5): the snowy mountain and the caves, the bar folded to one slim row and out again. */
+    /**
+     * Portrait (4a.5): the snowy mountain, the caves, the island, the coast and the wooded slope with its boulders
+     * (Phase 4), the bar folded to one slim row and out again.
+     */
     @Test
     fun templatesAndFoldedBar(): Unit = ActivityScenario.launch(MainActivity::class.java).use {
         compose.waitForIdle()
         compose.onNodeWithText("Spielplatz").performClick()
         run(800)
-        for ((template, name) in listOf("MOUNTAIN" to "23_berg", "CAVES" to "24_hoehlen", "ISLAND" to "25_insel", "COAST" to "26_kueste")) {
+        for ((template, name) in listOf("MOUNTAIN" to "23_berg", "CAVES" to "24_hoehlen", "ISLAND" to "25_insel", "COAST" to "26_kueste", "FOREST" to "45_wald_am_hang")) {
             compose.onNodeWithContentDescription("Menü").performClick()
             compose.onNodeWithText("Neue Welt …").performClick()
             compose.waitForIdle()
