@@ -497,13 +497,16 @@ internal object Templates {
         k.grass(surface)
         // trees on the slope; against every other one, uphill, a boulder
         val stone = k.id("stone")
+        // each boulder, log and the raft is an object of its own (Phase 4b): touching, they stay apart
         fun boulder(cx: Int, r: Int) {
             var cy = Int.MAX_VALUE
             for (x in cx - r..cx + r) if (x in 0 until w) cy = min(cy, surface[x])
             cy -= r + 1
+            world.startPiece()
             for (y in cy - r..cy + r) for (x in cx - r..cx + r) {
                 if ((x - cx) * (x - cx) + (y - cy) * (y - cy) <= r * r + r && k.at(x, y) == k.air) k.put(x, y, stone)
             }
+            world.endPiece()
         }
         val grass = k.id("grass")
         var x = ledge + (w * 0.05f).toInt()
@@ -525,11 +528,15 @@ internal object Templates {
         val deadwood = k.id("deadwood")
         for ((x0, len) in listOf((shore * 0.84f).toInt() to 12, (shore * 0.9f).toInt() to 9)) {
             val y = surface[x0 + len / 2] - 3
+            world.startPiece()
             for (yy in y..y + 1) for (xx in x0 until x0 + len) if (k.at(xx, yy) == k.air) k.put(xx, yy, deadwood)
+            world.endPiece()
         }
         val wood = k.id("wood")
         val rx = (w * 0.72f).toInt()
+        world.startPiece()
         for (yy in level - 2..level - 1) for (xx in rx until rx + 16) k.put(xx, yy, wood)
+        world.endPiece()
         k.birds(listOf((w * 0.3f).toInt(), (w * 0.45f).toInt()))
     }
 

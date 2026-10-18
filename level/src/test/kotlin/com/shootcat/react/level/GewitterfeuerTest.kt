@@ -138,8 +138,11 @@ class GewitterfeuerTest {
 
     @Test
     fun `a post stood on the pile even later, as long as the storm lasts, bronze`() {
-        // the plateau drains into the cave (Phase 4): the rain wets the wood only on top, it still burns
-        val (_, r) = lateOnPile(130, 180)
+        // the plateau drains into the cave (Phase 4): the rain wets the wood only on top, it still burns. Whether
+        // a stroke still kindles it this late is chance. Measured (4b, with floating and riding): a post put there
+        // at 95, 115, 120 or 125 s kindles it; at 100, 105, 110 and 130 s no stroke did before the storm passed
+        // (at 105 s six went into the post and the wet pile did not catch)
+        val (_, r) = lateOnPile(120, 180)
         assertEquals(Medal.BRONZE, assertNotNull(r).medal)
     }
 
@@ -152,10 +155,18 @@ class GewitterfeuerTest {
 
     @Test
     fun `a post in the rock beside the pile takes every stroke, and is too hot to take back`() {
-        val (play, r, strikes) = solve("geerdet", "wait 30\nhand 142 79\nhand 185 79\nwait 900\nhand 185 75")
+        val (play, r, strikes) = solve("geerdet", "wait 30\nhand 142 79\nhand 185 79\nwait 900")
         assertNull(r)
         assertEquals(72, count(play, "wood"), "nothing burnt")
         assertTrue(strikes.count { it.x == 185 } > 10, "the lightning goes into the post: ${strikes.map { it.x }}")
+        // reaching for it just after the next stroke into it
+        val w = play.session.world
+        var steps = 0
+        while (!(w.boltAge == BOLT_NEW && w.boltX[w.boltLength - 1] == 185) && steps < 3600) {
+            play.session.tick()
+            steps++
+        }
+        play.perform(Action.parse("wait 30\nhand 185 75"), limitSeconds = 0)
         assertEquals("Zu heiß zum Anfassen", play.session.notice)
     }
 

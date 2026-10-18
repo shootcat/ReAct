@@ -114,10 +114,20 @@ class SignalfeuerTest {
         val snow = listOf(145 to 14, 138 to 20).joinToString("") { (x, y) -> "scoop $x $y 6 20\npour 29 60 3 20\n" }
         val (play, r) = solve("krater", "wait 60\n" + snow + "wait 1800\n" + hotSand(136, 18) + "wait 300\n" + hotSand(136, 18), limit = 90)
         assertNull(r)
-        // since Phase 4 pieces of the crust are bodies and some sink into the lava still liquid (basalt is
-        // heavier): 153 cells of basalt in the lake instead of 166, 96 of lava instead of 83
-        println("crater: ${count(play, "basalt", 14, 60, 44, 76)} basalt, ${count(play, "lava", 14, 60, 44, 76)} lava")
-        assertTrue(count(play, "basalt", 14, 60, 44, 76) > 150, "a crust of basalt over the lake: ${count(play, "basalt", 14, 60, 44, 76)}")
+        // since Phase 4 pieces of the crust are bodies and sink into the lava still liquid (basalt is heavier);
+        // since 4b loose pieces no longer grow together, so more of them sink and melt again: the crust is the
+        // part that froze in place, three to four rows (Phase 3: 166 cells, Phase 4: 153, 4b: 98). It covers the
+        // lake all over: no lava lies open to the air
+        val w = play.session.world
+        val lava = mt.id("lava")
+        var open = 0
+        for (y in 60..76) for (x in 14..44) {
+            if (w.material(x, y) != lava) continue
+            if (mt.kind[w.material(x, y - 1)] == com.shootcat.react.sim.Kind.GAS) open++
+        }
+        println("crater: ${count(play, "basalt", 14, 60, 44, 76)} basalt, ${count(play, "lava", 14, 60, 44, 76)} lava, $open open to the air")
+        assertTrue(count(play, "basalt", 14, 60, 44, 76) > 80, "a crust of basalt over the lake: ${count(play, "basalt", 14, 60, 44, 76)}")
+        assertEquals(0, open, "the lava is covered")
         assertEquals(80, count(play, "wood"))
     }
 

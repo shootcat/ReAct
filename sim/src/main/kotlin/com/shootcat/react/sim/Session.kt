@@ -198,6 +198,8 @@ class Session(
         bx = x
         by = y
         lastAnimal = NO_ANIMAL
+        // what one stroke builds is one piece (Phase 4b): it holds together, and only with itself
+        world.startPiece()
         strokeStart = true
         dab(x, y)
         strokeStart = false
@@ -228,6 +230,7 @@ class Session(
         if (!down) return
         log += Release(world.step)
         down = false
+        world.endPiece()
     }
 
     /**
@@ -240,7 +243,9 @@ class Session(
         log += Shape(world.step, kind, x0, y0, x1, y1, tool, size)
         this.tool = tool
         this.radius = size
+        world.startPiece()
         applyShape(kind, x0, y0, x1, y1, tool, size)
+        world.endPiece()
     }
 
     private fun applyShape(kind: ShapeKind, x0: Int, y0: Int, x1: Int, y1: Int, tool: Int, size: Int) {

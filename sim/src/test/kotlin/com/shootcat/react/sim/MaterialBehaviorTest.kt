@@ -142,8 +142,9 @@ class MaterialBehaviorTest {
         lab.rect("lava", 2, 50, 61, 61, 1300f)
         lab.world.paint(lab.id("ore_rubble"), 31, 44, 4)
         var molten = 0
-        repeat(8) {
-            lab.seconds(1f)
+        // looked at every tenth of a second: it melts, sinks to the cool rock floor and sets there within a second
+        repeat(80) {
+            lab.world.run(6)
             molten = maxOf(molten, lab.count("molten_metal"))
         }
         assertTrue(molten > 5, "molten metal: $molten")

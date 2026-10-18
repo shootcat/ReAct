@@ -40,6 +40,14 @@ internal class Body(val id: Int) {
     var still = 0
     var stuck = 0
 
+    /**
+     * Round (a log seen end on, a boulder): it touches a surface at one point and rolls (Phase 4b). Its outline
+     * is the same however it is turned, so its cells keep their places in the grid while it rolls (a turned
+     * raster would catch on every step of a slope); how far it has rolled is [spin], for drawing it.
+     */
+    var round = false
+    var spin = 0f
+
     /** All of it is plant (a fallen tree, a burnt-off crown): its roots may take hold again. */
     var plant = false
 
@@ -74,6 +82,24 @@ internal class Body(val id: Int) {
     /** Other bodies it pressed against in its last step. */
     var touch = IntArray(4)
     var touches = 0
+
+    /**
+     * Riding (Phase 4b): a body lying still on another one that moves (a stone on a floating raft) goes along with
+     * it: [carrier] is that body's id, and the rider keeps its place in the carrier's frame ([rideX], [rideY], turned
+     * by [rideCs], [rideSn] against it). Its weight presses on the carrier. [rideStill] counts the steps it lay still
+     * on it before it got on. A carrier knows its riders.
+     */
+    var carrier = 0
+    var rideX = 0f
+    var rideY = 0f
+    var rideCs = 1f
+    var rideSn = 0f
+    var rideStill = 0
+    var riders = IntArray(2)
+
+    /** In its last step it waited for another body to move out of its way. */
+    var waited = false
+    var riderCount = 0
 }
 
 /**
@@ -98,8 +124,11 @@ internal class Bodies(private val world: World) {
     private val life = world.life
     private val variant = world.variant
     private val flags = world.flags
+    private val piece = world.piece
     private val kind = mt.kind
     private val dens = FloatArray(mt.count) { maxOf(MIN_DENSITY, mt.density[it] / 1000f) }
+    // liquids that level out (water): the water line a little way off; a thick one (lava) stands as it lies
+    private val thin = BooleanArray(mt.count) { mt.viscosity[it] < World.LEVEL_VISCOSITY }
     private val fric = mt.friction
     private val plantOf = mt.plant
     private val softOf = mt.soft
@@ -144,6 +173,8 @@ internal class Bodies(private val world: World) {
     fun forget(b: Body) = remove(b)
 
     private fun remove(b: Body) {
+        dropRiders(b)
+        if (b.carrier != 0) getOff(b)
         for (k in 0 until b.n) if (bodyAt[b.at[k]] == b.id) bodyAt[b.at[k]] = 0
         slots[b.id - 1] = null
         count--
@@ -185,30 +216,6 @@ internal class Bodies(private val world: World) {
         b.vx = vx
         b.vy = vy
         return b
-    }
-
-    /** Merges bodies resting against each other into one, where they are, with their common motion. */
-    private fun merge(parts: Array<Body>, k: Int) {
-        var n = 0
-        var px = 0f
-        var py = 0f
-        var m = 0f
-        for (j in 0 until k) {
-            n += parts[j].n
-            px += parts[j].vx * parts[j].mass
-            py += parts[j].vy * parts[j].mass
-            m += parts[j].mass
-        }
-        val cells = IntArray(n)
-        var c = 0
-        for (j in 0 until k) {
-            val p = parts[j]
-            p.at.copyInto(cells, c, 0, p.n)
-            c += p.n
-            remove(p)
-        }
-        cells.sort()
-        create(cells, n, px / m, py / m)
     }
 
     /** Mass, centre of weight and inertia from the cells; the body stays where it is. */
@@ -257,6 +264,26 @@ internal class Bodies(private val world: World) {
         b.inertia = inertia
         b.radius = sqrt(r2)
         outline(b)
+        b.round = b.n >= ROUND_CELLS && roundness(b) > ROUND
+    }
+
+    /** How round [b] is: the nearest of its rim cells to its centre against the farthest (a disc about 0.9, a square 0.71). */
+    private fun roundness(b: Body): Float {
+        var near = Float.MAX_VALUE
+        var far = 0f
+        for (k in 0 until b.n) {
+            val x = b.lx[k] - b.ox
+            val y = b.ly[k] - b.oy
+            val rim = x == 0 || y == 0 || x == b.ow - 1 || y == b.oh - 1 ||
+                !b.occ[y * b.ow + x - 1] || !b.occ[y * b.ow + x + 1] || !b.occ[(y - 1) * b.ow + x] || !b.occ[(y + 1) * b.ow + x]
+            if (!rim) continue
+            val rx = b.lx[k] - b.comX
+            val ry = b.ly[k] - b.comY
+            val d = rx * rx + ry * ry
+            if (d < near) near = d
+            if (d > far) far = d
+        }
+        return if (far == 0f) 0f else sqrt(near / far)
     }
 
     /** Which cells of its own frame [b] fills. */
@@ -316,6 +343,8 @@ internal class Bodies(private val world: World) {
      */
     private fun sync(b: Body): Boolean {
         b.dirty = false
+        if (b.carrier != 0) getOff(b)
+        dropRiders(b)
         var keep = 0
         for (k in 0 until b.n) {
             if (bodyAt[b.at[k]] != b.id) continue
@@ -423,6 +452,7 @@ internal class Bodies(private val world: World) {
             nb.py = opy
             nb.cs = b.cs
             nb.sn = b.sn
+            nb.spin = b.spin
             nb.plant = b.plant
             massProps(nb)
             // a piece flies on with the motion its place in the whole had
@@ -455,6 +485,11 @@ internal class Bodies(private val world: World) {
         while (s < slots.size) {
             val b = slots[s++] ?: continue
             if (b.dirty && !sync(b)) continue
+            // a rider goes where its carrier takes it; on a carrier at rest it gets off if something changes round it
+            if (b.carrier != 0) {
+                if (slots[b.carrier - 1]?.asleep != true || !disturbed(b)) continue
+                wake(b)
+            }
             if (b.asleep) {
                 if (!disturbed(b)) continue
                 wake(b)
@@ -466,9 +501,11 @@ internal class Bodies(private val world: World) {
     }
 
     fun wake(b: Body) {
+        if (b.carrier != 0) getOff(b)
         b.asleep = false
         b.still = 0
         b.stuck = 0
+        for (r in 0 until b.riderCount) slots[b.riders[r] - 1]?.asleep = false
     }
 
     // scratch for drawing a body into the grid: the cells of a trial pose, of the last pose taken, exact places
@@ -496,6 +533,10 @@ internal class Bodies(private val world: World) {
     private var outX = 0f
     private var outY = 0f
 
+    /** The last collision was only with other bodies that move (none asleep or lying on the ground, no ground). */
+    private var onlyBodies = false
+    private var waitedNow = false
+
     private fun ensure(n: Int) {
         if (cand.size >= n) return
         val s = maxOf(n, cand.size * 2)
@@ -515,6 +556,7 @@ internal class Bodies(private val world: World) {
         b.touches = 0
         impacts = 0
         b.vy += G
+        floatPull = G
         val wet = buoyancy(b)
         if (b.vx > VMAX) b.vx = VMAX else if (b.vx < -VMAX) b.vx = -VMAX
         if (b.vy > VMAX) b.vy = VMAX else if (b.vy < -VMAX) b.vy = -VMAX
@@ -530,11 +572,20 @@ internal class Bodies(private val world: World) {
         var py = b.py
         var cs = b.cs
         var sn = b.sn
+        val opx = px
+        val opy = py
+        val ocs = cs
+        val osn = sn
         bestValid = false
         var blocked = 0
         var contact = false
+        val roll = b.round
+        waitedNow = false
+        // a cell held tight on both sides (a post in a slot, a bar in a crack) cannot turn: a square in a square hole
+        val clamped = clamped(b)
+        if (clamped) b.w = 0f
         for (s in 0 until steps) {
-            var turn = b.w * inv
+            var turn = if (roll) 0f else b.w * inv
             var c1 = cs * cosOf(turn) - sn * sinOf(turn)
             var s1 = sn * cosOf(turn) + cs * sinOf(turn)
             var nx = px + b.vx * inv
@@ -546,7 +597,7 @@ internal class Bodies(private val world: World) {
             }
             contact = true
             collide(b, nx, ny)
-            turn = b.w * inv
+            turn = if (roll) 0f else b.w * inv
             c1 = cs * cosOf(turn) - sn * sinOf(turn)
             s1 = sn * cosOf(turn) + cs * sinOf(turn)
             nx = px + b.vx * inv
@@ -554,6 +605,12 @@ internal class Bodies(private val world: World) {
             if (tryPose(b, nx, ny, c1, s1)) {
                 px = nx; py = ny; cs = c1; sn = s1
                 continue
+            }
+            // against a body that moves itself (a stone lying on a floating raft) it waits a step for it to move on:
+            // pushed back out it would jump, and shake what lies on it; two that wait on each other are pushed apart
+            if (onlyBodies && !b.waited) {
+                waitedNow = true
+                break
             }
             // pushed back out along the surfaces it hit: a body turning over an edge lifts a little at the edge
             val ox = outX
@@ -568,6 +625,7 @@ internal class Bodies(private val world: World) {
             }
             if (++blocked >= 2) break
         }
+        b.waited = waitedNow
         // keep the turn a true turn: lengths stay one
         val len = sqrt(cs * cs + sn * sn)
         cs /= len
@@ -576,13 +634,25 @@ internal class Bodies(private val world: World) {
         b.py = py
         b.cs = cs
         b.sn = sn
+        if (roll) b.spin += b.w
         var moved = false
         if (bestValid) {
             for (k in 0 until b.n) if (best[k] != b.at[k]) {
                 moved = true
                 break
             }
-            if (moved) commit(b, best)
+        }
+        if (b.riderCount > 0) {
+            // what rides on it goes along, all in one move; if one of them cannot, the carrier stays where it was
+            if (!carry(b, if (bestValid) best else b.at)) {
+                b.px = opx
+                b.py = opy
+                b.cs = ocs
+                b.sn = osn
+                moved = false
+            }
+        } else if (moved) {
+            commit(b, best)
         }
         if (contact) b.w *= ROLL
         if (moved && !b.asleep && b.vy > FALL_NOTE && b.still == 0 && b.stuck == 0) world.note(Seen.FALL, b.main)
@@ -600,20 +670,301 @@ internal class Bodies(private val world: World) {
             b.stuck++
             val slow = maxOf(if (b.vx < 0f) -b.vx else b.vx, if (b.vy < 0f) -b.vy else b.vy) +
                 (if (b.w < 0f) -b.w else b.w) * b.radius < SLEEP_SPEED
-            if (slow) b.still++ else b.still = 0
+            // floating, it rests only where the lift holds its weight, not at the low point of a bob; lighter than the
+            // liquid and all under it, it rises on, however slowly (glass in lava)
+            val held = wet == 0f || (if (floatPull < 0f) -floatPull else floatPull) < FLOAT_REST && !(wet >= SUNK && floatPull < 0f)
+            if (slow && held) b.still++ else b.still = 0
         }
         if (wet > 0f && b.still > 0) world.note(Seen.FLOAT, b.main)
-        if (b.still >= SLEEP_STEPS || b.stuck >= STUCK_STEPS || (b.touches > 0 && b.still >= MERGE_STEPS)) rest(b)
+        // lying still on a body that moves (a raft on the water), it rides along
+        if (b.riderCount == 0 && b.touches > 0) {
+            val o = carrierUnder(b)
+            if (o != null && stillOn(b, o)) {
+                if (++b.rideStill >= RIDE_STEPS) {
+                    getOn(b, o)
+                    return
+                }
+            } else {
+                b.rideStill = 0
+            }
+        }
+        if (b.still >= SLEEP_STEPS || b.stuck >= STUCK_STEPS) {
+            // it may only rest where it stands: on a tip or with its weight beside its foot it goes over
+            if (wet == 0f && !standing(b)) {
+                b.still = 0
+                b.stuck = 0
+                return
+            }
+            rest(b)
+        }
+    }
+
+    /**
+     * [b] stands where it rests (Phase 4b): its centre of weight is over the cells it stands on, and it does
+     * not balance on a tip or an edge (standing on a foot far narrower than itself). Otherwise it is given the
+     * slightest turn towards the side its weight is on (or, exactly balanced, one way by its number), and the
+     * weight does the rest: it tips slowly at first, then faster and faster. Lying on nothing (floating,
+     * held at the sides) it stands.
+     */
+    private fun standing(b: Body): Boolean {
+        val w = width
+        val id = b.id
+        var minX = Int.MAX_VALUE
+        var maxX = Int.MIN_VALUE
+        for (k in 0 until b.n) {
+            val c = b.at[k]
+            val u = c + w
+            if (u >= size || bodyAt[u] == id || !hard(b, u)) continue
+            val x = c % w
+            if (x < minX) minX = x
+            if (x > maxX) maxX = x
+        }
+        if (minX > maxX) return true
+        val foot = maxX - minX + 1
+        val reach = b.x1 - b.x0 + 1
+        val centre = (minX + maxX) * 0.5f
+        val off = b.px - centre
+        val over = b.px >= minX - 0.5f + OVER_EDGE && b.px <= maxX + 0.5f - OVER_EDGE
+        val tip = foot * TIP_RATIO < reach && foot <= TIP_FOOT
+        if (over && !tip) return true
+        val side = if (off > 0.05f) 1f else if (off < -0.05f) -1f else if (id and 1 == 0) 1f else -1f
+        b.w += side * NUDGE
+        return false
+    }
+
+    /** The one body [b] stands on, if all it stands on is that body and it moves (floats, slides), not a rider itself. */
+    private fun carrierUnder(b: Body): Body? {
+        val w = width
+        var id = 0
+        for (k in 0 until b.n) {
+            val c = b.at[k]
+            val u = c + w
+            if (u >= size || bodyAt[u] == b.id || !hard(b, u)) continue
+            val o = bodyAt[u]
+            if (o == 0 || (id != 0 && o != id)) return null
+            id = o
+        }
+        if (id == 0) return null
+        val o = slots[id - 1] ?: return null
+        if (o.asleep || o.carrier != 0 || o.round || world.step - o.ground <= GROUNDED) return null
+        return o
+    }
+
+    /**
+     * [b] floats off what it lies on: it is lighter than the liquid that stands beside it from its bottom row up
+     * past half its height (glass on a crust of basalt that sinks into the lava, a plank on a sinking stone). A
+     * stone on a raft awash stays on it.
+     */
+    private fun inLiquid(b: Body): Boolean {
+        val w = width
+        for (y in b.y0..b.y1) {
+            rowMin[y] = Int.MAX_VALUE
+            rowMax[y] = Int.MIN_VALUE
+        }
+        for (k in 0 until b.n) {
+            val c = b.at[k]
+            val x = c % w
+            val y = c / w
+            if (x < rowMin[y]) rowMin[y] = x
+            if (x > rowMax[y]) rowMax[y] = x
+        }
+        var wet = 0
+        var rho = 0f
+        for (y in b.y1 downTo b.y0) {
+            if (rowMin[y] > rowMax[y]) continue
+            val l = if (rowMin[y] > 0) mat[y * w + rowMin[y] - 1].toInt() else AIR
+            val r = if (rowMax[y] < w - 1) mat[y * w + rowMax[y] + 1].toInt() else AIR
+            val lw = kind[l] == Kind.LIQUID
+            val rw = kind[r] == Kind.LIQUID
+            if (!lw && !rw) break
+            if (lw && dens[l] > rho) rho = dens[l]
+            if (rw && dens[r] > rho) rho = dens[r]
+            wet++
+        }
+        return wet * 2 > b.y1 - b.y0 + 1 && b.mass < rho * b.n
+    }
+
+    /** [b] moves no differently from [o] under it, and [o] is not leaning further than [b] could lie on it. */
+    private fun stillOn(b: Body, o: Body): Boolean {
+        if (inLiquid(b)) return false
+        val dvx = b.vx - (o.vx - o.w * (b.py - o.py))
+        val dvy = b.vy - (o.vy + o.w * (b.px - o.px))
+        val dw = b.w - o.w
+        if (abs(dvx) + abs(dvy) + abs(dw) * b.radius > RIDE_SPEED) return false
+        return !sliding(b, o)
+    }
+
+    /** [o] leans more than [b] could lie on it without sliding off (by the rubbing between the two). */
+    private fun sliding(b: Body, o: Body): Boolean {
+        val mu = minOf(fric[b.main], fric[o.main])
+        val up = maxOf(abs(o.cs), abs(o.sn))
+        return up * up * (1f + mu * mu) < 1f
+    }
+
+    private fun abs(v: Float) = if (v < 0f) -v else v
+
+    /** [b] gets on [o]: from now on it keeps its place on it. */
+    private fun getOn(b: Body, o: Body) {
+        val dx = b.px - o.px
+        val dy = b.py - o.py
+        b.rideX = o.cs * dx + o.sn * dy
+        b.rideY = -o.sn * dx + o.cs * dy
+        b.rideCs = o.cs * b.cs + o.sn * b.sn
+        b.rideSn = o.cs * b.sn - o.sn * b.cs
+        b.carrier = o.id
+        b.rideStill = 0
+        b.vx = 0f
+        b.vy = 0f
+        b.w = 0f
+        b.asleep = true
+        if (o.riderCount == o.riders.size) o.riders = o.riders.copyOf(o.riderCount * 2)
+        o.riders[o.riderCount++] = b.id
+    }
+
+    /** [b] gets off its carrier, moving on as it moved with it. */
+    private fun getOff(b: Body) {
+        val o = slots[b.carrier - 1]
+        b.carrier = 0
+        b.asleep = false
+        b.still = 0
+        b.stuck = 0
+        if (o == null) return
+        b.vx = o.vx - o.w * (b.py - o.py)
+        b.vy = o.vy + o.w * (b.px - o.px)
+        b.w = o.w
+        var j = 0
+        for (r in 0 until o.riderCount) if (o.riders[r] != b.id) o.riders[j++] = o.riders[r]
+        o.riderCount = j
+    }
+
+    /** [b] lets everything riding on it go. */
+    private fun dropRiders(b: Body) {
+        while (b.riderCount > 0) {
+            val o = slots[b.riders[b.riderCount - 1] - 1]
+            if (o == null) {
+                b.riderCount--
+                continue
+            }
+            getOff(o)
+        }
+    }
+
+    private val blockMark = IntArray(size)
+    private var blockStamp = 0
+    private val heldMark = IntArray(size)
+    private var heldStamp = 0
+    private var riderNext = arrayOf(IntArray(64))
+
+    /**
+     * Moves [b] into [next] together with its riders, each to its place on it (set a little higher where the
+     * raster of the turned carrier steps up under it). A rider that would slide off because [b] leans too far,
+     * or does not fit, gets off and goes on by itself; if [b] would move into it, nothing moves and false is
+     * returned.
+     */
+    private fun carry(b: Body, next: IntArray): Boolean {
+        val n0 = b.n
+        if (riderNext.size < b.riderCount + 1) riderNext = Array(b.riderCount + 1) { IntArray(64) }
+        if (riderNext[0].size < n0) riderNext[0] = IntArray(n0)
+        next.copyInto(riderNext[0], 0, 0, n0)
+        if (++blockStamp == Int.MAX_VALUE) {
+            blockMark.fill(0)
+            blockStamp = 1
+        }
+        for (k in 0 until n0) blockMark[riderNext[0][k]] = blockStamp
+        groupCount = 0
+        groupBodies[groupCount++] = b
+        var r = 0
+        while (r < b.riderCount) {
+            val o = slots[b.riders[r] - 1]
+            if (o == null) {
+                b.riders[r] = b.riders[--b.riderCount]
+                continue
+            }
+            // in the water (the carrier sinks) it floats or sinks by itself
+            if (inLiquid(o)) {
+                for (k in 0 until o.n) if (blockMark[o.at[k]] == blockStamp) {
+                    getOff(o)
+                    return false
+                }
+                getOff(o)
+                continue
+            }
+            val px = b.px + b.cs * o.rideX - b.sn * o.rideY
+            val py = b.py + b.sn * o.rideX + b.cs * o.rideY
+            val cs = b.cs * o.rideCs - b.sn * o.rideSn
+            val sn = b.sn * o.rideCs + b.cs * o.rideSn
+            var lift = 0f
+            var fits = !sliding(o, b) && rideFits(b, o, px, py, cs, sn)
+            while (!fits && !sliding(o, b) && lift < RIDE_LIFT) {
+                lift += 0.5f
+                fits = rideFits(b, o, px + b.sn * lift, py - b.cs * lift, cs, sn)
+            }
+            if (!fits) {
+                // it goes on by itself; the carrier must not move into it
+                for (k in 0 until o.n) if (blockMark[o.at[k]] == blockStamp) {
+                    getOff(o)
+                    return false
+                }
+                getOff(o)
+                continue
+            }
+            if (lift > 0f) o.rideY -= lift
+            o.px = px + b.sn * lift
+            o.py = py - b.cs * lift
+            o.cs = cs
+            o.sn = sn
+            if (riderNext.size <= groupCount) riderNext = riderNext.copyOf(groupCount * 2).let { a -> Array(a.size) { a[it] ?: IntArray(64) } }
+            if (riderNext[groupCount].size < o.n) riderNext[groupCount] = IntArray(o.n)
+            cand.copyInto(riderNext[groupCount], 0, 0, o.n)
+            for (k in 0 until o.n) blockMark[cand[k]] = blockStamp
+            if (groupCount == groupBodies.size) groupBodies = groupBodies.copyOf(groupCount * 2)
+            groupBodies[groupCount++] = o
+            r++
+        }
+        commitGroup()
+        return true
+    }
+
+    private var groupBodies = arrayOfNulls<Body>(4)
+    private var groupCount = 0
+
+    /** Rider [o] of [b] can be at the pose: none of its cells where the carrier or another rider goes, or in anything else. */
+    private fun rideFits(b: Body, o: Body, px: Float, py: Float, cs: Float, sn: Float): Boolean {
+        ensure(o.n)
+        if (!place(o, px, py, cs, sn, cand)) return false
+        for (k in 0 until o.n) {
+            val g = cand[k]
+            if (blockMark[g] == blockStamp) return false
+            val id = bodyAt[g]
+            if (id == o.id || id == b.id) continue
+            if (id != 0) {
+                // another rider's place it leaves, if that rider is already on its way
+                var gone = false
+                for (j in 1 until groupCount) if (groupBodies[j]!!.id == id) gone = true
+                if (!gone) return false
+                continue
+            }
+            if (!passable(o, g)) return false
+        }
+        return true
+    }
+
+    /** One of the cells of [b] has something hard right and left of it, or above and below. */
+    private fun clamped(b: Body): Boolean {
+        val w = width
+        for (k in 0 until b.n) {
+            val c = b.at[k]
+            val x = c % w
+            if (x > 0 && x < w - 1 && hard(b, c - 1) && hard(b, c + 1)) return true
+            if (c >= w && c + w < size && hard(b, c - w) && hard(b, c + w)) return true
+        }
+        return false
     }
 
     /** Draws [b] at the pose into [cand] and takes it if every cell is free; then it is the pose of [best]. */
     private fun tryPose(b: Body, px: Float, py: Float, cs: Float, sn: Float): Boolean {
         if (!place(b, px, py, cs, sn, cand)) return false
-        val id = b.id
-        for (k in 0 until b.n) {
-            val g = cand[k]
-            if (bodyAt[g] != id && !passable(b, g)) return false
-        }
+        for (k in 0 until b.n) if (hard(b, cand[k])) return false
         val t = best
         best = cand
         cand = t
@@ -688,7 +1039,7 @@ internal class Bodies(private val world: World) {
         val w = width
         var best = -1
         var bd = Float.MAX_VALUE
-        for (r in 1..2) {
+        for (r in 1..NEAREST_REACH) {
             for (dy in -r..r) for (dx in -r..r) {
                 if (dx > -r && dx < r && dy > -r && dy < r) continue
                 val x = gx + dx
@@ -765,8 +1116,13 @@ internal class Bodies(private val world: World) {
         return k == Kind.STATIC || flags[c].toInt() and Flag.ANCHORED != 0 || (k == Kind.POWDER && dens[q] >= FIRM_GROUND)
     }
 
-    /** Neither the body's own cell nor one it may pass: something it hits. */
-    private fun hard(b: Body, c: Int): Boolean = bodyAt[c] != b.id && !passable(b, c)
+    /** Neither the body's own cell nor one it may pass, nor one of what rides on it: something it hits. */
+    private fun hard(b: Body, c: Int): Boolean {
+        val id = bodyAt[c]
+        if (id == b.id) return false
+        if (id != 0 && b.riderCount > 0 && slots[id - 1]?.carrier == b.id) return false
+        return !passable(b, c)
+    }
 
     // manifold points of one collision
     private val pK = IntArray(MAX_POINTS)
@@ -847,6 +1203,31 @@ internal class Bodies(private val world: World) {
                         sy = -1f
                     }
                 }
+                // another body's surface is one of its four sides, however its turned cells step in the grid (a stone
+                // on a raft that leans a little stands on its deck, not on the edge of a step in the raster)
+                val o = if (owner != 0) slots[owner - 1] else null
+                if (o != null && !o.round) {
+                    var best = sx * o.cs + sy * o.sn
+                    var bx = o.cs
+                    var by = o.sn
+                    if (-best > best) {
+                        best = -best
+                        bx = -o.cs
+                        by = -o.sn
+                    }
+                    val side = -sx * o.sn + sy * o.cs
+                    if (side > best) {
+                        best = side
+                        bx = -o.sn
+                        by = o.cs
+                    }
+                    if (-side > best) {
+                        bx = o.sn
+                        by = -o.cs
+                    }
+                    sx = bx
+                    sy = by
+                }
             }
             val l = sqrt(sx * sx + sy * sy)
             ck[nc] = k
@@ -858,7 +1239,17 @@ internal class Bodies(private val world: World) {
         if (nc == 0) {
             outX = 0f
             outY = -1f
+            onlyBodies = false
             return
+        }
+        onlyBodies = true
+        for (c in 0 until nc) {
+            val g = cg[c]
+            val o = if (g >= 0 && bodyAt[g] != 0) slots[bodyAt[g] - 1] else null
+            if (o == null || o.asleep || world.step - o.ground <= GROUNDED) {
+                onlyBodies = false
+                break
+            }
         }
         // group the contacts by what was hit and which way it faces
         var groups = 0
@@ -931,6 +1322,13 @@ internal class Bodies(private val world: World) {
             val first = np
             if (gSmax[gi] - gSmin[gi] < 1f) {
                 np = point(b, np, (fxs[ck[a]] + fxs[ck[z]]) * 0.5f, (fys[ck[a]] + fys[ck[z]]) * 0.5f, ck[a], cg[a], gSx[gi], gSy[gi], nx, ny)
+            } else if (b.round) {
+                // a round body touches at one point, under its centre: the corners of its cells do not hold it, it rolls
+                val sc = (-gSy[gi] * nx + gSx[gi] * ny).coerceIn(gSmin[gi], gSmax[gi])
+                val t = (sc - gSmin[gi]) / (gSmax[gi] - gSmin[gi])
+                val kk = if (t < 0.5f) ck[a] else ck[z]
+                val gg = if (t < 0.5f) cg[a] else cg[z]
+                np = point(b, np, fxs[ck[a]] + (fxs[ck[z]] - fxs[ck[a]]) * t, fys[ck[a]] + (fys[ck[z]] - fys[ck[a]]) * t, kk, gg, gSx[gi], gSy[gi], nx, ny)
             } else {
                 np = point(b, np, fxs[ck[a]], fys[ck[a]], ck[a], cg[a], gSx[gi], gSy[gi], nx, ny)
                 np = point(b, np, fxs[ck[z]], fys[ck[z]], ck[z], cg[z], gSx[gi], gSy[gi], nx, ny)
@@ -1156,6 +1554,7 @@ internal class Bodies(private val world: World) {
     private var bl = ShortArray(64)
     private var bv = ByteArray(64)
     private var bf = ByteArray(64)
+    private var bp = ShortArray(64)
     private var entered = IntArray(64)
     private var left = IntArray(64)
     private var dm = ByteArray(64)
@@ -1163,37 +1562,71 @@ internal class Bodies(private val world: World) {
     private var dl = ShortArray(64)
     private var dv = ByteArray(64)
     private var df = ByteArray(64)
+    private var eUsed = BooleanArray(64)
+    private var lWet = IntArray(64)
+    private var lDone = BooleanArray(64)
+
+    /** Moves the cells of [b] into [next]. */
+    private fun commit(b: Body, next: IntArray) {
+        groupBodies[0] = b
+        groupCount = 1
+        if (riderNext.isEmpty()) riderNext = arrayOf(IntArray(64))
+        if (riderNext[0].size < b.n) riderNext[0] = IntArray(b.n)
+        next.copyInto(riderNext[0], 0, 0, b.n)
+        commitGroup()
+    }
 
     /**
-     * Moves the cells of [b] into [next]. What was in the cells it moves into (air, water, …) takes the places
-     * it left, in order; leaves and vines in the way are torn off and come down as withered leaves.
+     * Moves the cells of the [groupCount] bodies in [groupBodies] into [riderNext], all at once (a carrier and what
+     * rides on it). What was in the cells they move into (air, water, …) is put aside: water closes round them
+     * without gaps, at the surface beside them, as spray if they came fast; air takes the places they left.
+     * Leaves and vines in the way are torn off and come down as withered leaves.
      */
-    private fun commit(b: Body, next: IntArray) {
-        val n = b.n
+    private fun commitGroup() {
+        var n = 0
+        for (j in 0 until groupCount) n += groupBodies[j]!!.n
         if (bm.size < n) {
             val s = maxOf(n, bm.size * 2)
-            bm = ByteArray(s); bt = FloatArray(s); bl = ShortArray(s); bv = ByteArray(s); bf = ByteArray(s)
+            bm = ByteArray(s); bt = FloatArray(s); bl = ShortArray(s); bv = ByteArray(s); bf = ByteArray(s); bp = ShortArray(s)
             entered = IntArray(s); left = IntArray(s)
             dm = ByteArray(s); dtp = FloatArray(s); dl = ShortArray(s); dv = ByteArray(s); df = ByteArray(s)
+            eUsed = BooleanArray(s); lWet = IntArray(s); lDone = BooleanArray(s)
         }
         if (++claimMark == Int.MAX_VALUE) {
             claim.fill(0)
             claimMark = 1
         }
-        val id = b.id
+        if (++heldStamp == Int.MAX_VALUE) {
+            heldMark.fill(0)
+            heldStamp = 1
+        }
         var ne = 0
         var nl = 0
-        for (k in 0 until n) {
-            val c = b.at[k]
-            bm[k] = mat[c]
-            bt[k] = temp[c]
-            bl[k] = life[c]
-            bv[k] = variant[c]
-            bf[k] = flags[c]
-            claim[next[k]] = claimMark
-            if (bodyAt[next[k]] != id) entered[ne++] = next[k]
+        var at = 0
+        for (j in 0 until groupCount) {
+            val g = groupBodies[j]!!
+            val next = riderNext[j]
+            for (k in 0 until g.n) {
+                val c = g.at[k]
+                bm[at] = mat[c]
+                bt[at] = temp[c]
+                bl[at] = life[c]
+                bv[at] = variant[c]
+                bf[at] = flags[c]
+                bp[at] = piece[c]
+                heldMark[c] = heldStamp
+                claim[next[k]] = claimMark
+                at++
+            }
         }
-        for (k in 0 until n) if (claim[b.at[k]] != claimMark) left[nl++] = b.at[k]
+        for (j in 0 until groupCount) {
+            val g = groupBodies[j]!!
+            val next = riderNext[j]
+            for (k in 0 until g.n) {
+                if (heldMark[next[k]] != heldStamp) entered[ne++] = next[k]
+                if (claim[g.at[k]] != claimMark) left[nl++] = g.at[k]
+            }
+        }
         java.util.Arrays.sort(entered, 0, ne)
         java.util.Arrays.sort(left, 0, nl)
         val w = width
@@ -1204,7 +1637,7 @@ internal class Bodies(private val world: World) {
             if (softOf[q]) {
                 // torn off
                 val o = bodyAt[c]
-                if (o != 0 && o != id) slots[o - 1]?.dirty = true
+                if (o != 0) slots[o - 1]?.dirty = true
                 dm[e] = deadPlant.toByte()
                 dtp[e] = temp[c]
                 dl[e] = 0
@@ -1219,30 +1652,174 @@ internal class Bodies(private val world: World) {
                 df[e] = flags[c]
             }
         }
-        for (e in 0 until minOf(ne, nl)) {
-            val c = left[e]
-            mat[c] = dm[e]
-            temp[c] = dtp[e]
-            life[c] = dl[e]
-            variant[c] = dv[e]
-            flags[c] = df[e]
-            bodyAt[c] = 0
-            world.wakeHeat(c % w, c / w)
+        // where what it put aside goes (Phase 4b): the water closes round the body without gaps
+        val splash = groupBodies[0]!!.vy > SPLASH_SPEED
+        for (e in 0 until ne) eUsed[e] = false
+        for (l in 0 until nl) {
+            lWet[l] = wetBeside(left[l])
+            lDone[l] = false
         }
-        for (k in 0 until n) {
-            val c = next[k]
-            mat[c] = bm[k]
-            temp[c] = bt[k]
-            life[c] = bl[k]
-            variant[c] = bv[k]
-            flags[c] = bf[k]
-            if (bodyAt[c] != id) world.wakeHeat(c % w, c / w)
-            bodyAt[c] = id
-            b.at[k] = c
+        // a place it left under water takes the water it moved into (sinking, moving along in the water)
+        var e0 = 0
+        for (l in 0 until nl) {
+            if (lWet[l] < 0) continue
+            while (e0 < ne && (eUsed[e0] || kind[dm[e0].toInt()] != Kind.LIQUID)) e0++
+            if (e0 == ne) break
+            putBack(left[l], e0)
+            lDone[l] = true
+        }
+        // water it pushed down and aside goes to the surface beside it (a little wave), or up as spray if it came fast
+        for (e in 0 until ne) {
+            if (eUsed[e] || kind[dm[e].toInt()] != Kind.LIQUID) continue
+            val c = freeBeside(entered[e], splash)
+            if (c >= 0) putBack(c, e)
+        }
+        // a place it left under water that is still empty: the water runs in from the surface beside
+        for (l in 0 until nl) {
+            if (lDone[l] || lWet[l] < 0) continue
+            if (pullSurface(left[l], lWet[l])) lDone[l] = true
+        }
+        // the rest as before: what it moved into takes the places it left (liquid first, so none is lost), or air
+        for (l in 0 until nl) {
+            if (lDone[l]) continue
+            var pick = -1
+            for (e in 0 until ne) if (!eUsed[e] && kind[dm[e].toInt()] == Kind.LIQUID) {
+                pick = e
+                break
+            }
+            if (pick < 0) for (e in 0 until ne) if (!eUsed[e]) {
+                pick = e
+                break
+            }
+            if (pick >= 0) {
+                putBack(left[l], pick)
+            } else {
+                val c = left[l]
+                mat[c] = AIR.toByte()
+                temp[c] = world.ambient
+                life[c] = 0
+                variant[c] = 0
+                flags[c] = 0
+                world.wakeHeat(c % w, c / w)
+            }
+            lDone[l] = true
+        }
+        for (l in 0 until nl) {
+            piece[left[l]] = 0
+            bodyAt[left[l]] = 0
+        }
+        at = 0
+        for (j in 0 until groupCount) {
+            val g = groupBodies[j]!!
+            val next = riderNext[j]
+            for (k in 0 until g.n) {
+                val c = next[k]
+                mat[c] = bm[at]
+                temp[c] = bt[at]
+                life[c] = bl[at]
+                variant[c] = bv[at]
+                flags[c] = bf[at]
+                piece[c] = bp[at]
+                if (bodyAt[c] != g.id) world.wakeHeat(c % w, c / w)
+                bodyAt[c] = g.id
+                g.at[k] = c
+                at++
+            }
+            bounds(g)
         }
         world.gasMoved()
         if (tore) world.structuresMoved()
-        bounds(b)
+    }
+
+    /** The content [e] the body moved out of its way goes into cell [c]. */
+    private fun putBack(c: Int, e: Int) {
+        mat[c] = dm[e]
+        temp[c] = dtp[e]
+        life[c] = dl[e]
+        variant[c] = dv[e]
+        flags[c] = df[e]
+        eUsed[e] = true
+        world.wakeHeat(c % width, c / width)
+    }
+
+    /** The liquid next to cell [c] (not where the moving bodies are or go), or -1: the place is under water. */
+    private fun wetBeside(c: Int): Int {
+        val w = width
+        val x = c % w
+        for (n in intArrayOf(if (x > 0) c - 1 else -1, if (x < w - 1) c + 1 else -1, c + w, c - w)) {
+            if (n < 0 || n >= size || claim[n] == claimMark || heldMark[n] == heldStamp) continue
+            val q = mat[n].toInt()
+            if (kind[q] == Kind.LIQUID) return q
+        }
+        return -1
+    }
+
+    /** Air or gas a liquid may be put into: not where the body is going to be, nor another body. */
+    private fun open(c: Int): Boolean {
+        if (claim[c] == claimMark || bodyAt[c] != 0) return false
+        val q = mat[c].toInt()
+        return q == AIR || kind[q] == Kind.GAS
+    }
+
+    /**
+     * The nearest free place for water pushed out of cell [c]: along the same row and then the rows above, out to
+     * either side, a place with something under it (the surface beside the body); for a splash a place a few rows
+     * higher up, in the air, from where it falls back. -1 if there is none near.
+     */
+    private fun freeBeside(c: Int, splash: Boolean): Int {
+        val w = width
+        val x = c % w
+        val y = c / w
+        val lift = if (splash) SPLASH_LIFT else 0
+        for (dy in lift..DISPLACE_REACH) {
+            val yy = y - dy
+            if (yy < 0) break
+            for (dx in 0..DISPLACE_REACH) {
+                for (sgn in 0..1) {
+                    if (dx == 0 && sgn == 1) continue
+                    val xx = if (sgn == 0) x - dx else x + dx
+                    if (xx < 0 || xx >= w) continue
+                    val g = yy * w + xx
+                    if (!open(g)) continue
+                    if (!splash && (g + w >= size || open(g + w))) continue
+                    return g
+                }
+            }
+        }
+        return -1
+    }
+
+    /** Fills cell [c] with liquid [m] from the nearest surface cell of it (liquid with air above), if one is near. */
+    private fun pullSurface(c: Int, m: Int): Boolean {
+        val w = width
+        val x = c % w
+        val y = c / w
+        for (dy in 0..DISPLACE_REACH) {
+            val yy = y - dy
+            if (yy < 1) break
+            for (dx in 0..DISPLACE_REACH) {
+                for (sgn in 0..1) {
+                    if (dx == 0 && sgn == 1) continue
+                    val xx = if (sgn == 0) x - dx else x + dx
+                    if (xx < 0 || xx >= w) continue
+                    val g = yy * w + xx
+                    if (mat[g].toInt() != m || bodyAt[g] != 0 || claim[g] == claimMark || !open(g - w)) continue
+                    mat[c] = mat[g]
+                    temp[c] = temp[g]
+                    life[c] = life[g]
+                    variant[c] = variant[g]
+                    flags[c] = flags[g]
+                    mat[g] = AIR.toByte()
+                    temp[g] = world.ambient
+                    life[g] = 0
+                    flags[g] = 0
+                    world.wakeHeat(c % w, c / w)
+                    world.wakeHeat(xx, yy)
+                    return true
+                }
+            }
+        }
+        return false
     }
 
     // per row of the world: the leftmost and rightmost cell of the body there, the liquid at its ends
@@ -1276,11 +1853,11 @@ internal class Bodies(private val world: World) {
             if (rowMin[y] <= rowMax[y]) {
                 if (rowMin[y] > 0) {
                     val l = y * w + rowMin[y] - 1
-                    if (bodyAt[l] != id && kind[mat[l].toInt()] == Kind.LIQUID) rho = dens[mat[l].toInt()]
+                    if (bodyAt[l] != id && kind[mat[l].toInt()] == Kind.LIQUID && deepBeside(b, l)) rho = dens[mat[l].toInt()]
                 }
                 if (rowMax[y] < w - 1) {
                     val r = y * w + rowMax[y] + 1
-                    if (bodyAt[r] != id && kind[mat[r].toInt()] == Kind.LIQUID && dens[mat[r].toInt()] > rho) rho = dens[mat[r].toInt()]
+                    if (bodyAt[r] != id && kind[mat[r].toInt()] == Kind.LIQUID && deepBeside(b, r) && dens[mat[r].toInt()] > rho) rho = dens[mat[r].toInt()]
                 }
             }
             rowRho[y] = rho
@@ -1293,24 +1870,35 @@ internal class Bodies(private val world: World) {
                 val c = b.at[k]
                 if (c < w) continue
                 val u = c - w
-                if (bodyAt[u] != id && kind[mat[u].toInt()] == Kind.LIQUID) {
+                if (bodyAt[u] != id && kind[mat[u].toInt()] == Kind.LIQUID && !cupped(b, u)) {
                     if (u / w < surface) surface = u / w
                     if (dens[mat[u].toInt()] > rho) rho = dens[mat[u].toInt()]
                 }
             }
-            if (rho == 0f) return 0f
+            // (under it too: water poured onto its top only weighs on it)
+            if (rho == 0f || !wetBelow(b)) return 0f
             for (y in b.y0..b.y1) rowRho[y] = rho
             surface -= 1
         }
         // the row above the surface takes the part of its cells that the body, sinking, has already put under
         if (surface > b.y0 && rowRho[surface - 1] == 0f) rowRho[surface - 1] = rowRho[surface]
-        // the top edge of the highest liquid cell beside it
-        val line = surface - 0.5f
+        // the water line (Phase 4b): the level of the liquid a little way off to either side, so it does not jump
+        // by a whole row as the body sinks a cell and puts the water aside; else the top of the liquid beside it
+        var line = surface - 0.5f
+        var deep = rowRho[surface.coerceIn(b.y0, b.y1)]
+        // liquid over its top row as well (right over it or beside it): it is all under, the surface is higher up
+        if (surface == b.y0 && b.y0 > 0 && over(b)) line -= 1f
+        val level = levelBeside(b)
+        if (level >= 0f) {
+            line = level
+            deep = levelRho
+        }
         var f = 0f
         var share = 0f
         var mx = 0f
         for (k in 0 until b.n) {
-            val rho = rowRho[b.at[k] / w]
+            var rho = rowRho[b.at[k] / w]
+            if (rho == 0f && level >= 0f) rho = deep
             if (rho == 0f) continue
             val rx = b.lx[k] - b.comX
             val ry = b.ly[k] - b.comY
@@ -1324,13 +1912,130 @@ internal class Bodies(private val world: World) {
         }
         if (f == 0f) return 0f
         val force = f * G
-        b.vy -= force / b.mass
-        b.w -= (mx / f) * force / b.inertia
+        // what rides on it weighs on it too: it sinks deeper and leans towards the load
+        var mass = b.mass
+        var inertia = b.inertia
+        var load = 0f
+        for (r in 0 until b.riderCount) {
+            val o = slots[b.riders[r] - 1] ?: continue
+            val dx = o.px - b.px
+            val dy = o.py - b.py
+            mass += o.mass
+            inertia += o.inertia + o.mass * (dx * dx + dy * dy)
+            load += o.mass * dx
+        }
+        // gravity pulls the riders and the carrier down alike; the riders' weight beside the centre turns it
+        if (mass > b.mass) b.w += load * G / inertia
+        b.vy -= force / mass
+        b.w -= (mx / f) * force / inertia
+        floatPull = G - force / mass
         share /= b.n
         b.vx *= 1f - DRAG * share
         b.vy *= 1f - DRAG * share
         b.w *= 1f - SPIN_DRAG * share
         return share
+    }
+
+    private var levelRho = 0f
+
+    /** Liquid right under a cell of [b]'s bottom row. */
+    private fun wetBelow(b: Body): Boolean {
+        val w = width
+        for (k in 0 until b.n) {
+            val c = b.at[k]
+            if (c / w != b.y1 || c + w >= size) continue
+            if (bodyAt[c + w] != b.id && kind[mat[c + w].toInt()] == Kind.LIQUID) return true
+        }
+        return false
+    }
+
+    /**
+     * The liquid at [c] beside [b] reaches down unbroken as deep as the body (or under it): it is the water the
+     * body lies in, not a drop falling past nor water standing on snow beside its top, which lift nothing.
+     */
+    private fun deepBeside(b: Body, c: Int): Boolean {
+        val w = width
+        var d = c + w
+        while (d < size && d / w <= b.y1) {
+            if (bodyAt[d] == b.id) return true
+            if (kind[mat[d].toInt()] != Kind.LIQUID) return false
+            d += w
+        }
+        return true
+    }
+
+    /**
+     * The liquid at [u] lies in a hollow of [b] itself (water caught between the logs of a pile): the body has
+     * cells to either side of it in that row (from [rowMin], [rowMax]). It goes along and does not lift it.
+     */
+    private fun cupped(b: Body, u: Int): Boolean {
+        val y = u / width
+        val x = u % width
+        return y >= b.y0 && rowMin[y] < x && x < rowMax[y]
+    }
+
+    /** Liquid right over a cell of [b]'s top row or diagonally over its ends. */
+    private fun over(b: Body): Boolean {
+        val w = width
+        val y = b.y0
+        val from = maxOf(0, rowMin[y] - 1)
+        val to = minOf(w - 1, rowMax[y] + 1)
+        for (x in from..to) {
+            val c = (y - 1) * w + x
+            if (bodyAt[c] != b.id && kind[mat[c].toInt()] == Kind.LIQUID) {
+                val below = c + w
+                if (x == from || x == to || bodyAt[below] == b.id) return true
+            }
+        }
+        return false
+    }
+
+    /** What gravity and the lift of the liquid leave over on the body in this step (cells per step per step). */
+    private var floatPull = 0f
+
+    /**
+     * Where the surface of the liquid a body floats in lies (the top edge of its highest cell), as the mean over
+     * [LEVEL_SPAN] columns on either side from [LEVEL_OFF] cells off it (the water it puts aside heaps up right
+     * beside it, and the waves it makes rock it on and on if it feels them), counting only liquid that reaches down
+     * unbroken as deep as the body; or -1 if there is none or it is a thick
+     * liquid such as lava, which does not level out (then the liquid right beside it counts); [levelRho] is the
+     * density of that liquid.
+     */
+    private fun levelBeside(b: Body): Float {
+        val w = width
+        var sum = 0f
+        var n = 0
+        levelRho = 0f
+        for (j in 0 until 2 * LEVEL_SPAN) {
+            val col = if (j < LEVEL_SPAN) b.x0 - LEVEL_OFF - j else b.x1 + LEVEL_OFF + j - LEVEL_SPAN
+            if (col < 0 || col >= w) continue
+            var y = maxOf(0, b.y0 - LEVEL_LOOK)
+            val end = minOf(height - 1, b.y1 + 1)
+            while (y <= end) {
+                val q = mat[y * w + col].toInt()
+                if (kind[q] == Kind.LIQUID && bodyAt[y * w + col] == 0) {
+                    if (!thin[q]) return -1f
+                    // only open water: something solid right over it is a ceiling, not a surface; and water that reaches
+                    // down unbroken as deep as the body, not water lying on snow or on a ledge beside it
+                    val up = if (y > 0) mat[(y - 1) * w + col].toInt() else AIR
+                    var down = y + 1
+                    while (down <= b.y1 && kind[mat[down * w + col].toInt()] == Kind.LIQUID) down++
+                    if ((up == AIR || kind[up] == Kind.GAS) && down > b.y1) {
+                        sum += y - 0.5f
+                        n++
+                        if (dens[q] > levelRho) levelRho = dens[q]
+                        break
+                    }
+                    // a drop falling past: the surface is further down
+                    if (down > b.y1 || mat[down * w + col].toInt() != AIR) break
+                    y = down
+                    continue
+                }
+                if (q != AIR && kind[q] != Kind.GAS) break
+                y++
+            }
+        }
+        return if (n == 0) -1f else sum / n
     }
 
     /**
@@ -1358,7 +2063,8 @@ internal class Bodies(private val world: World) {
                 if (kind[q] == Kind.SOLID && breakProduct[q] >= 0 && flags[g].toInt() and Flag.ANCHORED == 0) {
                     val limit = HIT_BREAK * strength[q] * strength[q]
                     val energy = e * impM[j]
-                    if (energy > limit) shatter(g, q, energy / limit, body(bodyAt[g]))
+                    // what breaks through breaks a hole at least as wide as itself (Phase 4b)
+                    if (energy > limit) shatter(g, q, energy / limit, body(bodyAt[g]), punch = b.radius + 0.5f)
                 }
                 if (v >= SHAKE_SPEED) world.shake(g % w, g / w, SHAKE_RADIUS)
             }
@@ -1377,11 +2083,11 @@ internal class Bodies(private val world: World) {
         shatter(c, m, SHOCK, b, mt.shockProduct[m], Seen.CRACK)
     }
 
-    private fun shatter(c: Int, m: Int, q: Float, owner: Body?, product: Int = breakProduct[m], seen: Int = Seen.SHATTER) {
+    private fun shatter(c: Int, m: Int, q: Float, owner: Body?, product: Int = breakProduct[m], seen: Int = Seen.SHATTER, punch: Float = 0f) {
         val w = width
         val x0 = c % w
         val y0 = c / w
-        val r = minOf(MAX_CORE, CORE + CORE_GROW * q)
+        val r = maxOf(minOf(MAX_CORE, CORE + CORE_GROW * q), minOf(MAX_PUNCH, punch))
         world.note(seen, m)
         if (owner != null && owner.n <= r * r * WHOLE) {
             for (k in 0 until owner.n) {
@@ -1422,31 +2128,11 @@ internal class Bodies(private val world: World) {
     // ------------------------------------------------------------------ rest and waking
 
     /**
-     * [b] lies still. Resting against another body that lies still too, they become one. Otherwise it lies
-     * square if it is nearly so, and goes to sleep; if it is anchored (or a plant has taken root) it becomes
-     * a fixed part of the world again.
+     * [b] lies still: it lies square if it is nearly so, and goes to sleep; if it is anchored (or a plant has
+     * taken root) it becomes a fixed part of the world again. Bodies resting against each other stay apart
+     * (Phase 4b): only what was made in one stroke holds together.
      */
     private fun rest(b: Body) {
-        if (b.touches > 0) {
-            val parts = arrayOfNulls<Body>(b.touches + 1)
-            var k = 0
-            parts[k++] = b
-            for (t in 0 until b.touches) {
-                val o = slots[b.touch[t] - 1] ?: continue
-                if (o === b || parts.any { it === o }) continue
-                if (!o.asleep && o.still < MERGE_STEPS / 2 && world.step - o.ground > GROUNDED) {
-                    // it rests on something still moving: wait
-                    b.still = MERGE_STEPS / 2
-                    return
-                }
-                parts[k++] = o
-            }
-            if (k > 1) {
-                @Suppress("UNCHECKED_CAST")
-                merge(parts as Array<Body>, k)
-                return
-            }
-        }
         // it fell over on its way here: turned by about a quarter, not rolled on and on
         if (b.turned in TOPPLE_FROM..TOPPLE_TO) world.note(Seen.TOPPLE, b.main)
         b.turned = 0f
@@ -1460,10 +2146,21 @@ internal class Bodies(private val world: World) {
         b.vy = 0f
         b.w = 0f
         b.support = fingerprint(b)
+        // what rides on it rests with it, still on board: when it wakes (a raft on the water) they go on together,
+        // and its weight is on it from the first step
+        for (r in 0 until b.riderCount) {
+            val o = slots[b.riders[r] - 1] ?: continue
+            o.asleep = true
+            o.vx = 0f
+            o.vy = 0f
+            o.w = 0f
+            o.support = fingerprint(o)
+        }
     }
 
     /** Turns a body lying nearly square the last bit, if there is room. */
     private fun square(b: Body) {
+        if (b.round) return
         val a = if (b.sn < 0f) -b.sn else b.sn
         val c = if (b.cs < 0f) -b.cs else b.cs
         if (a < 1e-6f || c < 1e-6f) return
@@ -1562,12 +2259,14 @@ internal class Bodies(private val world: World) {
             ints += b.touches
             for (t in 0 until b.touches) ints += b.touch[t]
             ints += b.ground
+            ints += b.carrier; ints += b.rideStill
             for (k in 0 until b.n) {
                 ints += b.lx[k]; ints += b.ly[k]; ints += b.at[k]
             }
             floats += b.comX; floats += b.comY; floats += b.mass; floats += b.inertia; floats += b.radius
             floats += b.px; floats += b.py; floats += b.cs; floats += b.sn
-            floats += b.vx; floats += b.vy; floats += b.w; floats += b.turned
+            floats += b.vx; floats += b.vy; floats += b.w; floats += b.turned; floats += b.spin
+            floats += b.rideX; floats += b.rideY; floats += b.rideCs; floats += b.rideSn
             longs += b.support
         }
         return Saved(ints.toIntArray(), floats.toFloatArray(), longs.toLongArray())
@@ -1593,6 +2292,8 @@ internal class Bodies(private val world: World) {
             b.touches = ints[i++]
             for (t in 0 until b.touches) b.touch[t] = ints[i++]
             b.ground = ints[i++]
+            b.carrier = ints[i++]
+            b.rideStill = ints[i++]
             b.lx = IntArray(b.n)
             b.ly = IntArray(b.n)
             b.at = IntArray(b.n)
@@ -1601,7 +2302,8 @@ internal class Bodies(private val world: World) {
             }
             b.comX = s.floats[f++]; b.comY = s.floats[f++]; b.mass = s.floats[f++]; b.inertia = s.floats[f++]; b.radius = s.floats[f++]
             b.px = s.floats[f++]; b.py = s.floats[f++]; b.cs = s.floats[f++]; b.sn = s.floats[f++]
-            b.vx = s.floats[f++]; b.vy = s.floats[f++]; b.w = s.floats[f++]; b.turned = s.floats[f++]
+            b.vx = s.floats[f++]; b.vy = s.floats[f++]; b.w = s.floats[f++]; b.turned = s.floats[f++]; b.spin = s.floats[f++]
+            b.rideX = s.floats[f++]; b.rideY = s.floats[f++]; b.rideCs = s.floats[f++]; b.rideSn = s.floats[f++]
             b.support = s.longs[l++]
             slots[b.id - 1] = b
             count++
@@ -1609,15 +2311,22 @@ internal class Bodies(private val world: World) {
             bounds(b)
             outline(b)
         }
+        // the carriers' lists of riders, in the order of the riders' slots
+        for (o in slots) {
+            if (o == null || o.carrier == 0) continue
+            val c = slots[o.carrier - 1] ?: continue
+            if (c.riderCount == c.riders.size) c.riders = c.riders.copyOf(c.riderCount * 2)
+            c.riders[c.riderCount++] = o.id
+        }
     }
 
     fun hash(mix: (Int) -> Unit) {
         mix(count)
         for (b in slots) {
             if (b == null) continue
-            mix(b.id); mix(b.n); mix(if (b.asleep) 1 else 0); mix(b.still); mix(b.stuck); mix(b.ground)
+            mix(b.id); mix(b.n); mix(if (b.asleep) 1 else 0); mix(b.still); mix(b.stuck); mix(b.ground); mix(b.carrier)
             for (k in 0 until b.n) mix(b.at[k])
-            for (v in floatArrayOf(b.px, b.py, b.cs, b.sn, b.vx, b.vy, b.w)) mix(java.lang.Float.floatToRawIntBits(v))
+            for (v in floatArrayOf(b.px, b.py, b.cs, b.sn, b.vx, b.vy, b.w, b.spin)) mix(java.lang.Float.floatToRawIntBits(v))
         }
     }
 
@@ -1648,16 +2357,29 @@ internal class Bodies(private val world: World) {
         /** A body that lay on the ground within this many steps still counts as lying there. */
         private const val GROUNDED = 10
 
-        /** Lying still this many steps against another body that lies still, they become one. */
-        private const val MERGE_STEPS = 8
-
         /** Spinning slows in the air a little, and rolling on the ground more (rolling resistance). */
         private const val AIR_SPIN = 0.998f
         private const val ROLL = 0.985f
 
         /** A liquid slows a body down by this share per step, if all of it is in the liquid. */
-        private const val DRAG = 0.1f
+        private const val DRAG = 0.15f
         private const val SPIN_DRAG = 0.12f
+        /** How far above a body the surface of the water beside it is looked for. */
+        private const val LEVEL_LOOK = 3
+        private const val LEVEL_SPAN = 10
+        private const val LEVEL_OFF = 3
+        /** A floating body rests only where gravity and lift leave less than this over (cells per step per step). */
+        private const val FLOAT_REST = 0.03f
+        /** All under the surface (the share of it under): a body lighter than the liquid does not rest there. */
+        private const val SUNK = 0.99f
+
+        /**
+         * Water a body puts aside goes at most this far (cells, either way); coming into the water faster than
+         * [SPLASH_SPEED] it is thrown up [SPLASH_LIFT] rows and falls back: a small wave.
+         */
+        private const val DISPLACE_REACH = 24
+        private const val SPLASH_SPEED = 1.2f
+        private const val SPLASH_LIFT = 2
 
         /** Light loose stuff a body sinks into: at most this dense (snow, ash, withered leaves), the body at least so many times as dense. */
         private const val LIGHT_POWDER = 0.6f
@@ -1670,6 +2392,28 @@ internal class Bodies(private val world: World) {
         const val SLEEP_STEPS = 20
         private const val STUCK_STEPS = 120
         private const val SLEEP_SPEED = 0.08f
+
+        /**
+         * Standing (Phase 4b): the centre of weight must be this far inside the outer edges of the foot; a foot of at
+         * most [TIP_FOOT] cells under a body more than [TIP_RATIO] times as wide is a tip it cannot balance on; the
+         * slightest turn (radians per step) that sets a body going over.
+         */
+        private const val OVER_EDGE = 0.1f
+
+        /**
+         * Riding: lying this many steps on a moving body, at most this fast against it (cells per step), a body
+         * gets on; set at most this much higher (cells) where the turned carrier's raster steps up under it.
+         */
+        private const val RIDE_STEPS = 3
+        private const val RIDE_SPEED = 0.25f
+        private const val RIDE_LIFT = 1f
+
+        /** Round: at least this many cells, its rim at least this share as near to the centre as its farthest cell. */
+        private const val ROUND_CELLS = 9
+        private const val ROUND = 0.85f
+        private const val TIP_FOOT = 2
+        private const val TIP_RATIO = 4
+        private const val NUDGE = 0.002f
 
         /** A body lying within this (sine of the angle, about 3.5°) of square is laid square when it sleeps. */
         private const val SQUARE = 0.06f
@@ -1694,6 +2438,8 @@ internal class Bodies(private val world: World) {
         private const val CORE = 0.7f
         private const val CORE_GROW = 0.5f
         private const val MAX_CORE = 4f
+        /** The widest hole (radius) a body breaking through punches. */
+        private const val MAX_PUNCH = 8f
         private const val CRACK = 4f
         private const val CRACK_GROW = 5f
         private const val MAX_CRACK = 40
@@ -1712,6 +2458,9 @@ internal class Bodies(private val world: World) {
 
         /** A free cell outside the body's outline counts as this much farther (cells squared) than one inside. */
         private const val OUTSIDE = 1.5f
+        /** How far a cell of a turned body looks for a free place when another cell took its own (Phase 4b: 2 left a
+         *  body of wood and stone, turned over, stuck in the water). */
+        private const val NEAREST_REACH = 4
 
         /** Two contact points closer than this (relative) count as one for the paired push. */
         private const val PAIR_DET = 1e-4f

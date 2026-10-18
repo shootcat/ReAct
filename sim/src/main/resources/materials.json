@@ -230,7 +230,7 @@
       "color": "#a9d8f0", "color_variance": 0.05, "opacity": 0.85, "pattern": "ice", "cost": 1
     },
     {
-      "id": "wood", "name": "Holz", "kind": "solid", "density": 650, "anchored": false,
+      "id": "wood", "name": "Holz", "kind": "solid", "density": 500, "anchored": false,
       "flammable": true, "ignite_temp": 280, "burn_time": 4.5, "burn_temp": 750, "burn_heat": 45, "flame": 0.9, "smoke": 0.01,
       "burn_product": "ash", "residue": 0.2, "quench_product": "charcoal", "wet_blocks_burning": true, "absorbs": 0.002,
       "conductivity": 0.08, "heat_capacity": 1.2, "hardness": 0.5, "erodes_in_water": false,

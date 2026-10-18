@@ -21,8 +21,9 @@ class StructureTest {
     @Test
     fun `a loose block of wood falls as a whole and keeps its shape`() {
         val lab = Lab()
-        lab.rect("wood", 20, 10, 29, 14)
-        lab.rect("wood", 24, 15, 25, 18)
+        // the stem on top: standing on a stem two cells wide under a top ten wide, it would tip over (Phase 4b)
+        lab.rect("wood", 20, 14, 29, 18)
+        lab.rect("wood", 24, 10, 25, 13)
         val before = shape(lab, "wood")
         lab.seconds(2f)
         val after = shape(lab, "wood")

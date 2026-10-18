@@ -129,6 +129,17 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     val variant = ByteArray(size)
     val flags = ByteArray(size)
 
+    /**
+     * Which piece each solid cell belongs to (Phase 4b): everything built or painted in one stroke is one piece,
+     * and only cells of the same piece hold together. 0 is what the world made itself (and what a level or a
+     * test set cell by cell): those cells hold together with every touching cell of 0, as before.
+     */
+    val piece = ShortArray(size)
+
+    /** The piece what is set now belongs to: one stroke or shape of the player, one object of a landscape. */
+    private var drawing = 0
+    private var nextPiece = 1
+
     /** The step mark at which the particle in this cell last moved. */
     internal val stamp = IntArray(size)
 
@@ -149,6 +160,9 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
      * any heat to exchange, and heat is the costliest part of a step.
      */
     private var heatAwake = BooleanArray(chunksX * chunksY)
+
+    /** Chunks where something happened since the last levelling of the water (Phase 4b). */
+    private val recent = BooleanArray(chunksX * chunksY) { true }
     private var heatPending = BooleanArray(chunksX * chunksY) { true }
 
     /** For measuring: update every chunk, asleep or not. */
@@ -306,6 +320,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     private var fillAnchored = false
     private var fillTouch = IntArray(8)
     private var fillTouches = 0
+    private var fillPiece: Short = 0
 
     /**
      * Plants that stand by their roots (Phase 4): the cells their roots hold on by, per plant from
@@ -330,7 +345,9 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     fun bodyStates(): List<BodyState> {
         val out = ArrayList<BodyState>()
         bodies.each { b ->
-            out += BodyState(b.id, b.n, b.main, b.px, b.py, Math.toDegrees(Math.atan2(b.sn.toDouble(), b.cs.toDouble())).toFloat(), b.vx, b.vy, b.w, b.asleep)
+            // a round body's raster does not turn as it rolls: how far it has rolled is its spin
+            val angle = Math.atan2(b.sn.toDouble(), b.cs.toDouble()) + b.spin
+            out += BodyState(b.id, b.n, b.main, b.px, b.py, Math.toDegrees(angle).toFloat(), b.vx, b.vy, b.w, b.asleep)
         }
         return out
     }
@@ -379,6 +396,17 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
 
     init {
         temp.fill(ambient)
+    }
+
+    /** What is set from now on is one new piece (a stroke, a shape, an object of a landscape), until [endPiece]. */
+    fun startPiece() {
+        drawing = nextPiece
+        nextPiece = if (nextPiece >= MAX_PIECE) 1 else nextPiece + 1
+    }
+
+    /** What is set from now on is the world's own again (piece 0). */
+    fun endPiece() {
+        drawing = 0
     }
 
     fun index(x: Int, y: Int) = y * width + x
@@ -557,6 +585,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             temp[i] = ambient
             life[i] = 0
             flags[i] = 0
+            piece[i] = 0
         }
         bodies.clear()
         pending.fill(true)
@@ -592,7 +621,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
                 if (n < 0 || n >= size || n in seen || bodyAt[n] != 0) continue
                 val q = mat[n].toInt()
                 // like structures: a log leaning on a bridge is a piece of its own
-                if (solid && kindOf[q] == Kind.SOLID && plantOf[q] == plantOf[m] || !solid && q == m) {
+                if (solid && kindOf[q] == Kind.SOLID && plantOf[q] == plantOf[m] && piece[n] == piece[i] || !solid && q == m) {
                     seen += n
                     stack.addLast(n)
                 } else if (n != c + width && (materials.anchored[q] || (flags[n].toInt() and Flag.ANCHORED) != 0)) {
@@ -622,6 +651,9 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     // ------------------------------------------------------------------ the step
 
     fun step() {
+        // what the world makes in the step is its own, even while a stroke of the player goes on
+        val stroke = drawing
+        drawing = 0
         val t = awake
         awake = pending
         pending = t
@@ -659,7 +691,10 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             pressure()
             pressureNanos += System.nanoTime() - t0
         }
+        for (c in recent.indices) if (awake[c]) recent[c] = true
+        if (step % LEVEL_EVERY == 0) levelLiquids()
         step++
+        drawing = stroke
     }
 
     fun run(steps: Int) = repeat(steps) { step() }
@@ -1277,6 +1312,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         life[i] = initLife(m).toShort()
         variant[i] = next().toByte()
         flags[i] = (if (materials.spawnBurning[m]) Flag.BURNING else 0).toByte()
+        piece[i] = if (kindOf[m] == Kind.SOLID) drawing.toShort() else 0
         // a vine is planted as a growing tip
         val g = materials.growSize[m]
         if (g > 0) {
@@ -1293,6 +1329,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         temp[i] = ambient
         life[i] = 0
         flags[i] = 0
+        piece[i] = 0
         wakeHeat(x, y)
     }
 
@@ -2335,8 +2372,9 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
                 val q = mat[n].toInt()
                 val k = kindOf[q]
                 if (k == Kind.GAS) continue
-                // a pool or a heap on the floor is no wall: pressure presses it down, it cannot give way
-                if (n == j + w && (k == Kind.LIQUID || k == Kind.POWDER)) continue
+                // a pool or a heap on the floor is no wall: pressure presses it down, it cannot give way; nor is the edge of a
+                // pool beside the gas, lying on more of it (water put aside by a body heaps up a cell at its surface)
+                if ((k == Kind.LIQUID || k == Kind.POWDER) && (n == j + w || (n + w < size && kindOf[mat[n + w].toInt()] != Kind.GAS))) continue
                 val s = if (flags[n].toInt() and Flag.ANCHORED != 0) Float.POSITIVE_INFINITY else st[q]
                 if (s < least) {
                     least = s
@@ -2516,6 +2554,110 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         }
     }
 
+    // ------------------------------------------------------------------ level water (Phase 4b)
+
+    private val levelSeen = IntArray(size)
+    private val spotSeen = IntArray(size)
+    private var levelPass = 0
+    private var levelQueue = IntArray(1024)
+    private var levelTops = IntArray(64)
+    private var levelSpots = IntArray(64)
+
+    /**
+     * Water at rest has a level surface (Phase 4b). A cellular liquid only flows sideways where it can sink, so
+     * steps of a cell stay standing, and there is no pressure: water in two vessels joined below stays as high as
+     * it was poured in each. So every [LEVEL_EVERY] steps, for each body of thin liquid in the chunks where
+     * something happened (all of it connected, of one material, in any shape: a basin, two vessels and the pipe
+     * between them), a few cells go from the highest point of its surface to the lowest free place beside or
+     * above it that something holds up, until the surface is level to within one cell. Liquid that is flowing
+     * (a share of it moved in this step: a stream, a waterfall) is left to flow; only the surface of still
+     * water is taken from.
+     */
+    private fun levelLiquids() {
+        if (++levelPass == Int.MAX_VALUE) {
+            levelSeen.fill(0)
+            spotSeen.fill(0)
+            levelPass = 1
+        }
+        val w = width
+        for (cy in 0 until chunksY) for (cx in 0 until chunksX) {
+            val ci = cy * chunksX + cx
+            if (!recent[ci]) continue
+            recent[ci] = false
+            val x0 = cx shl SHIFT
+            val y0 = cy shl SHIFT
+            val x1 = minOf(w, x0 + CHUNK)
+            val y1 = minOf(height, y0 + CHUNK)
+            for (y in maxOf(1, y0) until y1) for (x in x0 until x1) {
+                val i = y * w + x
+                val m = mat[i].toInt()
+                if (kindOf[m] != Kind.LIQUID || materials.viscosity[m] >= LEVEL_VISCOSITY || levelSeen[i] == levelPass) continue
+                if (!openAbove(mat[i - w].toInt())) continue
+                levelBody(i, m)
+            }
+        }
+    }
+
+    private fun openAbove(q: Int) = q == AIR || kindOf[q] == Kind.GAS
+
+    /** Levels the body of liquid [m] that cell [start] belongs to. */
+    private fun levelBody(start: Int, m: Int) {
+        val w = width
+        var head = 0
+        var tail = 0
+        var tops = 0
+        var spots = 0
+        var moving = 0
+        levelSeen[start] = levelPass
+        levelQueue[tail++] = start
+        while (head < tail) {
+            val c = levelQueue[head++]
+            if (stamp[c] == mark) moving++
+            val x = c % w
+            val y = c / w
+            // the surface of still water, standing on more of it
+            if (y > 0 && openAbove(mat[c - w].toInt()) && c + w < size && mat[c + w].toInt() == m && stamp[c] != mark) {
+                if (tops == levelTops.size) levelTops = levelTops.copyOf(tops * 2)
+                levelTops[tops++] = c
+            }
+            for (d in 0 until 4) {
+                val n = when (d) {
+                    0 -> if (x > 0) c - 1 else -1
+                    1 -> if (x < w - 1) c + 1 else -1
+                    2 -> if (y > 0) c - w else -1
+                    else -> if (y < height - 1) c + w else -1
+                }
+                if (n < 0) continue
+                val q = mat[n].toInt()
+                if (q == m) {
+                    if (levelSeen[n] != levelPass) {
+                        levelSeen[n] = levelPass
+                        if (tail == levelQueue.size) levelQueue = levelQueue.copyOf(tail * 2)
+                        levelQueue[tail++] = n
+                    }
+                } else if (d != 3 && openAbove(q) && spotSeen[n] != levelPass && n + w < size && !openAbove(mat[n + w].toInt()) && bodyAt[n + w] == 0) {
+                    // a free place beside or above the water with something under it: the water can go there
+                    spotSeen[n] = levelPass
+                    if (spots == levelSpots.size) levelSpots = levelSpots.copyOf(spots * 2)
+                    levelSpots[spots++] = n
+                }
+            }
+        }
+        if (tops == 0 || spots == 0 || moving * LEVEL_MOVING > tail) return
+        java.util.Arrays.sort(levelTops, 0, tops)
+        java.util.Arrays.sort(levelSpots, 0, spots)
+        val moves = minOf(LEVEL_MAX_MOVES, LEVEL_MIN_MOVES + tops / LEVEL_PER_MOVE)
+        var k = 0
+        while (k < moves && k < tops && k < spots) {
+            val from = levelTops[k]
+            val to = levelSpots[spots - 1 - k]
+            // the free place lies one row above the surface it is on: from a row above it the step is two or more
+            if (from / w >= to / w) break
+            swap(from, to, from % w, from / w, to % w, to / w)
+            k++
+        }
+    }
+
     // ------------------------------------------------------------------ structures (3.1)
 
     /**
@@ -2546,6 +2688,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             if (kindOf[m0] != Kind.SOLID || owner[i] != 0 || bodyAt[i] != 0) continue
             id++
             val plant = plantOf[m0]
+            fillPiece = piece[i]
             var count = 0
             var rootFrom = rootStart[rootPlants]
             fillTop = 0
@@ -2618,13 +2761,17 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         bodies.create(cells, n)
     }
 
-    /** A neighbour [n] of [c] in the flood fill: solid ones of the same sort (plant or not) join, anchored ground that holds [c] ([holds]) anchors. */
+    /**
+     * A neighbour [n] of [c] in the flood fill: solid ones of the same sort (plant or not) and the same piece join,
+     * anchored ground that holds [c] ([holds]) anchors. Another piece touching it is only something it lies on or
+     * leans against (Phase 4b).
+     */
     private fun visit(n: Int, id: Int, plant: Boolean, c: Int) {
         val mn = mat[n].toInt()
         val b = bodyAt[n]
         if (b != 0) {
-            // built onto a body (or frozen onto ice): they become one
-            if (kindOf[mn] == Kind.SOLID && plantOf[mn] == plant) {
+            // the rest of a stroke that already came loose (or ice frozen onto its floe): they become one
+            if (kindOf[mn] == Kind.SOLID && plantOf[mn] == plant && piece[n] == fillPiece) {
                 var known = false
                 for (t in 0 until fillTouches) if (fillTouch[t] == b) known = true
                 if (!known) {
@@ -2634,7 +2781,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             }
             return
         }
-        if (kindOf[mn] == Kind.SOLID && plantOf[mn] == plant) {
+        if (kindOf[mn] == Kind.SOLID && plantOf[mn] == plant && piece[n] == fillPiece) {
             if (owner[n] == 0) {
                 owner[n] = id
                 fillStack[fillTop++] = n
@@ -2735,11 +2882,14 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
      */
     fun placeBody(cells: IntArray, mats: IntArray, temps: FloatArray, looks: ByteArray) {
         val w = width
+        val stroke = drawing
+        startPiece()
         for (k in cells.indices) {
             val c = cells[k]
             spawn(c % w, c / w, c, mats[k], temps[k])
             variant[c] = looks[k]
         }
+        drawing = stroke
         bodies.create(cells.copyOf(), cells.size)
     }
 
@@ -2764,6 +2914,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         life[j] = 0
         variant[j] = next().toByte()
         flags[j] = 0
+        piece[j] = piece[p]
         stamp[j] = mark
         wakeHeat(x, y)
         if (structuresDirty) return
@@ -2808,8 +2959,11 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         internal val weatherInts: IntArray,
         internal val weatherFloats: FloatArray,
         internal val bodies: Bodies.Saved,
+        internal val piece: ShortArray,
+        internal val nextPiece: Int,
+        internal val recent: BooleanArray,
     ) {
-        val bytes: Int get() = mat.size * 9 + light.size * 4
+        val bytes: Int get() = mat.size * 11 + light.size * 4
     }
 
     fun snapshot() = Snapshot(
@@ -2817,6 +2971,9 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         heatPending.copyOf(), placed.copyOf(), light.level.copyOf(), closedBits.copyOf(),
         intArrayOf(cloudBase, gustSteps, if (randomWeather) 1 else 0, storm, lastStrike), floatArrayOf(wind, gust, ambient, cloudDrift),
         bodies.save(),
+        piece.copyOf(),
+        nextPiece,
+        recent.copyOf(),
     )
 
     fun restore(s: Snapshot) {
@@ -2825,6 +2982,10 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         s.life.copyInto(life)
         s.variant.copyInto(variant)
         s.flags.copyInto(flags)
+        s.piece.copyInto(piece)
+        nextPiece = s.nextPiece
+        s.recent.copyInto(recent)
+        drawing = 0
         s.pending.copyInto(pending)
         s.heatPending.copyInto(heatPending)
         s.placed.copyInto(placed)
@@ -2862,8 +3023,10 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             mix(life[i].toInt())
             mix(variant[i].toInt())
             mix(flags[i].toInt())
+            mix(piece[i].toInt())
         }
         bodies.hash(::mix)
+        mix(nextPiece)
         mix(rng)
         mix(step)
         return h
@@ -2879,6 +3042,9 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
 
     companion object {
         const val SHIFT = 5
+
+        /** Pieces are numbered 1 to this, then from 1 again. */
+        const val MAX_PIECE = 65535
         const val CHUNK = 1 shl SHIFT
 
         private const val EPS = 0.001f
@@ -2998,6 +3164,18 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
 
         /** Pressure is checked every so many steps; absolute zero for the gas law. */
         const val PRESSURE_EVERY = 10
+
+        /**
+         * Levelling the water (Phase 4b): every so many steps; only liquids thinner than this; a body of liquid of
+         * which more than one cell in so many moved in the step is flowing and left alone; cells moved per body
+         * and pass: at least, one more per so many surface cells, at most.
+         */
+        const val LEVEL_EVERY = 8
+        internal const val LEVEL_VISCOSITY = 0.3f
+        private const val LEVEL_MOVING = 4
+        private const val LEVEL_MIN_MOVES = 2
+        private const val LEVEL_PER_MOVE = 8
+        private const val LEVEL_MAX_MOVES = 48
         private const val KELVIN = 273f
 
         /** Gas beyond what the region would hold as plain air (in cells of air) before anything can burst: small hot pockets in a heap do nothing. */

@@ -207,8 +207,9 @@ class BodyTest {
         fun drop(r: Int): Pair<Int, Int> {
             val lab = Lab(96, 64)
             lab.world.setAmbient(0f)
-            lab.rect("rock", 2, 40, 20, 61)
-            lab.rect("rock", 76, 40, 93, 61)
+            // the banks as cold as the air: warmer rock would melt the ends of the ice off them (Phase 4b)
+            lab.rect("rock", 2, 40, 20, 61, 0f)
+            lab.rect("rock", 76, 40, 93, 61, 0f)
             lab.rect("water", 21, 46, 75, 61, 0.5f)
             lab.rect("ice", 21, 44, 75, 45, -1f)
             disc(lab, "stone", 48, 10, r)
