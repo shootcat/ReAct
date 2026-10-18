@@ -70,6 +70,20 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
      */
     private val wallFrom = Backdrop.groundLine(world)
 
+    /**
+     * Bodies as pictures of their own (Phase 4b): [renderBodies] draws each body as an image in its own frame, to
+     * be turned, smoothed and placed where it is; [render] then fills the body's cells in the grid with what is
+     * around them. Off, the bodies are drawn cell by cell as before (overviews, the level list).
+     */
+    var bodySprites = false
+
+    /** The colour each body cell got in the last [render], and its place in its body's own frame (for the grain). */
+    private val bodyColour = IntArray(world.size)
+    private val bodyLocal = IntArray(world.size)
+    private val bodyStamp = IntArray(world.size)
+    private var stamp = 0
+    private var shownFrame = 0
+
     /** Fish and birds seen while drawing: tails and wings are added afterwards. */
     private var critters = IntArray(64)
     private var critterCount = 0
@@ -201,6 +215,19 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
         }
         computeShade(running, x0, y0, x1, y1)
         critterCount = 0
+        shownFrame = frame
+        // where each body cell lies in its body's own frame: the grain of wood goes with the body (Phase 4b)
+        if (++stamp == Int.MAX_VALUE) {
+            bodyStamp.fill(0)
+            stamp = 1
+        }
+        world.bodies.each { b ->
+            for (k in 0 until b.n) {
+                val c = b.at[k]
+                bodyLocal[c] = ((b.lx[k] - b.ox) shl 16) or (b.ly[k] - b.oy)
+                bodyStamp[c] = stamp
+            }
+        }
         // the wind (3c.3): grass waves along it, faint streaks run through the open air
         val wn = world.windNow
         val windDir = if (wn > 0f) 1 else if (wn < 0f) -1 else 0
@@ -257,11 +284,7 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
                     else -> scale(c, 1f - minOf(d, 48) * 0.005f)
                 }
             } else when (mt.pattern[m]) {
-                Pattern.PLANKS -> {
-                    // grain along the planks
-                    val y = i / w
-                    if (((y + (x shr 3)) and 3) == 0) c = scale(c, 0.82f)
-                }
+                Pattern.PLANKS -> c = wood(c, i, x, i / w, v)
                 Pattern.BRICK -> {
                     // bricks of 6 × 3 cells in staggered rows, light mortar between them
                     val y = i / w
@@ -393,10 +416,269 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
             }
             val a = mt.opacity[m]
             out[i] = if (a >= 1f) c else if (m == glass && ((v and 15) == 0)) scale(mix(c, bg, 1f - a), 1.3f) else mix(c, bg, 1f - a)
+            if (bodySprites && bodyStamp[i] == stamp) bodyColour[i] = out[i]
         }
+        smoothWood(out, x0, y0, x1, y1)
+        if (bodySprites) fillUnderBodies(out, x0, y0, x1, y1)
         drawCritters(out, frame)
         highlight?.let { drawHighlight(out, it, frame, x0, y0, x1, y1) }
         drawLightning(out, x0, y0, x1, y1)
+    }
+
+    /**
+     * Wood (Phase 4b): a grain along the stroke it was painted with (two bits of its variant, [World.grain]),
+     * gently wavy, in the body's own frame if it is a body so the grain goes with it; darker bark at its edges.
+     */
+    private fun wood(c0: Int, i: Int, x: Int, y: Int, v: Int): Int {
+        val w = world.width
+        val body = bodyStamp[i] == stamp
+        val ux = if (body) bodyLocal[i] ushr 16 else x
+        val uy = if (body) bodyLocal[i] and 0xFFFF else y
+        val dir = (v shr 4) and 3
+        // across the grain and along it
+        val across = when (dir) {
+            World.GRAIN_ACROSS -> ux
+            World.GRAIN_FALLING -> ux - uy
+            World.GRAIN_RISING -> ux + uy
+            else -> uy
+        }
+        val along = when (dir) {
+            World.GRAIN_ACROSS -> uy
+            World.GRAIN_FALLING -> ux + uy
+            World.GRAIN_RISING -> ux - uy
+            else -> ux
+        }
+        // a line every few cells, shifting by one now and then along its way
+        val ring = across + (((along + 1024) / 9) and 1)
+        var c = when (Math.floorMod(ring, 4)) {
+            0 -> scale(c0, 0.8f)
+            2 -> scale(c0, 1.07f)
+            else -> c0
+        }
+        // bark: where the wood ends
+        val m = world.mat[i]
+        val edge = if (body) {
+            val b = world.bodies.body(world.bodyAt[i])
+            b == null || !filled(b, ux - 1, uy) || !filled(b, ux + 1, uy) || !filled(b, ux, uy - 1) || !filled(b, ux, uy + 1)
+        } else {
+            val mat = world.mat
+            (x > 0 && mat[i - 1] != m) || (x < w - 1 && mat[i + 1] != m) || (i >= w && mat[i - w] != m) || (i + w < world.size && mat[i + w] != m)
+        }
+        if (edge) c = mix(scale(c, 0.74f), BARK, 0.3f)
+        return c
+    }
+
+    private fun filled(b: Body, x: Int, y: Int): Boolean = x >= 0 && y >= 0 && x < b.ow && y < b.oh && b.occ[y * b.ow + x]
+
+    /**
+     * Less of a staircase on slanting edges of wood (Phase 4b): an empty cell in the notch of a step (wood to one
+     * side and below or above it) takes on some of the wood, and the outer corner of a step (open to one side and
+     * above or below) some of what lies beyond it, so a slanting beam reads as a slant. Bodies are smoothed in
+     * their own pictures.
+     */
+    private fun smoothWood(out: IntArray, x0: Int, y0: Int, x1: Int, y1: Int) {
+        val w = world.width
+        val mat = world.mat
+        val bodyAt = world.bodyAt
+        var n = 0
+        for (y in maxOf(1, y0)..minOf(world.height - 2, y1)) for (x in maxOf(1, x0)..minOf(w - 2, x1)) {
+            val i = y * w + x
+            val here = woodAt(i, bodyAt)
+            if (!here && mat[i].toInt() != AIR) continue
+            val l = woodAt(i - 1, bodyAt)
+            val r = woodAt(i + 1, bodyAt)
+            val u = woodAt(i - w, bodyAt)
+            val d = woodAt(i + w, bodyAt)
+            if (l == r || u == d) continue
+            val c = if (here) {
+                // the outer corner: open on the side without wood and above or below
+                val side = if (l) i + 1 else i - 1
+                val vert = if (u) i + w else i - w
+                if (mat[side].toInt() != AIR || mat[vert].toInt() != AIR) continue
+                mix(out[i], mix(out[side], out[vert], 0.5f), CORNER)
+            } else {
+                // the notch: wood on one side and above or below
+                val side = if (l) i - 1 else i + 1
+                val vert = if (u) i - w else i + w
+                mix(out[i], mix(out[side], out[vert], 0.5f), NOTCH)
+            }
+            if (n == smoothCells.size) {
+                smoothCells = smoothCells.copyOf(n * 2)
+                smoothColours = smoothColours.copyOf(n * 2)
+            }
+            smoothCells[n] = i
+            smoothColours[n] = c
+            n++
+        }
+        for (k in 0 until n) out[smoothCells[k]] = smoothColours[k]
+    }
+
+    private var smoothCells = IntArray(256)
+    private var smoothColours = IntArray(256)
+
+    private fun woodAt(j: Int, bodyAt: IntArray): Boolean {
+        val m = world.mat[j].toInt()
+        return m >= 0 && mt.pattern[m] == Pattern.PLANKS && (!bodySprites || bodyAt[j] == 0)
+    }
+
+    /**
+     * The cells of bodies in the grid, drawn as pictures of their own: here they take on what lies around them
+     * (the water a raft floats in, the sky), so nothing of the grid shows where the turned picture lies a little
+     * off it.
+     */
+    private fun fillUnderBodies(out: IntArray, x0: Int, y0: Int, x1: Int, y1: Int) {
+        val w = world.width
+        val h = world.height
+        for (y in y0..y1) for (x in x0..x1) {
+            val i = y * w + x
+            if (bodyStamp[i] != stamp) continue
+            var c = 0
+            var r = 1
+            while (c == 0 && r <= FILL_REACH) {
+                for (j in intArrayOf(i - r, i + r, i - r * w, i + r * w)) {
+                    val jx = j % w
+                    if (j < 0 || j >= world.size || (j == i - r && x - r < 0) || (j == i + r && x + r >= w)) continue
+                    if (jx < x0 || jx > x1 || j / w < y0 || j / w > y1 || bodyStamp[j] == stamp) continue
+                    c = out[j]
+                    break
+                }
+                r++
+            }
+            out[i] = if (c != 0) c else backdrop[i]
+        }
+    }
+
+    /** Body pictures made before, by body: unchanged bodies keep theirs. */
+    private var spriteSum = LongArray(64)
+    private var spritePixels = arrayOfNulls<IntArray>(64)
+    private var spriteW = IntArray(64)
+    private var lastX = FloatArray(64)
+    private var lastY = FloatArray(64)
+    private var lastAngle = FloatArray(64)
+    private var lastSeen = IntArray(64)
+    private var spriteRound = 0
+
+    /**
+     * Each body as a picture of its own (Phase 4b), into [out] (grown as needed), after [render]: its cells as
+     * [SPRITE_SCALE] × [SPRITE_SCALE] pixels each, in the colours [render] gave them, in its own frame; the rim
+     * smoothed (an edge between two cells along a slant runs as a slant), with the centre of weight as the point
+     * it turns about, where the body is now and where it was in the last picture, to draw it in between. Returns
+     * how many.
+     */
+    fun renderBodies(out: ArrayList<BodySprite>): Int {
+        if (thermal) return 0
+        spriteRound++
+        var count = 0
+        val sc = SPRITE_SCALE
+        world.bodies.each { b ->
+            if (b.id >= spriteSum.size) growSprites(b.id + 1)
+            val sprite = if (count < out.size) out[count] else BodySprite().also { out += it }
+            count++
+            val cw = b.ow
+            val ch = b.oh
+            // the colours of its cells, in its own frame; and a sum of them, to see whether anything changed
+            val col = IntArray(cw * ch)
+            var sum = (cw.toLong() shl 32) xor ch.toLong()
+            for (k in 0 until b.n) {
+                val c = b.at[k]
+                val m = world.mat[c].toInt()
+                var colour = if (bodyStamp[c] == stamp) bodyColour[c] else palette[m * SHADES + (world.variant[c].toInt() and (SHADES - 1))]
+                // what the hand could take, lit up and pulsing (3b.3)
+                val mark = highlight
+                if (mark != null && mark.size == world.size && mark[c]) colour = mix(colour, HIGHLIGHT, 0.3f + 0.25f * wave((shownFrame * 2) and 63))
+                val cell = (b.ly[k] - b.oy) * cw + (b.lx[k] - b.ox)
+                col[cell] = colour or OPAQUE
+                sum = sum * 31 + (cell.toLong() shl 32) + colour
+            }
+            var pixels = spritePixels[b.id]
+            if (pixels == null || spriteSum[b.id] != sum || spriteW[b.id] != cw * sc) {
+                pixels = IntArray(cw * sc * ch * sc)
+                drawSprite(b, col, cw, ch, pixels)
+                spritePixels[b.id] = pixels
+                spriteSum[b.id] = sum
+                spriteW[b.id] = cw * sc
+            }
+            sprite.id = b.id
+            sprite.w = cw * sc
+            sprite.h = ch * sc
+            sprite.pixels = pixels
+            sprite.pivotX = (b.comX - b.ox + 0.5f) * sc
+            sprite.pivotY = (b.comY - b.oy + 0.5f) * sc
+            sprite.x = b.px
+            sprite.y = b.py
+            val angle = Math.atan2(b.sn.toDouble(), b.cs.toDouble()).toFloat() + b.spin
+            // where it was in the picture before (a new body: where it is), the turn taken the short way round
+            if (lastSeen[b.id] != spriteRound - 1) {
+                lastX[b.id] = b.px
+                lastY[b.id] = b.py
+                lastAngle[b.id] = angle
+            }
+            var last = lastAngle[b.id]
+            while (angle - last > Math.PI) last += (2 * Math.PI).toFloat()
+            while (last - angle > Math.PI) last -= (2 * Math.PI).toFloat()
+            sprite.lastX = lastX[b.id]
+            sprite.lastY = lastY[b.id]
+            sprite.lastAngle = last
+            sprite.angle = angle
+            lastX[b.id] = b.px
+            lastY[b.id] = b.py
+            lastAngle[b.id] = angle
+            lastSeen[b.id] = spriteRound
+        }
+        return count
+    }
+
+    private fun growSprites(n: Int) {
+        val s = maxOf(n, spriteSum.size * 2)
+        spriteSum = spriteSum.copyOf(s)
+        spritePixels = spritePixels.copyOf(s)
+        spriteW = spriteW.copyOf(s)
+        lastX = lastX.copyOf(s)
+        lastY = lastY.copyOf(s)
+        lastAngle = lastAngle.copyOf(s)
+        lastSeen = lastSeen.copyOf(s)
+    }
+
+    /**
+     * One body's picture: each pixel takes the colour of the nearest cell of the body, and is as solid as the
+     * cells around it are, blended between their centres: inside it is solid, along an edge it fades over a third
+     * of a cell, and where two cells meet only at a corner the edge runs straight across the corner.
+     */
+    private fun drawSprite(b: Body, col: IntArray, cw: Int, ch: Int, pixels: IntArray) {
+        val sc = SPRITE_SCALE
+        val pw = cw * sc
+        for (sy in 0 until ch * sc) {
+            val fy = (sy + 0.5f) / sc - 0.5f
+            val cy = kotlin.math.floor(fy).toInt()
+            val ty = fy - cy
+            for (sx in 0 until pw) {
+                val fx = (sx + 0.5f) / sc - 0.5f
+                val cx = kotlin.math.floor(fx).toInt()
+                val tx = fx - cx
+                val a00 = if (filled(b, cx, cy)) 1f else 0f
+                val a10 = if (filled(b, cx + 1, cy)) 1f else 0f
+                val a01 = if (filled(b, cx, cy + 1)) 1f else 0f
+                val a11 = if (filled(b, cx + 1, cy + 1)) 1f else 0f
+                val o = (a00 * (1 - tx) + a10 * tx) * (1 - ty) + (a01 * (1 - tx) + a11 * tx) * ty
+                if (o <= SPRITE_EDGE - SPRITE_SOFT) continue
+                val alpha = ((o - (SPRITE_EDGE - SPRITE_SOFT)) / (2 * SPRITE_SOFT)).coerceIn(0f, 1f)
+                // the colour of the cell the pixel lies in, or of the nearest filled one
+                val ix = sx / sc
+                val iy = sy / sc
+                var c = if (filled(b, ix, iy)) col[iy * cw + ix] else 0
+                if (c == 0) {
+                    var best = -1f
+                    for ((dx, dy, wgt) in arrayOf(Triple(0, 0, (1 - tx) * (1 - ty)), Triple(1, 0, tx * (1 - ty)), Triple(0, 1, (1 - tx) * ty), Triple(1, 1, tx * ty))) {
+                        if (filled(b, cx + dx, cy + dy) && wgt > best) {
+                            best = wgt
+                            c = col[(cy + dy) * cw + cx + dx]
+                        }
+                    }
+                }
+                if (c == 0) continue
+                pixels[sy * pw + sx] = ((alpha * 255f).toInt() shl 24) or (c and 0xFFFFFF)
+            }
+        }
     }
 
     /** A faint streak of wind through the air at (x, y): short dashes, few of them, [density] of 1024. */
@@ -783,6 +1065,19 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
         private const val BOLT_EDGE = 0xFFC8BCFF.toInt()
         private const val FLASH = 0.045f
 
+        /** Body pictures (Phase 4b): pixels per cell; where the rim lies between empty (0) and filled (1), and how softly. */
+        const val SPRITE_SCALE = 4
+        private const val SPRITE_EDGE = 0.5f
+        private const val SPRITE_SOFT = 0.15f
+
+        /** How far a body cell in the grid looks for something around it to take on (Phase 4b). */
+        private const val FILL_REACH = 3
+
+        /** Wood (Phase 4b): the colour of its bark, and how much of the wood the notch of a step takes on. */
+        private const val BARK = 0xFF4A3020.toInt()
+        private const val NOTCH = 0.5f
+        private const val CORNER = 0.4f
+
         /** Ice in the dark is never darker than this (3b.8). */
         private const val ICE_SHADE = 0.72f
 
@@ -889,4 +1184,26 @@ object Backdrop {
             near[GROUND_SPAN]
         }
     }
+}
+
+/**
+ * A body drawn as a picture of its own (Phase 4b, [Renderer.renderBodies]): [w] × [h] pixels, [Renderer.SPRITE_SCALE]
+ * per cell, ARGB; its centre of weight at ([pivotX], [pivotY]) in the picture. Where it is now ([x], [y]: the
+ * centre of weight in cells, cell centres at whole numbers; [angle] in radians, clockwise on the screen) and where
+ * it was in the picture before ([lastX], [lastY], [lastAngle]), to draw it in between. [pixels] is never changed
+ * once handed out: a changed body gets new ones.
+ */
+class BodySprite {
+    var id = 0
+    var w = 0
+    var h = 0
+    var pixels = IntArray(0)
+    var pivotX = 0f
+    var pivotY = 0f
+    var x = 0f
+    var y = 0f
+    var angle = 0f
+    var lastX = 0f
+    var lastY = 0f
+    var lastAngle = 0f
 }

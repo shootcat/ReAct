@@ -18,7 +18,7 @@ class SimRunner(val session: Session, backdrop: IntArray) {
     @Volatile
     var speed = Speed.NORMAL
 
-    private val renderer = Renderer(session.world, backdrop)
+    private val renderer = Renderer(session.world, backdrop).also { it.bodySprites = true }
     private val inbox = ConcurrentLinkedQueue<(Session) -> Unit>()
 
     val width get() = session.world.width
@@ -36,6 +36,14 @@ class SimRunner(val session: Session, backdrop: IntArray) {
         val haze = IntArray(layerSize)
         val light = IntArray(layerSize)
         val flames = IntArray(flameSize)
+
+        /**
+         * The bodies as pictures of their own (Phase 4b), the first [spriteCount] of [sprites]: drawn turned and
+         * smoothed where they are, moved on from where they were in the picture before over [interval] nanoseconds.
+         */
+        val sprites = ArrayList<BodySprite>()
+        var spriteCount = 0
+        var interval = 0L
         var x0 = 0
         var y0 = 0
         var x1 = 0
@@ -305,6 +313,8 @@ class SimRunner(val session: Session, backdrop: IntArray) {
                 back.y1 = (view?.get(3) ?: (h - 1)).coerceIn(back.y0, h - 1)
                 renderer.render(back.pixels, frameNumber, speed != Speed.PAUSE, back.x0, back.y0, back.x1, back.y1)
                 renderer.renderClouds(back.clouds, frameNumber++)
+                back.spriteCount = renderer.renderBodies(back.sprites)
+                back.interval = if (lastRender == 0L) FRAME_NANOS else minOf(after - lastRender, MAX_INTERVAL)
                 renderer.renderLayers(back.haze, back.light)
                 renderer.renderFlames(back.flames)
                 synchronized(lock) {
@@ -377,6 +387,9 @@ class SimRunner(val session: Session, backdrop: IntArray) {
 
         /** Loops between two looks at what the hand could take. */
         const val HIGHLIGHT_EVERY = 30
+
+        /** Bodies are moved on between two pictures over at most this long (a picture after a pause comes at once). */
+        private const val MAX_INTERVAL = 100_000_000L
         const val WATCH_EVERY = 30
         const val FRAME_NANOS = 16_000_000L
     }

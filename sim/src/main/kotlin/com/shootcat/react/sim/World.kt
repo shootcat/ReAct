@@ -275,6 +275,15 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
 
     private val cloudId = materials.idOrNull("cloud") ?: AIR
 
+    /**
+     * The direction of the stroke being painted (Phase 4b), one of GRAIN_ALONG (left and right), GRAIN_FALLING,
+     * GRAIN_ACROSS (up and down), GRAIN_RISING: wood painted now takes it as its grain.
+     */
+    var grain = GRAIN_ALONG
+        set(value) {
+            field = value and 3
+        }
+
     /** Noise for the rims of painted clouds (Phase 4b); it takes nothing from the world's chance. */
     private val billow = Noise(seed + 11)
     private val snowId = materials.idOrNull("snow") ?: AIR
@@ -1317,6 +1326,8 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         temp[i] = t
         life[i] = initLife(m).toShort()
         variant[i] = next().toByte()
+        // wood keeps the direction of the stroke it was painted with, for its grain (Phase 4b)
+        if (materials.pattern[m] == Pattern.PLANKS) variant[i] = ((variant[i].toInt() and GRAIN_MASK.inv()) or (grain shl 4)).toByte()
         flags[i] = (if (materials.spawnBurning[m]) Flag.BURNING else 0).toByte()
         piece[i] = if (kindOf[m] == Kind.SOLID) drawing.toShort() else 0
         // a vine is planted as a growing tip
@@ -3204,6 +3215,25 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         private const val CLOUD_SINK = 0.3f
         /** A lone wisp of cloud evaporates now and then; without a condensation height clouds dissolve. */
         private const val CLOUD_EVAPORATE = 0.002f
+
+        /** The grain of wood (Phase 4b): along the stroke, left and right, sloping down, up and down, sloping up. */
+        const val GRAIN_ALONG = 0
+        const val GRAIN_FALLING = 1
+        const val GRAIN_ACROSS = 2
+        const val GRAIN_RISING = 3
+        private const val GRAIN_MASK = 0x30
+
+        /** The grain for a stroke going [dx], [dy] (y down). */
+        fun grainOf(dx: Int, dy: Int): Int {
+            val ax = if (dx < 0) -dx else dx
+            val ay = if (dy < 0) -dy else dy
+            return when {
+                ay * 12 <= ax * 5 -> GRAIN_ALONG
+                ax * 12 <= ay * 5 -> GRAIN_ACROSS
+                (dx > 0) == (dy > 0) -> GRAIN_FALLING
+                else -> GRAIN_RISING
+            }
+        }
 
         /** Painted cloud: the size of its bulges in cells, and how far in from the rim they fray it. */
         private const val BILLOW = 3f

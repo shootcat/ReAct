@@ -200,6 +200,7 @@ class Session(
         lastAnimal = NO_ANIMAL
         // what one stroke builds is one piece (Phase 4b): it holds together, and only with itself
         world.startPiece()
+        world.grain = World.GRAIN_ALONG
         strokeStart = true
         dab(x, y)
         strokeStart = false
@@ -215,6 +216,8 @@ class Session(
         val dx = x - bx
         val dy = y - by
         val dist = maxOf(kotlin.math.abs(dx), kotlin.math.abs(dy))
+        // wood takes the direction of the stroke as its grain (Phase 4b)
+        if (dist > 0) world.grain = World.grainOf(dx, dy)
         val stride = maxOf(1, radius / 2)
         var k = stride
         while (k < dist) {
@@ -244,6 +247,8 @@ class Session(
         this.tool = tool
         this.radius = size
         world.startPiece()
+        world.grain = if (kind == ShapeKind.LINE) World.grainOf(x1 - x0, y1 - y0)
+            else if (kotlin.math.abs(x1 - x0) >= kotlin.math.abs(y1 - y0)) World.GRAIN_ALONG else World.GRAIN_ACROSS
         applyShape(kind, x0, y0, x1, y1, tool, size)
         world.endPiece()
     }

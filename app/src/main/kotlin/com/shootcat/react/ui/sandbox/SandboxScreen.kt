@@ -51,6 +51,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -58,6 +59,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -65,9 +67,11 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
@@ -95,6 +99,7 @@ import com.shootcat.react.sim.Discoveries
 import com.shootcat.react.sim.Event
 import com.shootcat.react.sim.Kind
 import com.shootcat.react.sim.MaterialTable
+import com.shootcat.react.sim.Renderer
 import com.shootcat.react.sim.Session
 import com.shootcat.react.sim.SimRunner
 import com.shootcat.react.sim.Template
@@ -627,6 +632,11 @@ private fun WorldView(
     val ch = runner.cloudHeight
     val cloudBitmap = remember(runner) { Bitmap.createBitmap(cw, ch, Bitmap.Config.ARGB_8888) }
     val cloudImage = remember(cloudBitmap) { cloudBitmap.asImageBitmap() }
+    // the bodies as pictures of their own (Phase 4b): one image per body, made anew when its picture changes
+    val bodyImages = remember(runner) { HashMap<Int, BodyImage>() }
+    var shownFrame by remember(runner) { mutableStateOf<SimRunner.Frame?>(null) }
+    var arrived by remember(runner) { mutableLongStateOf(0L) }
+    var displayNanos by remember { mutableLongStateOf(0L) }
     val image = remember(bitmap) { bitmap.asImageBitmap() }
     val hazeImage = remember(hazeBitmap) { hazeBitmap.asImageBitmap() }
     val lightImage = remember(lightBitmap) { lightBitmap.asImageBitmap() }
@@ -643,10 +653,30 @@ private fun WorldView(
                 lightBitmap.setPixels(f.light, 0, lw, 0, 0, lw, lh)
                 flameBitmap.setPixels(f.flames, 0, fw, 0, 0, fw, fh)
                 cloudBitmap.setPixels(f.clouds, 0, cw, 0, 0, cw, ch)
+                for (k in 0 until f.spriteCount) {
+                    val sp = f.sprites[k]
+                    var have = bodyImages[sp.id]
+                    if (have == null || have.w != sp.w || have.h != sp.h) {
+                        val bmp = Bitmap.createBitmap(sp.w, sp.h, Bitmap.Config.ARGB_8888)
+                        have = BodyImage(sp.w, sp.h, bmp, bmp.asImageBitmap())
+                        bodyImages[sp.id] = have
+                    }
+                    if (have.pixels !== sp.pixels) {
+                        have.bitmap.setPixels(sp.pixels, 0, sp.w, 0, 0, sp.w, sp.h)
+                        have.pixels = sp.pixels
+                    }
+                }
+                shownFrame = f
+                arrived = System.nanoTime()
                 frames++
             }
             delay(POLL_MILLIS)
         }
+    }
+
+    // bodies move on smoothly between two pictures of the simulation: drawn anew on every frame of the display
+    LaunchedEffect(runner) {
+        while (true) withFrameNanos { displayNanos = it }
     }
 
     var view by remember { mutableStateOf(IntSize.Zero) }
@@ -923,6 +953,9 @@ private fun WorldView(
         val dstOffset = IntOffset(o.x.roundToInt(), o.y.roundToInt())
         val dstSize = IntSize((w * s).roundToInt(), (h * s).roundToInt())
         drawImage(image, dstOffset = dstOffset, dstSize = dstSize, filterQuality = FilterQuality.None)
+        @Suppress("UNUSED_EXPRESSION")
+        displayNanos
+        shownFrame?.let { f -> drawBodies(f, bodyImages, arrived, o, s) }
         drawImage(cloudImage, dstOffset = dstOffset, dstSize = dstSize, filterQuality = FilterQuality.Low)
         drawImage(hazeImage, dstOffset = dstOffset, dstSize = dstSize, filterQuality = FilterQuality.Low)
         drawImage(flameImage, dstOffset = dstOffset, dstSize = dstSize, filterQuality = FilterQuality.Low)
@@ -931,6 +964,35 @@ private fun WorldView(
         preview?.let { (a, b) -> drawPreview(a, b, mode, radius, tool, materials, o, s) }
         val h = held
         handAt?.let { (x, y) -> if (h != null) drawHeld(h, x, y, materials, o, s) }
+    }
+}
+
+/** The picture of one body in the app (Phase 4b): a bitmap of its size, and the pixels last put into it. */
+private class BodyImage(val w: Int, val h: Int, val bitmap: Bitmap, val image: ImageBitmap) {
+    var pixels: IntArray? = null
+}
+
+/**
+ * The bodies as pictures of their own (Phase 4b), turned and smoothed, each where it is between where it was in
+ * the picture before and where it is now, by how much of the time between the two pictures has passed.
+ */
+private fun DrawScope.drawBodies(f: SimRunner.Frame, images: Map<Int, BodyImage>, arrived: Long, o: Offset, s: Float) {
+    val t = ((System.nanoTime() - arrived).toFloat() / maxOf(1L, f.interval)).coerceIn(0f, 1f)
+    val k = s / Renderer.SPRITE_SCALE
+    for (n in 0 until f.spriteCount) {
+        val sp = f.sprites[n]
+        val img = images[sp.id]?.image ?: continue
+        val x = sp.lastX + (sp.x - sp.lastX) * t
+        val y = sp.lastY + (sp.y - sp.lastY) * t
+        val a = sp.lastAngle + (sp.angle - sp.lastAngle) * t
+        withTransform({
+            translate(o.x + (x + 0.5f) * s, o.y + (y + 0.5f) * s)
+            rotate(Math.toDegrees(a.toDouble()).toFloat(), pivot = Offset.Zero)
+            scale(k, k, pivot = Offset.Zero)
+            translate(-sp.pivotX, -sp.pivotY)
+        }) {
+            drawImage(img, filterQuality = FilterQuality.Low)
+        }
     }
 }
 
