@@ -112,6 +112,7 @@ import com.shootcat.react.ui.components.TopBar
 import com.shootcat.react.ui.theme.Palette
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.geometry.Size
@@ -674,9 +675,17 @@ private fun WorldView(
         }
     }
 
-    // bodies move on smoothly between two pictures of the simulation: drawn anew on every frame of the display
+    // bodies move on smoothly between two pictures of the simulation: while one of them is still on its way from
+    // its last pose to the new one, the picture is drawn anew on every frame of the display, then once more in the
+    // new pose; when nothing moves the display rests (and Compose is idle)
     LaunchedEffect(runner) {
-        while (true) withFrameNanos { displayNanos = it }
+        snapshotFlow { arrived }.collectLatest { since ->
+            val f = shownFrame ?: return@collectLatest
+            if (!f.bodiesMoving()) return@collectLatest
+            val end = since + f.interval
+            while (System.nanoTime() < end) withFrameNanos { displayNanos = it }
+            withFrameNanos { displayNanos = it }
+        }
     }
 
     var view by remember { mutableStateOf(IntSize.Zero) }
@@ -976,6 +985,19 @@ private class BodyImage(val w: Int, val h: Int, val bitmap: Bitmap, val image: I
  * The bodies as pictures of their own (Phase 4b), turned and smoothed, each where it is between where it was in
  * the picture before and where it is now, by how much of the time between the two pictures has passed.
  */
+/** Whether a body in [this] frame is on its way from its last pose to a new one, far enough to be seen. */
+private fun SimRunner.Frame.bodiesMoving(): Boolean {
+    for (n in 0 until spriteCount) {
+        val sp = sprites[n]
+        if (abs(sp.x - sp.lastX) > MOVE_SEEN || abs(sp.y - sp.lastY) > MOVE_SEEN || abs(sp.angle - sp.lastAngle) > TURN_SEEN) return true
+    }
+    return false
+}
+
+/** Less than this (cells, radians) between two pictures is not drawn in between. */
+private const val MOVE_SEEN = 0.05f
+private const val TURN_SEEN = 0.01f
+
 private fun DrawScope.drawBodies(f: SimRunner.Frame, images: Map<Int, BodyImage>, arrived: Long, o: Offset, s: Float) {
     val t = ((System.nanoTime() - arrived).toFloat() / maxOf(1L, f.interval)).coerceIn(0f, 1f)
     val k = s / Renderer.SPRITE_SCALE
