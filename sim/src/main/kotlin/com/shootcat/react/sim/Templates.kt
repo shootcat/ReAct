@@ -22,6 +22,7 @@ enum class Template(val label: String) {
     VOLCANO("Vulkan"),
     CAVES("Höhlensystem"),
     FOREST("Wald am Hang"),
+    LAKE("See, Hang und Wolken"),
     ;
 
     /** Builds the landscape into [world], whatever its size. */
@@ -35,11 +36,22 @@ enum class Template(val label: String) {
             VOLCANO -> Templates.volcano(world, seed)
             CAVES -> Templates.caves(world, seed)
             FOREST -> Templates.forest(world, seed)
+            LAKE -> Templates.lake(world, seed)
         }
         // clouds form above the landscape (3c.1): high over the meadow, lower round the snowy mountain, where
-        // its peaks reach into them; no wind to begin with
-        world.setWeather(cloudBase = (world.height * cloudHeight).toInt().coerceAtLeast(World.CLOUD_BAND + 2))
+        // its peaks reach into them; no wind to begin with, but over the lake (Phase 4b) a breeze with gusts
+        world.setWeather(
+            cloudBase = (world.height * cloudHeight).toInt().coerceAtLeast(World.CLOUD_BAND + 2),
+            wind = if (this == LAKE) LAKE_WIND else 0f,
+            gust = if (this == LAKE) LAKE_GUST else 0f,
+        )
         world.wakeAll()
+    }
+
+    private companion object {
+        /** The breeze over the lake (Phase 4b): to the right, gusting. */
+        const val LAKE_WIND = 0.3f
+        const val LAKE_GUST = 0.15f
     }
 
     /** Where the clouds form, as a share of the world's height from the top. */
@@ -538,6 +550,128 @@ internal object Templates {
         for (yy in level - 2..level - 1) for (xx in rx until rx + 16) k.put(xx, yy, wood)
         world.endPiece()
         k.birds(listOf((w * 0.3f).toInt(), (w * 0.45f).toInt()))
+    }
+
+    /**
+     * A lake below a slope, to try out how things move (Phase 4b): on the slope, on little terraces, round logs
+     * and boulders that roll down when pushed, long logs lying across it; on the lake a raft and a boat; above it
+     * a layer of billowing clouds the breeze takes along (the wind is set with the weather).
+     */
+    fun lake(world: World, seed: Long) {
+        val k = Kit(world, seed)
+        val w = k.w
+        val h = k.h
+        val level = (h * 0.62f).toInt()
+        val top = h * 0.3f
+        val shore = w * 0.45f
+        val terraces = 4
+        val surface = IntArray(w) { x ->
+            val fx = x.toFloat()
+            val y = when {
+                // the slope comes down in terraces, each a little flat step, to the shore of the lake
+                fx < shore -> {
+                    val u = fx / shore
+                    val step = (u * terraces).toInt().coerceAtMost(terraces - 1)
+                    val inStep = u * terraces - step
+                    val drop = (level + 2 - top) / terraces
+                    top + drop * step + drop * smooth((inStep - 0.55f) / 0.45f) + (k.n.fbm(fx / 14f, 2.1f, 3) - 0.5f) * h * 0.012f
+                }
+                // the lake bed, a bowl, and a low bank at the far side
+                fx < w * 0.94f -> {
+                    val u = (fx - shore) / (w * 0.49f)
+                    level + 2 + h * 0.2f * sqrt(sin01(u))
+                }
+                else -> level - h * 0.03f
+            }
+            y.toInt()
+        }
+        val earth = k.id("earth")
+        val sand = k.id("sand")
+        k.ground(surface) { x, d ->
+            when {
+                x > shore * 0.97f && x < w * 0.95f -> sand
+                d < 6 -> earth
+                else -> null
+            }
+        }
+        k.flood(k.id("water"), level, (shore * 0.95f).toInt(), (w * 0.95f).toInt())
+        k.grass(surface)
+        val stone = k.id("stone")
+        val deadwood = k.id("deadwood")
+        // a round thing (a boulder, a log seen end on) resting on the flat of a terrace: each an object of its own
+        fun round(cx: Int, r: Int, m: Int) {
+            var cy = Int.MAX_VALUE
+            for (x in cx - r..cx + r) if (x in 0 until w) cy = min(cy, surface[x])
+            cy -= r + 1
+            world.startPiece()
+            for (y in cy - r..cy + r) for (x in cx - r..cx + r) {
+                if ((x - cx) * (x - cx) + (y - cy) * (y - cy) <= r * r + r && k.at(x, y) == k.air) k.put(x, y, m)
+            }
+            world.endPiece()
+        }
+        for (t in 0 until terraces) {
+            // the flat part of each terrace, from its start to before its edge
+            val x0 = (shore * t / terraces).toInt()
+            val flat = (shore / terraces * 0.5f).toInt()
+            when (t % 2) {
+                0 -> {
+                    round(x0 + flat / 3, 4 + t % 3, stone)
+                    round(x0 + flat * 3 / 4, 3, deadwood)
+                }
+                else -> {
+                    round(x0 + flat / 4, 3, deadwood)
+                    round(x0 + flat * 2 / 3, 5, stone)
+                }
+            }
+        }
+        // a long log lying on the lowest terrace, by the shore
+        val lx = (shore * (terraces - 1) / terraces + shore / terraces * 0.1f).toInt()
+        val ly = surface[lx + 6] - 3
+        world.startPiece()
+        for (yy in ly..ly + 1) for (xx in lx until lx + 13) if (k.at(xx, yy) == k.air) k.put(xx, yy, deadwood)
+        world.endPiece()
+        // a raft and a boat on the lake
+        val wood = k.id("wood")
+        val rx = (w * 0.56f).toInt()
+        world.startPiece()
+        for (yy in level - 2..level - 1) for (xx in rx until rx + 18) k.put(xx, yy, wood)
+        world.endPiece()
+        val bx = (w * 0.76f).toInt()
+        val hull = 20
+        world.startPiece()
+        for (xx in 0 until hull) {
+            // a hull: a keel along the bottom, the bow and stern rising at the ends
+            val end = min(xx, hull - 1 - xx)
+            val rise = when {
+                end == 0 -> 4
+                end == 1 -> 3
+                end == 2 -> 1
+                else -> 0
+            }
+            for (yy in level - 2 - rise..level - 1) {
+                if (yy == level - 1 || yy == level - 2 && end > 0 || end <= 2) k.put(bx + xx, yy, wood)
+            }
+        }
+        world.endPiece()
+        // billows of cloud over the lake and the slope
+        val cloud = k.id("cloud")
+        for (c in 0 until LAKE_CLOUDS) {
+            val cx = (w * (c + 0.5f) / LAKE_CLOUDS + (k.n.hash(c, 31) - 0.5f) * w * 0.06f).toInt()
+            val r = 7 + (k.n.hash(c, 37) * 5).toInt()
+            world.paint(cloud, cx, (h * 0.12f).toInt(), r)
+            // a smaller billow on its shoulder
+            world.paint(cloud, cx + r, (h * 0.12f).toInt() + r / 3, r * 2 / 3)
+        }
+        k.birds(listOf((w * 0.6f).toInt()))
+    }
+
+    /** Billows of cloud over the lake template. */
+    private const val LAKE_CLOUDS = 7
+
+    /** 0 below 0, 1 above 1, smoothly in between. */
+    private fun smooth(u: Float): Float {
+        val c = u.coerceIn(0f, 1f)
+        return c * c * (3f - 2f * c)
     }
 
     /** A bowl from 0 to 1 and back to 0 over [u] in 0..1. */

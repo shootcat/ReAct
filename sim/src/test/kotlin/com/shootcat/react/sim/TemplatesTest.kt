@@ -28,6 +28,7 @@ class TemplatesTest {
                 Template.VOLCANO -> assertTrue(world.has("lava") > 300 && world.has("basalt") > 300 && world.has("saltwater") > 500, what)
                 Template.CAVES -> assertTrue(world.has("gas_vent") > 0 && world.has("firedamp") > 20 && world.has("firefly") > 0 && world.has("water") > 100, what)
                 Template.FOREST -> assertTrue(world.has("water") > world.size / 30 && world.has("trunk") > 30 && world.has("stone") > 100 && world.has("deadwood") > 0 && world.has("wood") > 0, what)
+                Template.LAKE -> assertTrue(world.has("water") > world.size / 30 && world.has("stone") > 50 && world.has("deadwood") > 40 && world.has("wood") > 40 && world.has("cloud") > 200, what)
             }
         }
     }
@@ -101,5 +102,37 @@ class TemplatesTest {
         }
         Pictures.write(world, backdrop, "template_forest_rolled", scale = 2)
         assertTrue(furthest > startX + 15, "the boulder rolled on down: from ${startX} to $furthest")
+    }
+
+    @Test
+    fun `by the lake the raft and the boat float, logs and boulders rest on the slope, the clouds drift in the breeze`() {
+        val size = WorldSize.MEDIUM
+        val world = World(size.width, size.height, materials, Terrain.SEED)
+        Template.LAKE.build(world)
+        val backdrop = Backdrop.of(world)
+        val cloud = materials.id("cloud")
+        fun cloudX(): Double {
+            var sum = 0.0
+            var n = 0
+            for (i in 0 until world.size) if (world.mat[i].toInt() == cloud) { sum += i % world.width; n++ }
+            return sum / n
+        }
+        val x0 = cloudX()
+        world.run(900)
+        Pictures.write(world, backdrop, "template_lake_after", scale = 2)
+        val bodies = world.bodyStates()
+        val wood = bodies.filter { it.material == materials.id("wood") }
+        val water = materials.id("water")
+        println("lake: " + bodies.joinToString { "${materials.spec(it.material).id}${it.cells}@%.0f,%.0f a%.0f%s".format(it.x, it.y, it.angle, if (it.asleep) "z" else "") })
+        assertEquals(2, wood.size, "a raft and a boat")
+        for (b in wood) {
+            val below = world.material(b.x.toInt(), b.y.toInt() + 3)
+            assertEquals(water, below, "floating: water under the ${b.cells} cells at ${b.x},${b.y}")
+        }
+        // (pebbles of stone in the sand of the lake bed come loose too)
+        val onSlope = bodies.filter { it.material != materials.id("wood") && it.cells > 5 }
+        assertTrue(onSlope.size >= 8, "logs and boulders: ${onSlope.size}")
+        assertTrue(onSlope.all { it.x < size.width * 0.45f }, "still on the slope: ${onSlope.map { it.x.toInt() }}")
+        assertTrue(cloudX() > x0 + 5, "the clouds drift with the breeze: from %.0f to %.0f".format(x0, cloudX()))
     }
 }
