@@ -74,10 +74,7 @@ class GewitterfeuerTest {
         assertNull(r)
         assertTrue(strikes.size > 30, "a thunderstorm: ${strikes.size} strokes")
         assertEquals("leaves", strikes.first().material, "the first stroke into the crown of the tree")
-        // since the clouds hang in their band (4b) the storm lies evenly over the whole width: now and then a
-        // stroke goes into the tower on the plateau (measured 3 of 53), never into the woodpile
-        assertTrue(strikes.count { it.x < 100 } >= strikes.size * 9 / 10, "most on the ridge and the hill: ${strikes.filter { it.x >= 100 }.map { it.x }}")
-        assertTrue(strikes.none { it.x in 155..190 }, "none into the woodpile: ${strikes.filter { it.x >= 100 }.map { it.x }}")
+        assertTrue(strikes.all { it.x < 100 }, "all on the ridge and the hill: ${strikes.filter { it.x >= 100 }.map { it.x }}")
         assertEquals(72, count(end, "wood"), "the woodpile is untouched")
         assertTrue(strikes.last().second < 160f, "the storm has passed: last stroke at ${strikes.last().second} s")
     }
@@ -142,9 +139,8 @@ class GewitterfeuerTest {
     @Test
     fun `a post stood on the pile even later, as long as the storm lasts, bronze`() {
         // the plateau drains into the cave (Phase 4): the rain wets the wood only on top, it still burns. Whether
-        // a stroke still kindles it this late is chance. Measured (4b, with floating and riding): a post put there
-        // at 95, 115, 120 or 125 s kindles it; at 100, 105, 110 and 130 s no stroke did before the storm passed
-        // (at 105 s six went into the post and the wet pile did not catch)
+        // a stroke still kindles it this late is chance. Measured (4b, clouds in their band): a post put there at
+        // 95, 100, 105, 115, 120, 125 or 130 s kindles it; at 110 s the strokes went into the posts in the rock
         val (_, r) = lateOnPile(120, 180)
         assertEquals(Medal.BRONZE, assertNotNull(r).medal)
     }
@@ -177,7 +173,7 @@ class GewitterfeuerTest {
     fun `a short post stood on the heap of sand is washed down by the rain, and kindles nothing`() {
         // before 4b it stood on the heap, took the strokes and made glass under it; with the clouds of 4b the rain
         // washes the sand from under it after about 3 s, it falls into the post hole beside the pile and takes a
-        // stroke now and then there, the ridge the rest (measured: 1 of 24 into it)
+        // stroke now and then there, the ridge the rest (measured: 4 of 19 into it)
         val (play, r, strikes) = solve("sand", "wait 30\nhand 145 79\nhand 192 74")
         assertNull(r)
         assertEquals(mt.id("metal"), play.session.world.material(185, 80), "the post in the hole: ${strikes.map { it.x }}")

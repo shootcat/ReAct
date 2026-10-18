@@ -604,7 +604,7 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
                 val alpha = a * a * (3f - 2f * a) * CLOUD_ALPHA
                 var bright = (1f - above * CLOUD_SHADOW).coerceAtLeast(floor) + (n - 0.5f) * 0.1f
                 bright = bright.coerceIn(0f, 1.04f)
-                var c = mix(scale(CLOUD_TOP, bright), CLOUD_BELLY, (1f - bright) * 0.35f)
+                var c = mix(scale(CLOUD_TOP, bright), CLOUD_BELLY, ((1f - bright) * 0.35f).coerceAtLeast(0f))
                 if (flash > 0f) c = mix(c, 0xFFFFFFFF.toInt(), minOf(1f, flash))
                 out[b] = ((alpha * 255f).toInt() shl 24) or (c and 0xFFFFFF)
             }
@@ -860,20 +860,27 @@ object Backdrop {
 
     /**
      * Per column, the row where the ground begins for the scenery (Phase 4b): above it the sky is seen, below it
-     * the cave wall. The first ground from the top that rests on something, not water, drops, loose bodies,
-     * things in the air or wood standing on it, which would leave a dark column of cave wall behind them in the
-     * sky (and behind a lake) once they moved; evened out over a few columns, so a thin spike of rock does not
-     * draw one either.
+     * the cave wall. The first ground from the top: rock, anchored level ground, or loose ground lying on
+     * something; not water, drops, stones, bodies, things in the air or wood standing on it, which would leave a
+     * dark column of cave wall behind them in the sky (and behind a lake) once they moved; evened out over a few
+     * columns, so a thin spike of rock does not draw one either.
      */
     fun groundLine(world: World): IntArray {
         val w = world.width
         val h = world.height
         val mt = world.materials
-        val firm = BooleanArray(mt.count) { it != AIR && mt.kind[it] != Kind.GAS && mt.kind[it] != Kind.LIQUID && !mt.flammable[it] }
         val first = IntArray(w) { x ->
             (0 until h).firstOrNull { y ->
                 val i = y * w + x
-                firm[world.mat[i].toInt()] && world.bodyOf(i) == 0 && (y == h - 1 || world.mat[i + w].toInt() != AIR)
+                val m = world.mat[i].toInt()
+                val k = mt.kind[m]
+                // rock and the level's anchored ground; loose ground (earth, sand) where it lies on something
+                when {
+                    m == AIR || k == Kind.GAS || k == Kind.LIQUID || mt.flammable[m] || world.bodyOf(i) != 0 -> false
+                    k == Kind.STATIC || world.flags[i].toInt() and Flag.ANCHORED != 0 -> true
+                    k == Kind.POWDER -> y == h - 1 || world.mat[i + w].toInt() != AIR
+                    else -> false
+                }
             } ?: h
         }
         return IntArray(w) { x ->

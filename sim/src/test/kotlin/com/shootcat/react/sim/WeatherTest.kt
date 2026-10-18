@@ -184,7 +184,8 @@ class WeatherTest {
         return lab
     }
 
-    private fun untilStrike(lab: Lab, seconds: Int = 40): Boolean {
+    /** (The first stroke comes by chance: measured with this lab after 0.4 to 49 s depending on the seed, 4b.) */
+    private fun untilStrike(lab: Lab, seconds: Int = 60): Boolean {
         repeat(seconds * 60) {
             lab.world.step()
             if (lab.world.events[Event.LIGHTNING] > 0) return true

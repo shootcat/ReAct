@@ -56,9 +56,12 @@ class Light(private val world: World, private val diffuse: Boolean = false) {
     fun compute() {
         val glowing = gather()
         sky()
+        // the picture's diffuse light already reaches in under things along its slanting rays: it scatters less
+        val d = if (diffuse) DIFFUSE_DECAY else SKY_DECAY
+        val dd = if (diffuse) DIFFUSE_DECAY_DIAGONAL else SKY_DECAY_DIAGONAL
         repeat(ROUNDS) {
-            forward(level, out, SKY_DECAY, SKY_DECAY_DIAGONAL)
-            backward(level, out, SKY_DECAY, SKY_DECAY_DIAGONAL)
+            forward(level, out, d, dd)
+            backward(level, out, d, dd)
         }
         if (!glowing) return
         lamp.fill(0f)
@@ -250,6 +253,10 @@ class Light(private val world: World, private val diffuse: Boolean = false) {
         private const val RAYS = 5
         private val RAY_SLOPE = intArrayOf(-2, -1, 0, 1, 2)
         private val RAY_WEIGHT = floatArrayOf(0.1f, 0.22f, 0.36f, 0.22f, 0.1f)
+
+        /** Scattering of the diffuse light: what is left after one block off its way. */
+        const val DIFFUSE_DECAY = 0.85f
+        const val DIFFUSE_DECAY_DIAGONAL = 0.8f
 
         /** Forward and backward sweeps: two rounds carry light round a corner or two. */
         private const val ROUNDS = 2

@@ -288,6 +288,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     private val colClouds = IntArray(width)
     private val colBottom = IntArray(width)
     private val colRun = IntArray(width)
+    private val colCover = IntArray(width)
     private val spanX0 = IntArray(width / 2 + 1)
     private val spanX1 = IntArray(width / 2 + 1)
     private val kindOf = materials.kind
@@ -1843,9 +1844,10 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
 
     /**
      * A cloud (3c.1, 4b) hangs in its band of the sky, from the condensation height up to [cloudTop]: below the
-     * band it rises into it, above it it sinks back. Inside the band nothing pulls it down, so clouds keep their
-     * shape and never slide into heaps and cones. There they spread sideways where they are crowded, and lone
-     * wisps draw towards the nearest mass of cloud: clouds spread out and gather into billows. The wind takes
+     * band it rises into it, above it it sinks back. Inside the band it drifts slowly down onto its flat base and
+     * billows up from it, but never slides off sideways into a heap or cone. Where a column of cloud stands far
+     * deeper than the one beside, or the cloud is crowded, it spreads out sideways; lone wisps draw towards the
+     * nearest mass of cloud: clouds spread out and gather into billows. The wind takes
      * them along ([shiftClouds]); a lone wisp slowly evaporates; without a condensation height clouds dissolve.
      * Rain, snow and lightning come in [weather].
      */
@@ -1861,17 +1863,43 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
                 if (chance(CLOUD_RISE)) swap(i, up, x, y, x, y - 1) else wake(x, y)
                 return
             }
+            // under a cloud it joins it on top, as steam does: clouds grow upwards from their flat base
             val d = if (coin()) 1 else -1
-            val nx = x + d
-            if (nx in 0 until w && mat[up + d].toInt() == AIR && chance(CLOUD_RISE)) swap(i, up + d, x, y, nx, y - 1)
+            if (!chance(CLOUD_RISE)) {
+                wake(x, y)
+            } else if (mat[up].toInt() == cloudId && joinOnTop(x, y, i)) {
+                return
+            } else if (x + d in 0 until w && mat[up + d].toInt() == AIR) {
+                swap(i, up + d, x, y, x + d, y - 1)
+            } else if (x + d in 0 until w && mat[i + d].toInt() == AIR) {
+                swap(i, i + d, x, y, x + d, y)
+            } else {
+                wake(x, y)
+            }
             return
         }
         val top = cloudTop()
         if (y < top) {
+            // above the band it sinks back into it, past the cloud under it down its side
             val down = i + w
-            if (mat[down].toInt() == AIR) {
-                if (chance(CLOUD_SINK)) swap(i, down, x, y, x, y + 1) else wake(x, y)
+            val d = if (coin()) 1 else -1
+            if (!chance(CLOUD_SINK)) {
+                wake(x, y)
+            } else if (mat[down].toInt() == AIR) {
+                swap(i, down, x, y, x, y + 1)
+            } else if (x + d in 0 until w && mat[down + d].toInt() == AIR) {
+                swap(i, down + d, x, y, x + d, y + 1)
+            } else if (x + d in 0 until w && mat[i + d].toInt() == AIR) {
+                swap(i, i + d, x, y, x + d, y)
+            } else {
+                wake(x, y)
             }
+            return
+        }
+        // in the band it drifts slowly down onto its base, where nothing holds it: clouds get a flat underside at
+        // the condensation height and billow up from it, without sliding off sideways into a cone
+        if (y < cloudBase && mat[i + w].toInt() == AIR && chance(CLOUD_SETTLE)) {
+            swap(i, i + w, x, y, x, y + 1)
             return
         }
         val n = cloudAround(x, y)
@@ -1902,11 +1930,18 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             } else if (sx != 0 && nx in 0 until w && mat[i + sx].toInt() == AIR) {
                 swap(i, i + sx, x, y, nx, y)
             }
-        } else if (n >= CLOUD_CROWD) {
-            // crowded: it spreads out sideways, so a cloud widens rather than heaping up
+        } else {
+            // its column far deeper than the one beside: it spreads out sideways, so a tall cloud widens rather
+            // than standing as a tower, and keeps steep, rounded sides rather than the slope of a heap
             val d = if (coin()) 1 else -1
-            if (x + d in 0 until w && mat[i + d].toInt() == AIR) swap(i, i + d, x, y, x + d, y)
-            else if (x - d in 0 until w && mat[i - d].toInt() == AIR) swap(i, i - d, x, y, x - d, y)
+            for (side in intArrayOf(d, -d)) {
+                val nx = x + side
+                if (nx !in 0 until w || mat[i + side].toInt() != AIR) continue
+                if (cloudColumn(x, top) - cloudColumn(nx, top) >= CLOUD_SLOPE) {
+                    swap(i, i + side, x, y, nx, y)
+                    return
+                }
+            }
         }
     }
 
@@ -1926,6 +1961,28 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         spawn(x, k, k * w + x, cloudId, t)
         stamp[k * w + x] = mark
         return true
+    }
+
+    /** Cloud cell [i] at (x, y) under a column of cloud moves to the top of that column, if there is room in the band. */
+    private fun joinOnTop(x: Int, y: Int, i: Int): Boolean {
+        val w = width
+        val limit = cloudTop()
+        var k = y - 1
+        while (k > limit && mat[k * w + x].toInt() == cloudId) k--
+        if (mat[k * w + x].toInt() != AIR) return false
+        swap(i, k * w + x, x, y, x, k)
+        return true
+    }
+
+    /** Cloud cells in column [x] of the band of clouds, from [top] down to the condensation height. */
+    private fun cloudColumn(x: Int, top: Int): Int {
+        var n = 0
+        var i = top * width + x
+        for (y in top..cloudBase) {
+            if (mat[i].toInt() == cloudId) n++
+            i += width
+        }
+        return n
     }
 
     /** Cloud cells among the 8 around (x, y). */
@@ -1994,26 +2051,35 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
                 } else if (stir) {
                     wake(x, y)
                 } else {
-                    // wisps to gather, crowded edges to spread (Phase 4b)
-                    val n = cloudAround(x, y)
-                    if (n <= CLOUD_LONE || n in CLOUD_CROWD..7) wake(x, y)
+                    // wisps to gather, edges to spread (Phase 4b)
+                    if (cloudAround(x, y) < 8) wake(x, y)
                 }
             }
         }
         // thunderstorms: a bank of cloud at least STORM_WIDTH wide and on average STORM_DEPTH deep (raining
-        // makes it patchy: a column with half that still belongs to it)
+        // makes it patchy: a column with half that still belongs to it, and so does a thin column among deep
+        // ones, Phase 4b: the depth counts as the mean over STORM_SPAN columns around; a column with no cloud
+        // over it does not)
         // (all the banks that are thunderclouds together: the stroke goes to the best point under any of them)
         val needWidth = if (storm > 0) STORM_WIDTH / 2 else STORM_WIDTH
+        var around = 0
+        for (k in 0 until minOf(w, STORM_SPAN + 1)) around += colClouds[k]
+        for (k in 0 until w) {
+            colCover[k] = around
+            if (k - STORM_SPAN >= 0) around -= colClouds[k - STORM_SPAN]
+            if (k + STORM_SPAN + 1 < w) around += colClouds[k + STORM_SPAN + 1]
+        }
+        val half = (STORM_DEPTH / 2) * (2 * STORM_SPAN + 1)
         var spans = 0
         var x = 0
         while (x < w) {
-            if (colClouds[x] < STORM_DEPTH / 2) {
+            if (colCover[x] < half || colClouds[x] == 0) {
                 x++
                 continue
             }
             val x0 = x
             var sum = 0
-            while (x < w && colClouds[x] >= STORM_DEPTH / 2) sum += colClouds[x++]
+            while (x < w && colCover[x] >= half && colClouds[x] > 0) sum += colClouds[x++]
             val span = x - x0
             if (span >= needWidth && sum >= span * STORM_DEPTH) {
                 spanX0[spans] = x0
@@ -3146,14 +3212,17 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         /** Clouds hang no closer to the top of the world than this (Phase 4b). */
         const val CLOUD_CEILING = 3
 
+        /** Chance per step that a cloud cell in its band with nothing under it drifts down a row (Phase 4b). */
+        private const val CLOUD_SETTLE = 0.05f
+
         /** Chance per step that a cloud cell in its band moves to spread or gather (Phase 4b). */
         private const val CLOUD_STIR = 0.15f
 
         /** With this many cloud cells of the 8 around or fewer, a wisp draws towards more cloud (Phase 4b). */
         private const val CLOUD_LONE = 2
 
-        /** With this many or more, a cloud cell beside the open air spreads into it (Phase 4b). */
-        private const val CLOUD_CROWD = 6
+        /** A column of cloud this many cells deeper than the one beside spreads into it (Phase 4b). */
+        private const val CLOUD_SLOPE = 4
 
         /** How far a wisp looks for more cloud: columns to either side, rows up and down. */
         private const val GATHER_X = 5
@@ -3169,6 +3238,8 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         /** A thunderstorm: a bank of cloud this wide (columns) and deep (cloud cells per column). */
         private const val STORM_WIDTH = 24
         private const val STORM_DEPTH = 6
+        /** Columns to either side over which the depth of a bank of cloud is evened out (Phase 4b). */
+        private const val STORM_SPAN = 4
         /** Chance per look that a thunderstorm strikes; more in a storm called up; never sooner than this after the last stroke. */
         private const val STRIKE_CHANCE = 0.02f
         private const val STRIKE_STORM = 0.12f
