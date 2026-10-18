@@ -6,7 +6,7 @@ REACT wird ein Physik-Puzzle mit fein simulierter Materie, im Stil von Noita ode
 - Sand rieselt, Wasser fließt, Holz brennt, Lava erstarrt, Dampf steigt auf.
 - Was passiert, ergibt sich aus den **Eigenschaften** der Materialien (Dichte, Zündpunkt, Wärmeleitung …), nicht aus Rezepten.
 
-**Stand: Phase 4 (Körperphysik, schlanke Fassung) ist fertig: Lose Strukturen sind starre Körper, sie fallen, kippen, rollen, schwimmen und zerbrechen; neue Vorlage „Wald am Hang“. Phase 5 (Bewohner) ist nicht begonnen.** Berichte: [`docs/PHASE1.md`](docs/PHASE1.md), [`docs/PHASE2.md`](docs/PHASE2.md), [`docs/PHASE3.md`](docs/PHASE3.md), [`docs/PHASE3B.md`](docs/PHASE3B.md), [`docs/PHASE3C.md`](docs/PHASE3C.md), [`docs/PHASE4.md`](docs/PHASE4.md).
+**Stand: Phase 4b (Optik und Bewegungsgefühl, dazu Erdöl) ist fertig: weiche Wolken in ihrer Höhenschicht, Schatten nur auf Oberflächen, waagerechtes Wasser, Körper kippen, rollen und schwimmen glaubhaft und werden als gedrehte, geglättete Bilder gezeichnet; neues Material Erdöl; neue Vorlage „See, Hang und Wolken“. Phase 5 (Bewohner) ist nicht begonnen.** Berichte: [`docs/PHASE1.md`](docs/PHASE1.md), [`docs/PHASE2.md`](docs/PHASE2.md), [`docs/PHASE3.md`](docs/PHASE3.md), [`docs/PHASE3B.md`](docs/PHASE3B.md), [`docs/PHASE3C.md`](docs/PHASE3C.md), [`docs/PHASE4.md`](docs/PHASE4.md), [`docs/PHASE4B.md`](docs/PHASE4B.md).
 
 Die Raster-Version mit Leveln (Leitfaden V1 und V2) ist nicht mehr Teil dieses Branches. Sie liegt hier:
 - Commit `a7fc414` (Tag `grid-legacy`),
@@ -34,11 +34,12 @@ Alle Builds sind mit demselben Schlüssel signiert und installieren sich als Upd
      - **Küste** mit Steilküste und Strand;
      - **Berg mit Schnee** in kalter Luft, mit gefrorenem Teich;
      - **Vulkan** mit Krater, Schlot, Magmakammer und Meer;
-     - **Höhlensystem** mit Gängen, Kammern, Teichen, einer Gasspalte voll Grubengas und einer versiegelten Lavatasche;
+     - **Höhlensystem** mit Gängen, Kammern, Teichen, einer Gasspalte voll Grubengas, einer versiegelten Lavatasche, einer Öltasche unter Fels und einer Ölquelle;
      - **Wald am Hang** (Phase 4): Bäume an einem langen Hang, an jedem zweiten lehnt ein Felsbrocken; unten ein See mit Floß. Brennt ein Baum, rollt sein Brocken in den See.
+     - **See, Hang und Wolken** (Phase 4b): ein Terrassenhang mit runden Brocken und Stämmen, ein See mit Floß und Boot, darüber Wolkenballen in einer Brise.
 2. **Material wählen** in der Leiste unten. Ausgeklappt hat sie zwei Zeilen: oben die Kategorien, darunter die Materialien oder Werkzeuge. Der Pfeil klappt sie auf eine schmale Zeile ein. Jede Karte zeigt die Körnung des Materials, den Vorrat (hier ∞) und die Kosten pro Einheit.
-   - **Lose:** Sand, Erde, Kies, Lehm, Salz, Schnee, Geröll, Erzgeröll, Glasscherben, Holzkohle, Asche.
-   - **Flüssig:** Wasser, Salzwasser, Lava, flüssiges Metall, Dampf, Wolke, Rauch, Grubengas.
+   - **Lose:** Sand, Erde, Kies, Lehm, Salz, Schnee, Geröll, Erzgeröll, Glasscherben, Holzkohle, Asche, Ruß.
+   - **Flüssig:** Wasser, Salzwasser, Erdöl, Teer, Lava, flüssiges Metall, Dampf, Wolke, Rauch, Grubengas.
    - **Bauen:** Holz, Ziegel, Stein, Basalt, Glas, Metall, Eis.
    - **Hitze:** Feuer, Glut, Lava.
    - **Leben:** Samen, Gras, Moos, Ranke, Fisch, Glühwürmchen, Wurm, Vogel. Tiere werden einzeln gesetzt: ein Tippen ein Tier, ein Strich alle 12 Zellen eines, in ihren Lebensraum (Fisch ins Wasser, Wurm in die Erde).
@@ -241,7 +242,8 @@ docs/PHASE3.md              Bericht zu Phase 3: Level, Abweichungen, Messwerte, 
 docs/phase3/                Bilder der Lösungswege je Level
 docs/PHASE3B.md, PHASE3C.md Berichte zu 3b (Bedienung, Glühen, warme Luft) und 3c (Wetter, Level 4 und 5)
 docs/PHASE4.md              Bericht zu Phase 4: Körperphysik, geänderte Level, Leistung
-docs/ELEMENTE.md            Vorschläge, die noch nicht umgesetzt sind (Schwarzpulver; Brücken, Gelenke, Seile, Strömung)
+docs/PHASE4B.md             Bericht zu Phase 4b: Wolken, Licht, Wasser, Kippen, Körperbilder, Holz, Leistung, Erdöl
+docs/ELEMENTE.md            Vorschläge, die noch nicht umgesetzt sind (Schwarzpulver; Brücken, Gelenke, Seile, Strömung; ein Öl-Level)
 docs/v2/                    Unterlagen der Raster-Version (Leitfaden V2)
 ```
 

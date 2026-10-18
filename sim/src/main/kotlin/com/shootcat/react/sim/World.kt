@@ -341,7 +341,6 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     }
     private val densityOf = materials.density
     private val fireId = materials.idOrNull("fire") ?: AIR
-    private val smokeId = materials.idOrNull("smoke") ?: AIR
     private val steamId = materials.idOrNull("steam") ?: AIR
     private val deadPlantId = materials.idOrNull("dead_plant") ?: AIR
     private val waterId = materials.idOrNull("water") ?: AIR
