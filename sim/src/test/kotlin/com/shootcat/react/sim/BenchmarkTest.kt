@@ -17,8 +17,9 @@ class BenchmarkTest {
         val render = Benchmark.renderMillis(Benchmark.sandboxWorld(materials, Terrain.WIDTH, Terrain.HEIGHT))
         val paused = Benchmark.renderMillis(Benchmark.sandboxWorld(materials, Terrain.WIDTH, Terrain.HEIGHT), paused = true)
         val largest = Benchmark.renderLargest(materials)
+        val frame = Benchmark.frameMillis(materials)
         val device = "${System.getProperty("os.name")} ${System.getProperty("os.arch")}, Java ${System.getProperty("java.version")}, ${Runtime.getRuntime().availableProcessors()} Kerne"
-        val report = Benchmark.report(results, render, device, paused, largest)
+        val report = Benchmark.report(results, render, device, paused, largest, frame)
         println(report)
         File("build").mkdirs()
         File("build/benchmark.md").writeText(report)

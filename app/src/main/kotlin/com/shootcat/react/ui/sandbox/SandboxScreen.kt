@@ -272,7 +272,7 @@ fun SandboxScreen(
                     val results = Benchmark.runAll(materials, steps = 300)
                     val render = Benchmark.renderMillis(Benchmark.sandboxWorld(materials, Terrain.WIDTH, Terrain.HEIGHT))
                     val paused = Benchmark.renderMillis(Benchmark.sandboxWorld(materials, Terrain.WIDTH, Terrain.HEIGHT), paused = true)
-                    Benchmark.report(results, render, device, paused, Benchmark.renderLargest(materials))
+                    Benchmark.report(results, render, device, paused, Benchmark.renderLargest(materials), Benchmark.frameMillis(materials))
                 }
             }
             Log.i("REACT", text)

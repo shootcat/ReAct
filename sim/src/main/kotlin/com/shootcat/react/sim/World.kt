@@ -165,6 +165,13 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     private val recent = BooleanArray(chunksX * chunksY) { true }
     private var heatPending = BooleanArray(chunksX * chunksY) { true }
 
+    /**
+     * Chunks in which most neighbours differed in temperature at the last heat step (Phase 4b): there every
+     * pair is worked out, a difference too small to matter as zero, rather than first asked about; the
+     * answer would be hard to guess for the processor. The same numbers either way, only faster.
+     */
+    private val heatBusy = BooleanArray(chunksX * chunksY)
+
     /** For measuring: update every chunk, asleep or not. */
     var keepAllAwake = false
 
@@ -301,6 +308,23 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     private val spanX0 = IntArray(width / 2 + 1)
     private val spanX1 = IntArray(width / 2 + 1)
     private val kindOf = materials.kind
+
+    /**
+     * The heat exchange of each pair of neighbours in one table (Phase 4b), four numbers per pair (a, b):
+     * sideways or downwards [MaterialTable.pairA] and [MaterialTable.pairB]; upwards, when b below is the
+     * warmer, out of a gas, [MaterialTable.riseA] and [MaterialTable.riseB], else the same as sideways.
+     */
+    private val exchange = FloatArray(materials.count * materials.count * 4).also { t ->
+        val n = materials.count
+        for (a in 0 until n) for (b in 0 until n) {
+            val k = a * n + b
+            val gas = materials.kind[b] == Kind.GAS
+            t[k * 4] = materials.pairA[k]
+            t[k * 4 + 1] = materials.pairB[k]
+            t[k * 4 + 2] = if (gas) materials.riseA[k] else materials.pairA[k]
+            t[k * 4 + 3] = if (gas) materials.riseB[k] else materials.pairB[k]
+        }
+    }
     private val densityOf = materials.density
     private val fireId = materials.idOrNull("fire") ?: AIR
     private val smokeId = materials.idOrNull("smoke") ?: AIR
@@ -402,6 +426,10 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
 
     /** Time spent on structures and bodies so far (Phase 4), for the benchmark. */
     var bodyNanos = 0L
+        private set
+
+    /** Time spent on heat so far (Phase 4b), for the benchmark. */
+    var heatNanos = 0L
         private set
 
     /** How many structures are not anchored: since Phase 4 each of them is a body. */
@@ -691,7 +719,9 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         // gas can only have moved where something happens
         if (n > 0) gasDirty = true
         if (step % LIGHT_EVERY == 0) light.compute()
+        val th = System.nanoTime()
         heat()
+        heatNanos += System.nanoTime() - th
         if (n > 0) update()
         living.randomTicks()
         val tb = System.nanoTime()
@@ -717,18 +747,6 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     // ------------------------------------------------------------------ heat (4.2)
 
     private fun heat() {
-        val w = width
-        val h = height
-        val m = mat
-        val tp = temp
-        val pa = materials.pairA
-        val pb = materials.pairB
-        val ra = materials.riseA
-        val rb = materials.riseB
-        val holds = materials.holdsTemp
-        val spawn = materials.spawnTemp
-        val n = materials.count
-        val cloud = cloudId
         // the wind carries warm air along with it (3c.3): it moves on downwind like warm air rises
         val windDir = if (windNow > 0f) 1 else if (windNow < 0f) -1 else 0
         windChance = ((if (windNow > 0f) windNow else -windNow) * WIND_HEAT * 65536f).toInt()
@@ -736,137 +754,176 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             for (cx in 0 until chunksX) {
                 val c = cy * chunksX + cx
                 if (!heatAwake[c]) continue
-                val x0 = cx * CHUNK
-                val x1 = minOf(w, x0 + CHUNK) - 1
-                val y0 = cy * CHUNK
-                val y1 = minOf(h, y0 + CHUNK) - 1
-                val leftAsleep = cx > 0 && !heatAwake[c - 1]
-                val upAsleep = cy > 0 && !heatAwake[c - chunksX]
-                var hot = false
-                for (y in y0..y1) {
-                    var i = y * w + x0
-                    // warm air that went sideways this step moves on only in the next (one cell per step either way)
-                    var spread = false
-                    for (x in x0..x1) {
-                        val ma = m[i].toInt()
-                        // right neighbour; warm air that cannot rise any further spreads sideways into cooler air
-                        // under what holds it (3b.9)
-                        // (3c: most pairs are of the same temperature, so that is asked first; the rest only then)
-                        if (x < w - 1) {
-                            val j = i + 1
-                            val d = tp[j] - tp[i]
-                            if (!(d > EPS || d < -EPS)) {
-                                spread = false
-                            } else if (!spread && (d > RISE || d < -RISE) && ma == AIR && m[j].toInt() == AIR && (
-                                    d > RISE && (lidded(j) && rises(j) || windDir < 0 && windy(j) && !closed(j)) ||
-                                        d < -RISE && (lidded(i) && rises(i) || windDir > 0 && windy(i) && !closed(i))
-                                    )
-                            ) {
-                                tp[i] += d
-                                tp[j] -= d
-                                spread = true
-                                hot = true
-                                if (x == x1) wakeChunk(cx + 1, cy)
-                            } else {
-                                spread = false
-                                val k = ma * n + m[j].toInt()
-                                val da = pa[k] * d
-                                val db = pb[k] * d
-                                tp[i] += da
-                                tp[j] -= db
-                                // (once the chunk is known to be warm, only its edge still has to ask)
-                                if ((!hot || x == x1) && (da > HEAT_WAKE || da < -HEAT_WAKE || db > HEAT_WAKE || db < -HEAT_WAKE)) {
-                                    hot = true
-                                    if (x == x1) wakeChunk(cx + 1, cy)
-                                }
-                            }
+                // (a copy of its own for each kind of chunk, so each is compiled for what happens in it)
+                if (heatBusy[c]) heatChunk(cx, cy, windDir, true) else heatChunk(cx, cy, windDir, false)
+            }
+        }
+    }
+
+    /**
+     * Heat in chunk ([cx], [cy]): exchanged between neighbours, carried up and along by warm air, given off by
+     * open air. In a [busy] chunk (see [heatBusy]) every pair is worked out, a difference of at most [EPS] as
+     * zero; in a calm one such a pair is passed over. The same numbers either way.
+     */
+    @Suppress("NOTHING_TO_INLINE")
+    private inline fun heatChunk(cx: Int, cy: Int, windDir: Int, busy: Boolean) {
+        val w = width
+        val h = height
+        val m = mat
+        val tp = temp
+        val pa = materials.pairA
+        val pb = materials.pairB
+        val ex = exchange
+        val holds = materials.holdsTemp
+        val spawn = materials.spawnTemp
+        val n = materials.count
+        val cloud = cloudId
+        val c = cy * chunksX + cx
+        val x0 = cx * CHUNK
+        val x1 = minOf(w, x0 + CHUNK) - 1
+        val y0 = cy * CHUNK
+        val y1 = minOf(h, y0 + CHUNK) - 1
+        val leftAsleep = cx > 0 && !heatAwake[c - 1]
+        val upAsleep = cy > 0 && !heatAwake[c - chunksX]
+        var still = 0
+        var hot = false
+        for (y in y0..y1) {
+            var i = y * w + x0
+            // warm air that went sideways this step moves on only in the next (one cell per step either way)
+            var spread = false
+            for (x in x0..x1) {
+                val ma = m[i].toInt()
+                // right neighbour; warm air that cannot rise any further spreads sideways into cooler air
+                // under what holds it (3b.9)
+                // (3c: most pairs are of the same temperature, so that is asked first; the rest only then)
+                if (x < w - 1) {
+                    val j = i + 1
+                    val mj = m[j].toInt()
+                    var d = tp[j] - tp[i]
+                    if (busy) {
+                        // (all bits of the difference kept when it is more than EPS, else none: no branch)
+                        val keep = (EPS_BITS - (d.toRawBits() and 0x7fffffff)) shr 31
+                        d = Float.fromBits(d.toRawBits() and keep)
+                        still += keep + 1
+                    }
+                    if (!busy && !(d > EPS || d < -EPS)) {
+                        spread = false
+                        still++
+                    } else if (!spread && ma == AIR && mj == AIR && (d > RISE || d < -RISE) && (
+                            d > RISE && (lidded(j) && rises(j) || windDir < 0 && windy(j) && !closed(j)) ||
+                                d < -RISE && (lidded(i) && rises(i) || windDir > 0 && windy(i) && !closed(i))
+                            )
+                    ) {
+                        tp[i] += d
+                        tp[j] -= d
+                        spread = true
+                        hot = true
+                        if (x == x1) wakeChunk(cx + 1, cy)
+                    } else {
+                        spread = false
+                        val k = (ma * n + mj) shl 2
+                        val da = ex[k] * d
+                        val db = ex[k + 1] * d
+                        tp[i] += da
+                        tp[j] -= db
+                        // (once the chunk is known to be warm, only its edge still has to ask)
+                        if ((!hot || x == x1) && (da > HEAT_WAKE || da < -HEAT_WAKE || db > HEAT_WAKE || db < -HEAT_WAKE)) {
+                            hot = true
+                            if (x == x1) wakeChunk(cx + 1, cy)
                         }
-                        // lower neighbour; out of a hotter gas below, heat rises faster, and warmer air below
-                        // rises: it changes places with the cooler air above (3b.9)
-                        if (y < h - 1) {
-                            val j = i + w
-                            val d = tp[j] - tp[i]
-                            if (d > RISE && ma == AIR && m[j].toInt() == AIR && rises(j)) {
-                                tp[i] += d
-                                tp[j] -= d
-                                hot = true
-                                if (y == y1) wakeChunk(cx, cy + 1)
-                            } else if (d > EPS || d < -EPS) {
-                                val mj = m[j].toInt()
-                                val k = ma * n + mj
-                                val up = d > 0f && kindOf[mj] == Kind.GAS
-                                val ka = if (up) ra[k] else pa[k]
-                                val kb = if (up) rb[k] else pb[k]
-                                val da = ka * d
-                                val db = kb * d
-                                tp[i] += da
-                                tp[j] -= db
-                                if ((!hot || y == y1) && (da > HEAT_WAKE || da < -HEAT_WAKE || db > HEAT_WAKE || db < -HEAT_WAKE)) {
-                                    hot = true
-                                    if (y == y1) wakeChunk(cx, cy + 1)
-                                }
-                            }
-                        }
-                        // neighbours in sleeping chunks to the left and above are not visited from there
-                        if (x == x0 && leftAsleep) {
-                            val j = i - 1
-                            val d = tp[i] - tp[j]
-                            if (d > EPS || d < -EPS) {
-                                val k = m[j].toInt() * n + ma
-                                val dj = pa[k] * d
-                                tp[j] += dj
-                                tp[i] -= pb[k] * d
-                                if (dj > HEAT_WAKE || dj < -HEAT_WAKE) wakeChunk(cx - 1, cy)
-                                if (d * pb[k] > HEAT_WAKE || d * pb[k] < -HEAT_WAKE) hot = true
-                            }
-                        }
-                        if (y == y0 && upAsleep) {
-                            val j = i - w
-                            val d = tp[i] - tp[j]
-                            if (d > RISE && ma == AIR && m[j].toInt() == AIR && rises(i)) {
-                                tp[j] += d
-                                tp[i] -= d
-                                hot = true
-                                wakeChunk(cx, cy - 1)
-                            } else if (d > EPS || d < -EPS) {
-                                val k = m[j].toInt() * n + ma
-                                val dj = pa[k] * d
-                                tp[j] += dj
-                                tp[i] -= pb[k] * d
-                                if (dj > HEAT_WAKE || dj < -HEAT_WAKE) wakeChunk(cx, cy - 1)
-                                if (d * pb[k] > HEAT_WAKE || d * pb[k] < -HEAT_WAKE) hot = true
-                            }
-                        }
-                        // open air carries heat away and comes back to the temperature of the surroundings; air
-                        // shut in keeps its warmth (3b.9)
-                        if (ma == AIR || ma == cloud) {
-                            // (air at the temperature of the surroundings, most of it, has nothing to do)
-                            val d = ambient - tp[i]
-                            if (d != 0f && !closed(i)) {
-                                if (y == 0) {
-                                    // the top row is the open sky: what rises up to it is gone
-                                    if (d > EPS || d < -EPS) hot = true
-                                    tp[i] = ambient
-                                } else if (d > AIR_SNAP || d < -AIR_SNAP) {
-                                    tp[i] += d * AIR_RELAX
-                                    hot = true
-                                } else {
-                                    tp[i] = ambient
-                                }
-                            }
-                        } else if (holds[ma]) {
-                            // fed from the deep: what it gave off is made up at once
-                            if (tp[i] != spawn[ma]) hot = true
-                            tp[i] = spawn[ma]
-                        }
-                        i++
                     }
                 }
-                if (hot) {
-                    pending[c] = true
-                    heatPending[c] = true
+                // lower neighbour; out of a hotter gas below, heat rises faster, and warmer air below
+                // rises: it changes places with the cooler air above (3b.9)
+                if (y < h - 1) {
+                    val j = i + w
+                    val mj = m[j].toInt()
+                    var d = tp[j] - tp[i]
+                    if (busy) {
+                        val keep = (EPS_BITS - (d.toRawBits() and 0x7fffffff)) shr 31
+                        d = Float.fromBits(d.toRawBits() and keep)
+                        still += keep + 1
+                    }
+                    if (!busy && !(d > EPS || d < -EPS)) {
+                        // (nothing to exchange)
+                        still++
+                    } else if (ma == AIR && mj == AIR && d > RISE && rises(j)) {
+                        tp[i] += d
+                        tp[j] -= d
+                        hot = true
+                        if (y == y1) wakeChunk(cx, cy + 1)
+                    } else {
+                        // (upwards, when the cell below is the warmer: the sign bit of -d)
+                        val k = ((ma * n + mj) shl 2) + ((java.lang.Float.floatToRawIntBits(-d) ushr 30) and 2)
+                        val da = ex[k] * d
+                        val db = ex[k + 1] * d
+                        tp[i] += da
+                        tp[j] -= db
+                        if ((!hot || y == y1) && (da > HEAT_WAKE || da < -HEAT_WAKE || db > HEAT_WAKE || db < -HEAT_WAKE)) {
+                            hot = true
+                            if (y == y1) wakeChunk(cx, cy + 1)
+                        }
+                    }
                 }
+                // neighbours in sleeping chunks to the left and above are not visited from there
+                if (x == x0 && leftAsleep) {
+                    val j = i - 1
+                    val d = tp[i] - tp[j]
+                    if (d > EPS || d < -EPS) {
+                        val k = m[j].toInt() * n + ma
+                        val dj = pa[k] * d
+                        tp[j] += dj
+                        tp[i] -= pb[k] * d
+                        if (dj > HEAT_WAKE || dj < -HEAT_WAKE) wakeChunk(cx - 1, cy)
+                        if (d * pb[k] > HEAT_WAKE || d * pb[k] < -HEAT_WAKE) hot = true
+                    }
+                }
+                if (y == y0 && upAsleep) {
+                    val j = i - w
+                    val d = tp[i] - tp[j]
+                    if (d > RISE && ma == AIR && m[j].toInt() == AIR && rises(i)) {
+                        tp[j] += d
+                        tp[i] -= d
+                        hot = true
+                        wakeChunk(cx, cy - 1)
+                    } else if (d > EPS || d < -EPS) {
+                        val k = m[j].toInt() * n + ma
+                        val dj = pa[k] * d
+                        tp[j] += dj
+                        tp[i] -= pb[k] * d
+                        if (dj > HEAT_WAKE || dj < -HEAT_WAKE) wakeChunk(cx, cy - 1)
+                        if (d * pb[k] > HEAT_WAKE || d * pb[k] < -HEAT_WAKE) hot = true
+                    }
+                }
+                // open air carries heat away and comes back to the temperature of the surroundings; air
+                // shut in keeps its warmth (3b.9)
+                if (ma == AIR || ma == cloud) {
+                    // (air at the temperature of the surroundings, most of it, has nothing to do)
+                    val d = ambient - tp[i]
+                    if (d != 0f && !closed(i)) {
+                        if (y == 0) {
+                            // the top row is the open sky: what rises up to it is gone
+                            if (d > EPS || d < -EPS) hot = true
+                            tp[i] = ambient
+                        } else if (d > AIR_SNAP || d < -AIR_SNAP) {
+                            tp[i] += d * AIR_RELAX
+                            hot = true
+                        } else {
+                            tp[i] = ambient
+                        }
+                    }
+                } else if (holds[ma]) {
+                    // fed from the deep: what it gave off is made up at once
+                    if (tp[i] != spawn[ma]) hot = true
+                    tp[i] = spawn[ma]
+                }
+                i++
             }
+        }
+        heatBusy[c] = still < (x1 - x0 + 1) * (y1 - y0 + 1)
+        if (hot) {
+            pending[c] = true
+            heatPending[c] = true
         }
     }
 
@@ -3177,6 +3234,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         const val CHUNK = 1 shl SHIFT
 
         private const val EPS = 0.001f
+        private val EPS_BITS = EPS.toRawBits()
 
         /** A temperature change above this keeps a chunk awake. */
         private const val HEAT_WAKE = 0.02f

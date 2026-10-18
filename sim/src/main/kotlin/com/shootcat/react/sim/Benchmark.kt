@@ -19,6 +19,8 @@ object Benchmark {
         val bodyMs: Double = 0.0,
         val bodies: Int = 0,
         val movingBodies: Int = 0,
+        /** Of that, heat (Phase 4b). */
+        val heatMs: Double = 0.0,
     )
 
     fun emptyWorld(materials: MaterialTable, width: Int, height: Int): World = World(width, height, materials, 1L)
@@ -134,6 +136,7 @@ object Benchmark {
         var bodies = 0L
         var moving = 0L
         val b0 = world.bodyNanos
+        val h0 = world.heatNanos
         val t0 = System.nanoTime()
         repeat(steps) {
             world.step()
@@ -145,7 +148,7 @@ object Benchmark {
         val secs = ns / 1e9
         return Result(
             name, steps, steps / secs, ns / 1e6 / steps, awake / steps, world.chunksX * world.chunksY,
-            (world.bodyNanos - b0) / 1e6 / steps, (bodies / steps).toInt(), (moving / steps).toInt(),
+            (world.bodyNanos - b0) / 1e6 / steps, (bodies / steps).toInt(), (moving / steps).toInt(), (world.heatNanos - h0) / 1e6 / steps,
         )
     }
 
@@ -187,6 +190,42 @@ object Benchmark {
         )
     }
 
+    /**
+     * Milliseconds per whole frame as the app makes it while the world runs (Phase 4b): the picture, the soft
+     * cloud layer, the bodies as pictures of their own, haze, light and flames; in the landscape by the lake
+     * (raft, boat, logs, boulders, clouds in the wind), after [settle] steps.
+     */
+    fun frameMillis(materials: MaterialTable, frames: Int = 60, settle: Int = 300): Double {
+        val size = WorldSize.MEDIUM
+        val world = World(size.width, size.height, materials, Terrain.SEED)
+        Template.LAKE.build(world)
+        world.run(settle)
+        val renderer = Renderer(world, IntArray(world.size)).also { it.bodySprites = true }
+        val out = IntArray(world.size)
+        val clouds = IntArray(renderer.cloudWidth * renderer.cloudHeight)
+        val haze = IntArray(renderer.layerWidth * renderer.layerHeight)
+        val light = IntArray(renderer.layerWidth * renderer.layerHeight)
+        val flames = IntArray(renderer.flameWidth * renderer.flameHeight)
+        val sprites = ArrayList<BodySprite>()
+        fun frame(k: Int) {
+            renderer.render(out, k, true)
+            renderer.renderClouds(clouds, k)
+            renderer.renderBodies(sprites)
+            renderer.renderLayers(haze, light)
+            renderer.renderFlames(flames)
+        }
+        repeat(60) { frame(it) }
+        var ns = 0L
+        repeat(frames) {
+            // the world moves on between the frames, so the bodies' pictures are made anew where they turned
+            world.step()
+            val t0 = System.nanoTime()
+            frame(it)
+            ns += System.nanoTime() - t0
+        }
+        return ns / 1e6 / frames
+    }
+
     /** Milliseconds per picture of the largest world: all of it, and the part a phone shows (a third of its width). */
     fun renderLargest(materials: MaterialTable): Pair<Double, Double> {
         val big = WorldSize.LARGE
@@ -195,12 +234,15 @@ object Benchmark {
         return all to part
     }
 
-    fun report(results: List<Result>, renderMs: Double?, device: String, pausedRenderMs: Double? = null, largest: Pair<Double, Double>? = null): String = buildString {
+    fun report(
+        results: List<Result>, renderMs: Double?, device: String, pausedRenderMs: Double? = null, largest: Pair<Double, Double>? = null,
+        frameMs: Double? = null,
+    ): String = buildString {
         appendLine("Gerät: $device")
         for (r in results) {
             appendLine(
-                "%s: %.0f Schritte/s (%.2f ms pro Schritt, %d von %d Chunks wach, %d Schritte gemessen; Körper %.2f ms, %d Körper, %d bewegt)"
-                    .format(r.name, r.stepsPerSecond, r.msPerStep, r.awakeChunks, r.chunks, r.steps, r.bodyMs, r.bodies, r.movingBodies),
+                "%s: %.0f Schritte/s (%.2f ms pro Schritt, %d von %d Chunks wach, %d Schritte gemessen; Körper %.2f ms, %d Körper, %d bewegt; Wärme %.2f ms)"
+                    .format(r.name, r.stepsPerSecond, r.msPerStep, r.awakeChunks, r.chunks, r.steps, r.bodyMs, r.bodies, r.movingBodies, r.heatMs),
             )
         }
         if (renderMs != null) appendLine("Bild erzeugen: %.2f ms".format(renderMs))
@@ -209,5 +251,6 @@ object Benchmark {
             appendLine("Bild der größten Welt, ganz: %.2f ms".format(largest.first))
             appendLine("Bild der größten Welt, sichtbarer Ausschnitt (ein Drittel): %.2f ms".format(largest.second))
         }
+        if (frameMs != null) appendLine("Ganzes Bild mit Wolken und Körperbildern (See, Hang und Wolken): %.2f ms".format(frameMs))
     }
 }

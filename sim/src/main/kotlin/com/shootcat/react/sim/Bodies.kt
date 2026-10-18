@@ -1050,6 +1050,8 @@ internal class Bodies(private val world: World) {
                 val ex = x - fx
                 val ey = y - fy
                 var d = ex * ex + ey * ey
+                // (outside the outline it only gets further: asked only of a cell that could still win)
+                if (d >= bd) continue
                 if (!within(b, x - px, y - py, cs, sn)) d += OUTSIDE
                 if (d < bd) {
                     bd = d
