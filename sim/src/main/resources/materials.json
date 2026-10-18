@@ -364,7 +364,7 @@
       "conductivity": 0.03, "heat_capacity": 0.4, "hardness": 0, "erodes_in_water": false,
       "dissolves_in": null, "dissolved_product": null,
       "wind": 1.0,
-      "bucketable": false, "grabbable": false, "emits_light": 0, "blocks_light": false, "light_pass": 0.8,
+      "bucketable": false, "grabbable": false, "emits_light": 0, "blocks_light": false, "light_pass": 0.97,
       "color": "#eef2f6", "color_variance": 0.05, "opacity": 0.8, "cost": 1
     },
     {

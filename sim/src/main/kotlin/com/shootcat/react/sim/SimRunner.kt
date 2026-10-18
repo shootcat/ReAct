@@ -27,11 +27,12 @@ class SimRunner(val session: Session, backdrop: IntArray) {
     val layerHeight get() = renderer.layerHeight
 
     /**
-     * One finished picture: the cells, the soft haze and glow layers and the flame layer. Only the cells from
-     * ([x0], [y0]) to ([x1], [y1]) were drawn: the part of the world on screen.
+     * One finished picture: the cells, the soft cloud, haze and glow layers and the flame layer. Only the cells
+     * from ([x0], [y0]) to ([x1], [y1]) were drawn: the part of the world on screen.
      */
-    class Frame(size: Int, layerSize: Int, flameSize: Int) {
+    class Frame(size: Int, layerSize: Int, flameSize: Int, cloudSize: Int) {
         val pixels = IntArray(size)
+        val clouds = IntArray(cloudSize)
         val haze = IntArray(layerSize)
         val light = IntArray(layerSize)
         val flames = IntArray(flameSize)
@@ -95,7 +96,9 @@ class SimRunner(val session: Session, backdrop: IntArray) {
     private val lock = Any()
     val flameWidth get() = renderer.flameWidth
     val flameHeight get() = renderer.flameHeight
-    private fun newFrame() = Frame(session.world.size, renderer.layerWidth * renderer.layerHeight, renderer.flameWidth * renderer.flameHeight)
+    val cloudWidth get() = renderer.cloudWidth
+    val cloudHeight get() = renderer.cloudHeight
+    private fun newFrame() = Frame(session.world.size, renderer.layerWidth * renderer.layerHeight, renderer.flameWidth * renderer.flameHeight, renderer.cloudWidth * renderer.cloudHeight)
     private var back = newFrame()
     private var ready = newFrame()
     private var front = newFrame()
@@ -300,7 +303,8 @@ class SimRunner(val session: Session, backdrop: IntArray) {
                 back.y0 = (view?.get(1) ?: 0).coerceIn(0, h - 1)
                 back.x1 = (view?.get(2) ?: (w - 1)).coerceIn(back.x0, w - 1)
                 back.y1 = (view?.get(3) ?: (h - 1)).coerceIn(back.y0, h - 1)
-                renderer.render(back.pixels, frameNumber++, speed != Speed.PAUSE, back.x0, back.y0, back.x1, back.y1)
+                renderer.render(back.pixels, frameNumber, speed != Speed.PAUSE, back.x0, back.y0, back.x1, back.y1)
+                renderer.renderClouds(back.clouds, frameNumber++)
                 renderer.renderLayers(back.haze, back.light)
                 renderer.renderFlames(back.flames)
                 synchronized(lock) {

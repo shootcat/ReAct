@@ -29,12 +29,12 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
     private val firedamp = mt.idOrNull("firedamp") ?: -1
 
     /**
-     * Light for drawing (2b). While the world runs, the field the simulation works out every few steps is
-     * used; while it is paused (and before the first step) the picture works out its own, so whatever is
-     * placed lights up at once.
+     * Light for drawing (2b): diffuse daylight from the whole sky (Phase 4b), so shadows are soft and fade with
+     * the distance. Worked out as often as the simulation works out its own, and at once while it is paused
+     * (and before the first step), so whatever is placed lights up at once.
      */
-    private val ownLight = Light(world)
-    private var light = ownLight
+    private val light = Light(world, diffuse = true)
+    private var lightStep = -1
 
     /** Without lighting everything is drawn at full brightness (overviews of the materials). */
     var lit = true
@@ -62,6 +62,13 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
     private val shade = FloatArray(world.size)
     private val blockX = IntArray(world.width) { x -> lattice(x, light.width).first }
     private val blockTx = FloatArray(world.width) { x -> lattice(x, light.width).second }
+
+    /**
+     * Per column, the row from which the scenery behind is the cave wall (Phase 4b). Above it, under the open
+     * sky, air, water and haze are not shaded: shadows fall on surfaces only, and do not stand as dark columns
+     * in the air or in a lake; below it, in caves and under overhangs, it is as dark as the light says.
+     */
+    private val wallFrom = Backdrop.groundLine(world)
 
     /** Fish and birds seen while drawing: tails and wings are added afterwards. */
     private var critters = IntArray(64)
@@ -141,7 +148,10 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
             shade.fill(1f)
             return
         }
-        light = if (running && world.step > 0) world.light else ownLight.also { it.compute() }
+        if (!running || world.step == 0 || lightStep < 0 || world.step - lightStep >= World.LIGHT_EVERY || world.step < lightStep) {
+            light.compute()
+            lightStep = world.step
+        }
         for (b in factor.indices) {
             // the eye sees shade brighter than the bare amount of light: 1 - (1 - l)²; darkness stays dark
             val l = 1f - minOf(1f, light.shown(b))
@@ -212,8 +222,10 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
             val m = mat[i].toInt()
             if (clearLiquid[m]) depth[x]++ else depth[x] = 0
             val s = shade[i]
+            // under the open sky the air and what is seen through it are not shaded (Phase 4b)
+            val sa = if (y < wallFrom[x]) 1f else s
             if (m == AIR) {
-                val bg = if (s < 0.995f) darken(backdrop[i], maxOf(s, backdropMin)) else backdrop[i]
+                val bg = if (sa < 0.995f) darken(backdrop[i], maxOf(sa, backdropMin)) else backdrop[i]
                 // gaps inside falling water or a flame are drawn filled, so streams and flames hold together
                 val up = if (i >= w) mat[i - w].toInt() else AIR
                 val down = if (i < size - w) mat[i + w].toInt() else AIR
@@ -223,7 +235,7 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
                     // blades of grass stick up into the air; in the wind a lighter wave runs over them
                     val lean = windDir != 0 && ((x * 2 - windRun) and 31) < 6 + (windAbs * 10f).toInt()
                     mix(scale(palette[grass * SHADES + (variant[i + w].toInt() and (SHADES - 1))], (if (lean) 1.4f else 1.15f) * s), bg, 0.35f)
-                } else if (streaks > 0 && s > 0.6f && streak(x - windRun, i / w, streaks)) {
+                } else if (streaks > 0 && sa > 0.6f && streak(x - windRun, i / w, streaks)) {
                     mix(0xFFFFFFFF.toInt(), bg, 0.82f)
                 } else {
                     bg
@@ -233,7 +245,7 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
             val v = variant[i].toInt() and 0xFF
             var c = palette[m * SHADES + (v and (SHADES - 1))]
             val see = mt.opacity[m] < 1f || m == firefly
-            val bg = if (!see) 0 else if (s < 0.995f) darken(backdrop[i], maxOf(s, backdropMin)) else backdrop[i]
+            val bg = if (!see) 0 else if (sa < 0.995f) darken(backdrop[i], maxOf(sa, backdropMin)) else backdrop[i]
             val f = flags[i].toInt()
             val t = temp[i]
             if (clearLiquid[m]) {
@@ -329,20 +341,12 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
                 }
                 smoke -> {
                     val fade = (life[i] / 90f).coerceIn(0f, 1f)
-                    out[i] = mix(scale(c, s), bg, 1f - mt.opacity[m] * fade)
+                    out[i] = mix(scale(c, sa), bg, 1f - mt.opacity[m] * fade)
                     continue
                 }
                 cloud -> {
-                    // white on top, greyer the more cloud lies above: a thick thundercloud has a dark belly (3c.1)
-                    var d = 0
-                    var j = i - w
-                    while (d < CLOUD_DEEP && j >= 0 && mat[j].toInt() == cloud) {
-                        d++
-                        j -= w
-                    }
-                    var k = mix(CLOUD_LIGHT, CLOUD_DARK, d / CLOUD_DEEP.toFloat())
-                    if (d == 0) k = mix(k, 0xFFFFFFFF.toInt(), 0.4f) else if ((v and 7) == 0) k = scale(k, 1.05f)
-                    out[i] = mix(scale(k, maxOf(s, 0.55f)), bg, 1f - mt.opacity[m])
+                    // clouds are drawn soft in their own layer (renderClouds, Phase 4b); here the sky behind
+                    out[i] = bg
                     continue
                 }
                 firedamp -> {
@@ -374,9 +378,11 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
             // light of its own (fire, embers, lava, glowing heat) is not darkened; the cut face of solid ground
             // is always shown, darker away from the light, while air, water and glass show the real light; ice
             // stays clearly ice even in the shade of a cave (3b.8)
-            if (s < 0.995f && mt.glow[m] == 0f && f and Flag.BURNING == 0 && t < GLOW_FROM) {
+            // (clear water is a volume, not a surface: under the open sky only its depth darkens it)
+            val sm = if (clearLiquid[m]) sa else s
+            if (sm < 0.995f && mt.glow[m] == 0f && f and Flag.BURNING == 0 && t < GLOW_FROM) {
                 val floor = if (mt.pattern[m] == Pattern.ICE) ICE_SHADE else if (mt.lightPass[m] == 0f) CUT_FACE else 0f
-                c = darken(c, maxOf(s, floor))
+                c = darken(c, maxOf(sm, floor))
             }
             if (mt.pattern[m] == Pattern.ICE) {
                 // shining edges where the ice meets something else
@@ -534,6 +540,98 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
         }
     }
 
+    /** Width and height of the cloud layer, in blocks of [CLOUD_BLOCK] × [CLOUD_BLOCK] cells. */
+    val cloudWidth = (world.width + CLOUD_BLOCK - 1) / CLOUD_BLOCK
+    val cloudHeight = (world.height + CLOUD_BLOCK - 1) / CLOUD_BLOCK
+    private val cloudDensity = FloatArray(cloudWidth * cloudHeight)
+    private val cloudTmp = FloatArray(cloudWidth * cloudHeight)
+    private val cloudCells = IntArray(cloudWidth)
+    private val billows = Noise(CLOUD_NOISE_SEED)
+
+    /**
+     * The clouds (Phase 4b), drawn soft over the pixels, smoothly scaled: not cell by cell but as the density of
+     * their cells, blurred, with billowing rims from noise that slowly changes. White on top, greyer towards the
+     * underside the more cloud lies above; only a deep bank, a thundercloud, has a dark belly. One pixel per
+     * block of [CLOUD_BLOCK] × [CLOUD_BLOCK] cells; the cloud cells themselves are drawn as the sky behind.
+     */
+    fun renderClouds(out: IntArray, frame: Int) {
+        out.fill(0)
+        if (thermal || cloud < 0) return
+        val w = world.width
+        val mat = world.mat
+        val cw = cloudWidth
+        val ch = cloudHeight
+        val cell = 1f / (CLOUD_BLOCK * CLOUD_BLOCK)
+        cloudDensity.fill(0f)
+        cloudCells.fill(0)
+        var top = ch
+        var bottom = -1
+        for (y in 0 until world.height) {
+            val row = (y / CLOUD_BLOCK) * cw
+            var i = y * w
+            for (x in 0 until w) {
+                if (mat[i].toInt() == cloud) {
+                    val bx = x / CLOUD_BLOCK
+                    cloudDensity[row + bx] += cell
+                    cloudCells[bx]++
+                    val by = y / CLOUD_BLOCK
+                    if (by < top) top = by
+                    if (by > bottom) bottom = by
+                }
+                i++
+            }
+        }
+        if (bottom < 0) return
+        val y0 = maxOf(0, top - CLOUD_REACH)
+        val y1 = minOf(ch - 1, bottom + CLOUD_REACH)
+        repeat(2) { blur(cloudDensity, cloudTmp, cw, y0, y1, CLOUD_BLUR) }
+        val drift = frame * CLOUD_CHURN
+        val flash = world.flash * FLASH * 6f
+        for (bx in 0 until cw) {
+            // how deep the cloud above goes: the light gets greyer through it; a deep bank is a thundercloud
+            val storm = ((cloudCells[bx] / CLOUD_BLOCK.toFloat() - STORM_FROM) / STORM_RANGE).coerceIn(0f, 1f)
+            val floor = CLOUD_GREY + (CLOUD_STORM - CLOUD_GREY) * storm
+            var above = 0f
+            for (by in y0..y1) {
+                val b = by * cw + bx
+                val d = cloudDensity[b]
+                above += d
+                if (d < 0.02f) continue
+                val n = billows.fbm(bx * CLOUD_SCALE + drift, by * CLOUD_SCALE * 1.4f, 2)
+                val v = d * CLOUD_GAIN + (n - 0.5f) * CLOUD_FRAY
+                if (v <= CLOUD_EDGE) continue
+                val a = ((v - CLOUD_EDGE) / CLOUD_SOFT).coerceIn(0f, 1f)
+                val alpha = a * a * (3f - 2f * a) * CLOUD_ALPHA
+                var bright = (1f - above * CLOUD_SHADOW).coerceAtLeast(floor) + (n - 0.5f) * 0.1f
+                bright = bright.coerceIn(0f, 1.04f)
+                var c = mix(scale(CLOUD_TOP, bright), CLOUD_BELLY, (1f - bright) * 0.35f)
+                if (flash > 0f) c = mix(c, 0xFFFFFFFF.toInt(), minOf(1f, flash))
+                out[b] = ((alpha * 255f).toInt() shl 24) or (c and 0xFFFFFF)
+            }
+        }
+    }
+
+    /** A box blur of radius [r] over rows [y0]..[y1] of [a] ([w] wide), horizontal then vertical, in place. */
+    private fun blur(a: FloatArray, tmp: FloatArray, w: Int, y0: Int, y1: Int, r: Int) {
+        val k = 1f / (2 * r + 1)
+        for (y in y0..y1) {
+            val row = y * w
+            for (x in 0 until w) {
+                var sum = 0f
+                for (dx in -r..r) sum += a[row + (x + dx).coerceIn(0, w - 1)]
+                tmp[row + x] = sum * k
+            }
+        }
+        for (y in y0..y1) {
+            val row = y * w
+            for (x in 0 until w) {
+                var sum = 0f
+                for (dy in -r..r) sum += tmp[(y + dy).coerceIn(y0, y1) * w + x]
+                a[row + x] = sum * k
+            }
+        }
+    }
+
     /** Width and height of the flame layer, in blocks of [FLAME_BLOCK] × [FLAME_BLOCK] cells. */
     val flameWidth = (world.width + FLAME_BLOCK - 1) / FLAME_BLOCK
     val flameHeight = (world.height + FLAME_BLOCK - 1) / FLAME_BLOCK
@@ -645,10 +743,36 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
         private val HEAT_T = floatArrayOf(-30f, 0f, 20f, 60f, 150f, 400f, 800f, 1400f)
         private val HEAT_C = intArrayOf(0x1c1a6e, 0x2f6fd0, 0x1f8a8a, 0x3fae4a, 0xd6d03a, 0xf08a24, 0xe02a1a, 0xfff2e4)
 
-        /** Clouds (3c.1): the colour of the top and of the belly of a cloud this deep. */
-        private const val CLOUD_LIGHT = 0xFFF2F5F9.toInt()
-        private const val CLOUD_DARK = 0xFF6E7480.toInt()
-        private const val CLOUD_DEEP = 12
+        /**
+         * The soft clouds (Phase 4b): blocks of cells per pixel; blur radius in blocks and how far it reaches;
+         * how strongly the blurred density counts, how much the noise frays the rims, where the cloud begins
+         * and over how much it becomes solid, how opaque it gets; the noise: its scale per block and how fast it
+         * churns per frame.
+         */
+        const val CLOUD_BLOCK = 2
+        private const val CLOUD_BLUR = 2
+        private const val CLOUD_REACH = 6
+        private const val CLOUD_GAIN = 1.7f
+        private const val CLOUD_FRAY = 0.6f
+        private const val CLOUD_EDGE = 0.2f
+        private const val CLOUD_SOFT = 0.35f
+        private const val CLOUD_ALPHA = 0.95f
+        private const val CLOUD_SCALE = 0.32f
+        private const val CLOUD_CHURN = 0.004f
+        private const val CLOUD_NOISE_SEED = 97L
+
+        /**
+         * Cloud colours: the sunlit top, the tint of the underside; how much greyer per block of cloud above, the
+         * greyest an ordinary cloud gets and the darkest a thundercloud does; a column with more than STORM_FROM
+         * cells of cloud starts to be a thundercloud and is one fully STORM_RANGE cells later.
+         */
+        private const val CLOUD_TOP = 0xFFF6F8FB.toInt()
+        private const val CLOUD_BELLY = 0xFF7E8898.toInt()
+        private const val CLOUD_SHADOW = 0.07f
+        private const val CLOUD_GREY = 0.74f
+        private const val CLOUD_STORM = 0.4f
+        private const val STORM_FROM = 9f
+        private const val STORM_RANGE = 8f
 
         /** Wind streaks from this wind on, so many of 1024 cells per unit of wind (3c.3). */
         private const val STREAK_WIND = 0.15f
@@ -699,14 +823,14 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
  */
 object Backdrop {
 
+    /** The ground line is the middle of the ground over this many columns to either side. */
+    private const val GROUND_SPAN = 3
+
     fun of(world: World, seed: Long = Terrain.SEED): IntArray {
         val w = world.width
         val h = world.height
         val n = Noise(seed + 7)
-        // the ground line: wooden things standing on it are not part of the scenery
-        val mt = world.materials
-        val ground = BooleanArray(mt.count) { it != AIR && mt.kind[it] != Kind.GAS && !mt.flammable[it] }
-        val top = IntArray(w) { x -> (0 until h).firstOrNull { ground[world.material(x, it)] } ?: h }
+        val top = groundLine(world)
         val horizon = top.average().toFloat()
         val out = IntArray(world.size)
         val skyTop = 0x6fa6d6
@@ -732,5 +856,30 @@ object Backdrop {
             }
         }
         return out
+    }
+
+    /**
+     * Per column, the row where the ground begins for the scenery (Phase 4b): above it the sky is seen, below it
+     * the cave wall. The first ground from the top that rests on something, not water, drops, loose bodies,
+     * things in the air or wood standing on it, which would leave a dark column of cave wall behind them in the
+     * sky (and behind a lake) once they moved; evened out over a few columns, so a thin spike of rock does not
+     * draw one either.
+     */
+    fun groundLine(world: World): IntArray {
+        val w = world.width
+        val h = world.height
+        val mt = world.materials
+        val firm = BooleanArray(mt.count) { it != AIR && mt.kind[it] != Kind.GAS && mt.kind[it] != Kind.LIQUID && !mt.flammable[it] }
+        val first = IntArray(w) { x ->
+            (0 until h).firstOrNull { y ->
+                val i = y * w + x
+                firm[world.mat[i].toInt()] && world.bodyOf(i) == 0 && (y == h - 1 || world.mat[i + w].toInt() != AIR)
+            } ?: h
+        }
+        return IntArray(w) { x ->
+            val near = IntArray(2 * GROUND_SPAN + 1) { first[(x + it - GROUND_SPAN).coerceIn(0, w - 1)] }
+            near.sort()
+            near[GROUND_SPAN]
+        }
     }
 }

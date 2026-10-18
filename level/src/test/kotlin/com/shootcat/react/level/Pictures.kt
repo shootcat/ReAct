@@ -8,7 +8,7 @@ import javax.imageio.ImageIO
 
 /**
  * Writes what the renderer makes of a world to a PNG under build/pictures, the way the app draws it: the
- * pixels scaled up without smoothing, the haze and glow layers smoothly on top.
+ * pixels scaled up without smoothing, the clouds, haze and glow layers smoothly on top.
  */
 object Pictures {
     /** The whole world, or with [area] (x0, y0, x1, y1) only that part of it. */
@@ -27,6 +27,11 @@ object Pictures {
         val fh = renderer.flameHeight
         val flames = IntArray(fw * fh)
         renderer.renderFlames(flames)
+        val cw = renderer.cloudWidth
+        val ch = renderer.cloudHeight
+        val clouds = IntArray(cw * ch)
+        renderer.renderClouds(clouds, frame)
+        val cloudBlock = (Renderer.CLOUD_BLOCK * scale).toFloat()
         val flameBlock = (Renderer.FLAME_BLOCK * scale).toFloat()
         val ax = area?.get(0) ?: 0
         val ay = area?.get(1) ?: 0
@@ -38,6 +43,8 @@ object Pictures {
             val px = qx + ax * scale
             val py = qy + ay * scale
             var c = pixels[(py / scale) * world.width + px / scale]
+            val cl = sample(clouds, cw, ch, px / cloudBlock - 0.5f, py / cloudBlock - 0.5f)
+            c = Renderer.mix(c, (cl[1].toInt() shl 16) or (cl[2].toInt() shl 8) or cl[3].toInt(), cl[0] / 255f)
             val h = sample(haze, lw, lh, px / block - 0.5f, py / block - 0.5f)
             val a = h[0] / 255f
             c = Renderer.mix(c, (h[1].toInt() shl 16) or (h[2].toInt() shl 8) or h[3].toInt(), a)

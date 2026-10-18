@@ -623,6 +623,10 @@ private fun WorldView(
     val fh = runner.flameHeight
     val flameBitmap = remember(runner) { Bitmap.createBitmap(fw, fh, Bitmap.Config.ARGB_8888) }
     val flameImage = remember(flameBitmap) { flameBitmap.asImageBitmap() }
+    val cw = runner.cloudWidth
+    val ch = runner.cloudHeight
+    val cloudBitmap = remember(runner) { Bitmap.createBitmap(cw, ch, Bitmap.Config.ARGB_8888) }
+    val cloudImage = remember(cloudBitmap) { cloudBitmap.asImageBitmap() }
     val image = remember(bitmap) { bitmap.asImageBitmap() }
     val hazeImage = remember(hazeBitmap) { hazeBitmap.asImageBitmap() }
     val lightImage = remember(lightBitmap) { lightBitmap.asImageBitmap() }
@@ -638,6 +642,7 @@ private fun WorldView(
                 hazeBitmap.setPixels(f.haze, 0, lw, 0, 0, lw, lh)
                 lightBitmap.setPixels(f.light, 0, lw, 0, 0, lw, lh)
                 flameBitmap.setPixels(f.flames, 0, fw, 0, 0, fw, fh)
+                cloudBitmap.setPixels(f.clouds, 0, cw, 0, 0, cw, ch)
                 frames++
             }
             delay(POLL_MILLIS)
@@ -918,6 +923,7 @@ private fun WorldView(
         val dstOffset = IntOffset(o.x.roundToInt(), o.y.roundToInt())
         val dstSize = IntSize((w * s).roundToInt(), (h * s).roundToInt())
         drawImage(image, dstOffset = dstOffset, dstSize = dstSize, filterQuality = FilterQuality.None)
+        drawImage(cloudImage, dstOffset = dstOffset, dstSize = dstSize, filterQuality = FilterQuality.Low)
         drawImage(hazeImage, dstOffset = dstOffset, dstSize = dstSize, filterQuality = FilterQuality.Low)
         drawImage(flameImage, dstOffset = dstOffset, dstSize = dstSize, filterQuality = FilterQuality.Low)
         drawImage(lightImage, dstOffset = dstOffset, dstSize = dstSize, filterQuality = FilterQuality.Low)

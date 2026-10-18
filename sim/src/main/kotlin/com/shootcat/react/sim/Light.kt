@@ -4,17 +4,23 @@ package com.shootcat.react.sim
  * How bright it is everywhere in the world (Leitfaden V3, 4.2), in blocks of 2 × 2 cells, from 0 (dark) to
  * 1 (daylight).
  *
- * Sky light falls straight down from the top of the world. Air passes it whole; water, glass, leaves and
- * smoke dim it a little per cell (`light_pass`); solid ground, powders and rock stop it. From there it
- * scatters into every direction and fades slowly, the way daylight fills the shade under a bridge or a
- * tree and reaches some way into a cave mouth. Fire, embers, lava, molten and glowing hot material and
+ * Sky light falls straight down from the top of the world. Air passes it whole; water, glass, leaves, cloud
+ * and smoke dim it a little per cell (`light_pass`); solid ground, powders and rock stop it. From there it
+ * scatters into every direction and fades slowly, the way daylight fills the shade under a bridge or a tree
+ * and reaches some way into a cave mouth.
+ *
+ * For the picture ([diffuse], Phase 4b) it comes down from the whole sky instead, along [RAYS] directions from
+ * straight down to steeply slanting: a small thing in the air keeps off only part of it, and less and less
+ * further below it, as the slanting light reaches in under it, so its shadow on the ground is soft and fades
+ * with the height; a wide roof or the ground keeps it all off, caves stay dark. Plants and animals live by the
+ * light straight from above, as they always did. Fire, embers, lava, molten and glowing hot material and
  * fireflies give off light of their own, which fades faster. A cave without an opening and without a light
  * source is really dark.
  *
  * Only additions, multiplications and comparisons: the same world gives the same light on every device.
  * The simulation keeps one field for the plants and animals; the renderer computes its own for drawing.
  */
-class Light(private val world: World) {
+class Light(private val world: World, private val diffuse: Boolean = false) {
 
     val width = (world.width + 1) / 2
     val height = (world.height + 1) / 2
@@ -30,6 +36,10 @@ class Light(private val world: World) {
 
     /** Light leaving each block: what passes through it, or its own glow. */
     private val out = FloatArray(width * height)
+
+    /** Daylight along one direction leaving the row above, and leaving this row ([diffuse]). */
+    private var rayAbove = FloatArray(if (diffuse) width else 0)
+    private var rayHere = FloatArray(if (diffuse) width else 0)
 
     /** Light of the light sources alone, spread separately because it fades faster than daylight. */
     private val lamp = FloatArray(width * height)
@@ -125,18 +135,46 @@ class Light(private val world: World) {
         return e
     }
 
-    /** Daylight from the top, straight down until something stops it. */
+    /**
+     * Daylight from the top, straight down until something stops it; [diffuse]: along each of the [RAYS]
+     * directions, weighted together (beyond the sides of the world the sky is as at its edge).
+     */
     private fun sky() {
-        for (bx in 0 until width) {
-            var s = 1f
-            var b = bx
+        if (!diffuse) {
+            for (bx in 0 until width) {
+                var s = 1f
+                var b = bx
+                for (by in 0 until height) {
+                    level[b] = s
+                    s *= pass[b]
+                    out[b] = s
+                    b += width
+                }
+            }
+            return
+        }
+        level.fill(0f)
+        val w = width
+        for (r in 0 until RAYS) {
+            val slope = RAY_SLOPE[r]
+            val weight = RAY_WEIGHT[r]
+            rayAbove.fill(1f)
+            var b = 0
             for (by in 0 until height) {
-                level[b] = s
-                s *= pass[b]
-                out[b] = s
-                b += width
+                for (bx in 0 until w) {
+                    var from = bx - slope
+                    if (from < 0) from = 0 else if (from >= w) from = w - 1
+                    val a = rayAbove[from]
+                    level[b] += weight * a
+                    rayHere[bx] = a * pass[b]
+                    b++
+                }
+                val t = rayAbove
+                rayAbove = rayHere
+                rayHere = t
             }
         }
+        for (k in level.indices) out[k] = level[k] * pass[k]
     }
 
     /** Spreads light ([into], leaving blocks as [out]) rightwards and downwards, fading by [d] per block. */
@@ -204,6 +242,14 @@ class Light(private val world: World) {
         /** Daylight scatters further: what is left of it after one block of air off its straight way down. */
         const val SKY_DECAY = 0.95f
         const val SKY_DECAY_DIAGONAL = 0.93f
+
+        /**
+         * Directions of daylight (Phase 4b): blocks sideways per block down, straight down and slanting to
+         * either side, and how much of the sky's light comes along each.
+         */
+        private const val RAYS = 5
+        private val RAY_SLOPE = intArrayOf(-2, -1, 0, 1, 2)
+        private val RAY_WEIGHT = floatArrayOf(0.1f, 0.22f, 0.36f, 0.22f, 0.1f)
 
         /** Forward and backward sweeps: two rounds carry light round a corner or two. */
         private const val ROUNDS = 2
