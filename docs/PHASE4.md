@@ -2,7 +2,7 @@
 
 Phase 4, schlanke Fassung: Körperphysik. Lose Strukturen sind jetzt starre Körper. Sie fallen, kippen, drehen sich, rollen, schwimmen oder sinken nach ihrer Dichte und zerbrechen bei harten Stößen. Dabei bleiben sie Zellen der Materialwelt. Phase 5 (Bewohner) ist nicht begonnen.
 
-**Build:** [`beta-BUILD`](https://github.com/shootcat/ReAct/releases/tag/beta-BUILD), APK, Screenshots und Messwerte des CI-Rechners dort.
+**Build:** [`beta-105`](https://github.com/shootcat/ReAct/releases/tag/beta-105), APK, Screenshots und Messwerte des CI-Rechners dort. Die Zwischenstände `beta-103` und `beta-104` waren ebenfalls grün.
 
 ## 1. jbox2d oder eigene Lösung
 
@@ -211,12 +211,22 @@ Gemessen auf diesem Rechner (JVM, 4 Kerne), in ms pro Schritt, 3c und Phase 4 ab
 - Die voll aktive Welt erzeugt von selbst viele Körper, im Mittel über 5000, fast alle klein. Die meisten schlafen; in Bewegung sind im Mittel 759.
 - Ein Versuch, schlafende Körper nur jeden vierten Schritt nach Änderungen um sie fragen zu lassen, brachte etwa 0,1 ms. Dafür wachten sie bis zu drei Schritte später auf, und in Level 4 lag danach ein Pfosten anders. Ich habe den Versuch zurückgenommen.
 
-**Hochgerechnet auf das Galaxy Z Fold2: nicht sicher unter 8 ms.**
-- Die Berichte bis 3c rechneten mit dem Faktor 2,5 (dieser Rechnertyp ist etwa 2,5-mal langsamer als das Fold2). Damit ergäben sich 14,6 ms / 2,5 ≈ **5,8 ms**.
-- Dieser Rechner ist aber schneller als der aus dem 3c-Bericht: Die voll aktive Welt mit dem 3c-Code braucht hier 12,0 ms, im 3c-Bericht 16,2 ms.
-- Rechnet man stattdessen vom 3c-Bericht aus (belebte Welt auf dem Fold2 hochgerechnet 7,4 ms) mit dem hier gemessenen Verhältnis Phase 4 zu 3c, ergeben sich für die neue Messwelt 7,4 × 14,55 / 13,2 ≈ **8,2 ms**. Das liegt knapp über der Grenze.
-- **Den gültigen Wert liefert „Leistung messen“ auf dem Gerät.** Liegt die neue Messwelt dort über 8 ms, ist der nächste Hebel nicht der Körperlöser (1,7 ms). Es ist die Wärme, die schon in 3c ein Drittel des Schritts ausmachte; der Vorschlag dazu steht im 3c-Bericht.
-- Die Messwerte des CI-Rechners stehen im Release unter `benchmark.md`.
+**Zum Vergleich der CI-Rechner** (GitHub Actions, 4 Kerne, Java 17; geteilter Rechner, die Läufe streuen stärker). Je ein Lauf: 3c aus `beta-102`, Phase 4 aus `beta-103`.
+
+| Welt (600 × 340) | 3c | Phase 4 | davon Strukturen und Körper |
+|---|---|---|---|
+| voll aktiv | 17,79 | 16,57 | 1,81 ms |
+| voll aktiv, belebt | 20,13 | 19,99 | 1,74 ms |
+| voll aktiv, belebt, dazu 150 Körper | – | 19,81 | 2,23 ms |
+
+Auf dem CI-Rechner ist Phase 4 also nicht messbar langsamer als 3c. Die Messwelt mit 150 Körpern ist dort so schnell wie die belebte Welt.
+
+**Hochgerechnet auf das Galaxy Z Fold2: 7,3 bis 8,2 ms, die Grenze von 8 ms liegt in dieser Spanne.**
+- Der 3c-Bericht rechnete die belebte Welt auf 7,4 ms für das Fold2 hoch (18,5 ms / 2,5). Ausgehend davon:
+  - nach dem Verhältnis auf dem CI-Rechner (19,81 / 20,13): **7,3 ms**;
+  - nach dem Verhältnis auf diesem Rechner (14,55 / 13,2): **8,2 ms**.
+- Mit dem alten Faktor 2,5 direkt auf diesen Rechner angewendet, ergäben sich 5,8 ms. Diese Zahl ist zu günstig, denn dieser Rechner ist schneller als der aus dem 3c-Bericht: Die voll aktive Welt mit dem 3c-Code braucht hier 12,0 ms, im 3c-Bericht 16,2 ms.
+- **Den gültigen Wert liefert „Leistung messen“ auf dem Gerät** (Zeile „voll aktiv belebt, dazu 150 Körper“). Liegt er über 8 ms, ist der nächste Hebel nicht der Körperlöser (1,7 bis 2,2 ms). Es ist die Wärme, die schon in 3c ein Drittel des Schritts ausmachte; der Vorschlag dazu steht im 3c-Bericht.
 
 ## 12. Grenzen und Offenes
 
