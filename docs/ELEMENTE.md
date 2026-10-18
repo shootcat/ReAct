@@ -41,6 +41,21 @@ Zur Einordnung: Grubengas (`firedamp`) ist leichter als Luft, sammelt sich unter
 Explosion folgt der Größe der Gaswolke. Die Gasspalte (`gas_vent`) ist Levelgelände wie Fels und gibt in
 Minenleveln ab und zu Grubengas ab.
 
+## Erdöl (umgesetzt in 4b)
+
+Zur Einordnung: Erdöl (`oil`) folgt nur aus Eigenschaften, keine Rezepte. Es ist zäh (warm dünner), leichter
+als Wasser, brennt erst bei großer Hitze oder wenn etwas Brennendes es eine Weile berührt, löscht sich nicht mit
+Wasser und erstickt unter Sand, Erde oder einer Abdeckung. Es sickert in Sand und Erde (`oily_sand`,
+`oily_earth`, brennbar), vergiftet Pflanzen und Fische, gast erhitzt in eingeschlossene Luft aus (`oil_gas`,
+explosiv wie Grubengas) und verdunstet zu Teer (`tar`, klebt, brennt gut). Verbrannt hinterlässt es Ruß
+(`soot`) und dicken schwarzen Qualm (`black_smoke`). In Leveln tritt es aus einer Ölquelle im Gestein
+(`oil_spring`) oder liegt in Taschen unter Fels; beides kann ein Level über seine Farbe in der Bodenkarte setzen.
+
+**Noch offen, Vorschlag:** Keiner der fünf bestehenden Level enthält bisher Öl. Ein eigener Level mit einer
+Ölquelle (Idee: „Ölpest“, ein Ölfilm treibt auf einen Fischteich zu und muss mit Sand und Erde aufgehalten oder
+abgefackelt werden, ohne dass das Feuer auf das Ufergras übergreift) wäre der nächste Schritt; er braucht wie
+jeder Level mindestens drei Lösungswege mit Tests.
+
 ## Körperphysik: was in Phase 4 bewusst fehlt
 
 **Stand: nicht umgesetzt, nur Vorschläge.** Phase 4 („schlanke Fassung“) macht lose Strukturen zu starren

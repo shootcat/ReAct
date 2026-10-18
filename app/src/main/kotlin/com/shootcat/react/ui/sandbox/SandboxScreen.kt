@@ -131,8 +131,8 @@ private const val STORE = "Lager"
 /** The materials in the bar, by kind. Rock is level ground and never in the player's hands (Leitfaden V3, 3.1.6). */
 private val CATEGORIES = listOf(
     TOOLS to emptyList(),
-    "Lose" to listOf("sand", "earth", "gravel", "clay", "salt", "snow", "rubble", "ore_rubble", "glass_shards", "charcoal", "ash"),
-    "Flüssig" to listOf("water", "saltwater", "lava", "molten_metal", "steam", "cloud", "smoke", "firedamp"),
+    "Lose" to listOf("sand", "earth", "gravel", "clay", "salt", "snow", "rubble", "ore_rubble", "glass_shards", "charcoal", "ash", "soot"),
+    "Flüssig" to listOf("water", "saltwater", "oil", "tar", "lava", "molten_metal", "steam", "cloud", "smoke", "firedamp"),
     "Bauen" to listOf("wood", "brick", "stone", "basalt", "glass", "metal", "ice"),
     "Hitze" to listOf("fire", "ember", "lava"),
     "Leben" to listOf("seed", "grass", "moss", "vine", "fish", "firefly", "worm", "bird"),

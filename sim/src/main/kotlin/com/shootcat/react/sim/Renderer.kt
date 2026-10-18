@@ -336,6 +336,23 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
                         else -> scale(c, 0.86f + ((v shr 4) and 7) * 0.04f)
                     }
                 }
+                Pattern.OIL -> {
+                    // black to dark brown, an oily sheen gliding over the open surface; one cell thin on water,
+                    // a film shimmering in the colours of the rainbow (Phase 4b)
+                    val y = i / w
+                    val above = if (i >= w) mat[i - w].toInt() else AIR
+                    if (above == AIR || mt.kind[above] == Kind.GAS) {
+                        val below = if (i < size - w) mat[i + w].toInt() else m
+                        c = if (below != m && clearLiquid[below]) {
+                            mix(c, rainbow[(x * 3 + y * 2 + (frame shr 2)) and (RAINBOW_STEPS - 1)], OIL_FILM)
+                        } else {
+                            mix(c, OIL_SHEEN, OIL_GLOSS * wave((x * 2 - (frame shr 2)) and 63))
+                        }
+                    } else {
+                        // a little lighter swirls in the depth
+                        c = scale(c, 0.92f + 0.16f * wave((x + y * 3 + ((v shr 4) and 15)) and 63))
+                    }
+                }
             }
             if (mt.speckle[m] > 0f && (v ushr 4) < (mt.speckle[m] * 16f).toInt()) {
                 // inclusions that catch the light (ore), some of them glinting
@@ -974,6 +991,22 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
     /** A triangle wave 0..1..0 over 0..63, for the shimmer of the water surface. */
     private fun wave(p: Int): Float = (if (p < 32) p else 63 - p) / 31f
 
+    /** Soft colours of a thin film of oil on water, once round the rainbow (Phase 4b). */
+    private val rainbow = IntArray(RAINBOW_STEPS) { k ->
+        val h = k * 6f / RAINBOW_STEPS
+        val f = h - h.toInt()
+        val (r, g, b) = when (h.toInt()) {
+            0 -> Triple(1f, f, 0f)
+            1 -> Triple(1f - f, 1f, 0f)
+            2 -> Triple(0f, 1f, f)
+            3 -> Triple(0f, 1f - f, 1f)
+            4 -> Triple(f, 0f, 1f)
+            else -> Triple(1f, 0f, 1f - f)
+        }
+        // pale, as on a puddle: mostly a light grey-violet with the hue in it
+        OPAQUE or ((70 + r * 90).toInt() shl 16) or ((70 + g * 90).toInt() shl 8) or (85 + b * 90).toInt()
+    }
+
     private fun glowAt(t: Float): Int {
         val k = ((t - GLOW_FROM) / (GLOW_TO - GLOW_FROM) * (GLOW_STEPS - 1)).toInt().coerceIn(0, GLOW_STEPS - 1)
         return glow[k]
@@ -1048,6 +1081,12 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
          * greyest an ordinary cloud gets and the darkest a thundercloud does; a column with more than STORM_FROM
          * cells of cloud starts to be a thundercloud and is one fully STORM_RANGE cells later.
          */
+        // oil (Phase 4b): the sheen on its surface, how strongly at most, and how much of the rainbow on a film
+        private const val OIL_SHEEN = 0xFF8E96A8.toInt()
+        private const val OIL_GLOSS = 0.45f
+        private const val OIL_FILM = 0.38f
+        private const val RAINBOW_STEPS = 64
+
         private const val CLOUD_TOP = 0xFFF6F8FB.toInt()
         private const val CLOUD_BELLY = 0xFF7E8898.toInt()
         private const val CLOUD_SHADOW = 0.07f

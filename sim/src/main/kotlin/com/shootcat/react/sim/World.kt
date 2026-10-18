@@ -94,13 +94,27 @@ object Seen {
     const val SHATTER = 40
     const val TOPPLE = 41
     const val ROLL = 42
-    const val COUNT = 43
+
+    /**
+     * Oil (Phase 4b): kindled on water, splashed up by water, seeped into the ground, killed by it, gas given
+     * off in a closed room, evaporated, clinging (tar), thinner when warm.
+     */
+    const val BURN_ON_WATER = 43
+    const val SPLASH = 44
+    const val STAIN = 45
+    const val DIE_OIL = 46
+    const val OUTGAS = 47
+    const val EVAPORATE = 48
+    const val STICK = 49
+    const val THIN = 50
+    const val COUNT = 51
 
     val NAMES = listOf(
         "ignite", "burn_out", "douse", "suffocate", "char", "melt", "salt_melt", "boil", "residue", "set", "condense",
         "dissolve", "soak", "erode", "seep", "grow", "die_heat", "die_salt", "die_dry", "flee", "dig", "fall",
         "hold_heat", "glow", "float", "conduct", "shine", "wet_no_fire", "crack", "permeate", "compact", "avalanche",
         "burst", "explode", "cloud", "rain", "snowfall", "blown", "lightning", "fulgurite", "shatter", "topple", "roll",
+        "burn_on_water", "splash", "stain", "die_oil", "outgas", "evaporate", "stick", "thin",
     )
 
     fun parse(name: String): Int = NAMES.indexOf(name).also { require(it >= 0) { "unknown observation '$name'" } }
@@ -1035,16 +1049,31 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             if (!burn(x, y, i, m)) return
         } else if (mt.flammable[m] && temp[i] >= mt.igniteTemp[m] && ((f and Flag.WET) == 0 || !mt.wetBlocksBurning[m])) {
             if (oxygen(x, y, i) > 0) {
-                flags[i] = (f or Flag.BURNING).toByte()
-                life[i] = burnLife(m).toShort()
-                events[Event.IGNITE]++
-                note(Seen.IGNITE, m)
-                wake(x, y)
+                kindle(x, y, i, m)
             } else if (mt.quenchProduct[m] != m && temp[i] >= mt.igniteTemp[m] + CHAR_OVER && chance(CHAR_CHANCE)) {
                 // well above burning heat but no air to burn with: it slowly chars, as wood does in a charcoal kiln
                 note(Seen.CHAR, m)
                 change(x, y, i, mt.quenchProduct[m])
                 return
+            }
+        }
+
+        // oil catches fire from flames or embers that keep touching it, not from a spark flying past (Phase 4b):
+        // [life] counts the steps of touching, and slowly forgets them again
+        if (mt.catchSteps[m] > 0 && flags[i].toInt() and Flag.BURNING == 0) {
+            if (burningNeighbour(x, y, i)) {
+                val l = life[i] + 1
+                if (l >= mt.catchSteps[m] && oxygen(x, y, i) > 0) {
+                    // the flame has heated it to burning where it touches
+                    if (temp[i] < mt.igniteTemp[m]) temp[i] = mt.igniteTemp[m]
+                    kindle(x, y, i, m)
+                } else {
+                    life[i] = l.toShort()
+                }
+                wake(x, y)
+            } else if (life[i] > 0) {
+                life[i] = (life[i] - 1).toShort()
+                wake(x, y)
             }
         }
 
@@ -1110,7 +1139,8 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         if (mt.lifetimeSteps[m] > 0) {
             val l = life[i] - 1
             if (l <= 0) {
-                change(x, y, i, mt.decayProduct[m])
+                // (black smoke leaves a little soot, the rest of it thins into the air)
+                change(x, y, i, if (mt.decayShare[m] >= 1f || chance(mt.decayShare[m])) mt.decayProduct[m] else AIR)
                 return
             }
             life[i] = l.toShort()
@@ -1197,6 +1227,41 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         return true
     }
 
+    /** Air or a flame among the eight neighbours of [i]. */
+    private fun airAround(x: Int, y: Int, i: Int): Boolean {
+        val w = width
+        val ox = materials.oxygen
+        val x0 = if (x > 0) -1 else 0
+        val x1 = if (x < w - 1) 1 else 0
+        for (dy in (if (y > 0) -1 else 0)..(if (y < height - 1) 1 else 0)) {
+            val r = i + dy * w
+            for (dx in x0..x1) if (ox[mat[r + dx].toInt()]) return true
+        }
+        return false
+    }
+
+    /** Cell [i] catches fire. */
+    private fun kindle(x: Int, y: Int, i: Int, m: Int) {
+        flags[i] = (flags[i].toInt() or Flag.BURNING).toByte()
+        life[i] = burnLife(m).toShort()
+        events[Event.IGNITE]++
+        note(Seen.IGNITE, m)
+        if (y < height - 1 && materials.wets[mat[i + width].toInt()]) note(Seen.BURN_ON_WATER, m)
+        wake(x, y)
+    }
+
+    /** A neighbour, diagonal ones too, is burning: flames, embers, anything alight (an ember lying in oil touches the open surface beside it). */
+    private fun burningNeighbour(x: Int, y: Int, i: Int): Boolean {
+        val w = width
+        val x0 = if (x > 0) -1 else 0
+        val x1 = if (x < w - 1) 1 else 0
+        for (dy in (if (y > 0) -1 else 0)..(if (y < height - 1) 1 else 0)) {
+            val r = i + dy * w
+            for (dx in x0..x1) if (flags[r + dx].toInt() and Flag.BURNING != 0) return true
+        }
+        return false
+    }
+
     /** Neighbours (4) that give a fire air: air itself, and flames. */
     private fun oxygen(x: Int, y: Int, i: Int): Int {
         val ox = materials.oxygen
@@ -1231,14 +1296,16 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         val mt = materials
         wakeHeat(x, y)
         val t = temp[i]
-        if (t < mt.quenchTemp[m]) {
+        // (burning oil is not put out by water cooling it: it heats itself up again, as long as it has air)
+        if (t < mt.quenchTemp[m] && !mt.douseProof[m]) {
             // cooled below burning: by water next to it, if there is any
             val dousing = wetNeighbour(x, y, i)
             if (dousing >= 0) note(Seen.DOUSE, dousing)
             quench(x, y, i, m)
             return false
         }
-        if (oxygen(x, y, i) == 0) {
+        // (a burning pool of oil draws air in from the side, past its smoke: it counts the diagonal neighbours too)
+        if (oxygen(x, y, i) == 0 && !(mt.douseProof[m] && airAround(x, y, i))) {
             if (chance(SUFFOCATE)) {
                 note(Seen.SUFFOCATE, m)
                 quench(x, y, i, m)
@@ -1250,7 +1317,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             val bt = mt.burnTemp[m]
             if (t < bt) temp[i] = minOf(bt, t + mt.burnHeat[m] / mt.heatCapacity[m])
             if (mt.flame[m] > 0f && chance(mt.flame[m])) emit(x, y, i, fireId)
-            if (mt.smoke[m] > 0f && chance(mt.smoke[m])) emit(x, y, i, smokeId)
+            if (mt.smoke[m] > 0f && chance(mt.smoke[m])) emit(x, y, i, mt.smokeProduct[m])
         }
         val l = life[i] - 1
         if (l <= 0) {
@@ -1453,7 +1520,9 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     private fun yields(m: Int, q: Int): Boolean {
         if (q == AIR) return true
         val k = kindOf[q]
-        return (k == Kind.GAS || k == Kind.LIQUID || materials.animal[q]) && densityOf[q] < densityOf[m]
+        // (loose grains do not sink into thick oil or tar: they lie on top and cover it, Phase 4b)
+        return (k == Kind.GAS || k == Kind.LIQUID || materials.animal[q]) && densityOf[q] < densityOf[m] &&
+            !(materials.carriesPowder[q] && kindOf[m] == Kind.POWDER)
     }
 
     /** Falls up to 1 + speed / 2 cells through air and gases; a liquid below slows it down. Returns whether it moved. */
@@ -1464,6 +1533,12 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         val q = mat[below].toInt()
         if (!yields(m, q)) return false
         if (kindOf[q] == Kind.LIQUID) {
+            // water falling into burning oil does not put it out: it splashes the burning oil up (Phase 4b)
+            if (materials.douseProof[q] && materials.wets[m] && flags[below].toInt() and Flag.BURNING != 0 && splash(x, y + 1, below)) {
+                swap(i, below, x, y, x, y + 1)
+                setVelocity(below, 0)
+                return true
+            }
             // sinking through a liquid is slow
             setVelocity(i, 0)
             if (chance(SINK_CHANCE)) swap(i, below, x, y, x, y + 1)
@@ -1503,6 +1578,8 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
                 return
             }
         }
+        // grains lying on tar stick to it (Phase 4b)
+        if (materials.sticky[mat[i + width].toInt()]) return
         val fr = if (flags[i].toInt() and Flag.WET != 0) materials.wetFriction[m] else materials.friction[m]
         if (chance(fr)) return
         // roots hold the soil, wet or dry; turf holds itself
@@ -1672,6 +1749,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     private fun moveLiquid(x: Int, y: Int, i: Int, m: Int) {
         val mt = materials
         if (mt.wets[m] && soak(x, y, i)) return
+        if (mt.sticky[m] && clings(x, y, i)) return
         if (fall(x, y, i, m)) return
         if ((flags[i].toInt() and Flag.VEL_MASK) != 0) setVelocity(i, 0)
         val d = if (coin()) 1 else -1
@@ -1685,9 +1763,40 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
                 return
             }
         }
-        if (mt.viscosity[m] > 0f && chance(mt.viscosity[m])) return
-        if (flow(x, y, i, m, d)) return
-        flow(x, y, i, m, -d)
+        var v = mt.viscosity[m]
+        // warm oil is thinner (Phase 4b): the warmer, the more readily it flows
+        var thinned = false
+        if (v > 0f && mt.thinTemp[m] != Float.MAX_VALUE && temp[i] > ambient) {
+            v *= ((mt.thinTemp[m] - temp[i]) / (mt.thinTemp[m] - ambient)).coerceIn(0f, 1f)
+            thinned = v < mt.viscosity[m] * THINNED
+        }
+        if (v > 0f && chance(v)) {
+            // oil that could still run on stays awake for its next try (lava and molten metal are kept awake by their heat)
+            if (mt.thinTemp[m] != Float.MAX_VALUE && (dropDistance(x, i, m, d, mt.reach[m], true) > 0 || dropDistance(x, i, m, -d, mt.reach[m], true) > 0)) wake(x, y)
+            return
+        }
+        if ((flow(x, y, i, m, d) || flow(x, y, i, m, -d)) && thinned) note(Seen.THIN, m)
+    }
+
+    /**
+     * Tar touching something firm (rock, a wall, grains, a plant) clings to it and does not run (Phase 4b);
+     * hanging under a ledge with nothing below, it shows that it sticks.
+     */
+    private fun clings(x: Int, y: Int, i: Int): Boolean {
+        val w = width
+        var held = false
+        if (x > 0 && clingsTo(mat[i - 1].toInt())) held = true
+        else if (x < w - 1 && clingsTo(mat[i + 1].toInt())) held = true
+        else if (y > 0 && clingsTo(mat[i - w].toInt())) held = true
+        else if (y < height - 1 && clingsTo(mat[i + w].toInt())) held = true
+        if (held && y < height - 1 && (mat[i + w].toInt() == AIR || kindOf[mat[i + w].toInt()] == Kind.GAS)) note(Seen.STICK, mat[i].toInt())
+        return held
+    }
+
+    /** What tar clings to: anything but air, gas and liquid. */
+    private fun clingsTo(q: Int): Boolean {
+        val k = kindOf[q]
+        return q != AIR && k != Kind.GAS && k != Kind.LIQUID
     }
 
     /**
@@ -2740,6 +2849,120 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         }
     }
 
+    // ------------------------------------------------------------------ oil (Phase 4b)
+
+    /**
+     * Water falls into the burning oil at [o]: the oil is thrown up out of its way into the air above, a few
+     * cells up and to a side, still burning, and comes down again elsewhere. Returns whether there was room.
+     */
+    private fun splash(ox: Int, oy: Int, o: Int): Boolean {
+        val w = width
+        for (k in 0 until SPLASH_TRIES) {
+            val tx = ox + below(2 * SPLASH_SIDE + 1) - SPLASH_SIDE
+            val ty = oy - SPLASH_UP - below(SPLASH_UP)
+            if (tx < 0 || tx >= w || ty < 0) continue
+            val t = ty * w + tx
+            if (mat[t].toInt() != AIR) continue
+            note(Seen.SPLASH, mat[o].toInt())
+            swap(o, t, ox, oy, tx, ty)
+            return true
+        }
+        return false
+    }
+
+    /**
+     * The slow ways of oil, now and then (a random tick): it seeps into sand and earth beside or below it, and
+     * oily ground passes it on down into clean ground; heated beside shut-in air it gives off gas into it; at
+     * the open surface it evaporates, the warmer the sooner, and leaves some tar.
+     */
+    internal fun slowTick(x: Int, y: Int, i: Int, m: Int) {
+        val mt = materials
+        val w = width
+        if (flags[i].toInt() and Flag.BURNING != 0) return
+        if (mt.stains[m] > 0f) {
+            val j = stainable(x, y, i)
+            if (j >= 0 && chance(mt.stains[m])) {
+                note(Seen.STAIN, m)
+                change(j % w, j / w, j, mt.stainedProduct[mat[j].toInt()])
+                clear(x, y, i)
+                return
+            }
+        }
+        val clean = mt.unstained[m]
+        if (clean >= 0 && y < height - 1) {
+            val b = i + w
+            val q = mat[b].toInt()
+            if (mt.stainedProduct[q] >= 0 && flags[b].toInt() and Flag.BURNING == 0 && chance(OIL_SINK)) {
+                change(x, y + 1, b, mt.stainedProduct[q])
+                change(x, y, i, clean)
+            }
+            return
+        }
+        val t = temp[i]
+        if (t >= mt.outgasTemp[m]) {
+            val j = shutInAir(x, y, i)
+            if (j >= 0) {
+                if (chance(OUTGAS)) {
+                    note(Seen.OUTGAS, m)
+                    spawn(j % w, j / w, j, mt.outgas[m], t)
+                }
+                return
+            }
+        }
+        if (mt.evaporates[m] > 0f && y > 0 && mat[i - w].toInt() == AIR && !closed(i - w)) {
+            val warm = if (t > ambient) (t - ambient) / EVAPORATE_WARM else 0f
+            if (chance(mt.evaporates[m] * (1f + warm))) {
+                note(Seen.EVAPORATE, m)
+                if (chance(mt.evaporateShare[m])) change(x, y, i, mt.evaporateProduct[m]) else clear(x, y, i)
+            }
+        }
+    }
+
+    /** A grain below, beside or above [i] that oil can seep into (clean sand or earth, not burning), or -1. */
+    private fun stainable(x: Int, y: Int, i: Int): Int {
+        val w = width
+        val sp = materials.stainedProduct
+        fun takes(j: Int) = sp[mat[j].toInt()] >= 0 && flags[j].toInt() and Flag.BURNING == 0
+        if (y < height - 1 && takes(i + w)) return i + w
+        if (x > 0 && takes(i - 1)) return i - 1
+        if (x < w - 1 && takes(i + 1)) return i + 1
+        if (y > 0 && takes(i - w)) return i - w
+        return -1
+    }
+
+    /** Air beside [i] that was shut in at the last check, or -1. */
+    private fun shutInAir(x: Int, y: Int, i: Int): Int {
+        val w = width
+        if (y > 0 && mat[i - w].toInt() == AIR && closed(i - w)) return i - w
+        if (x > 0 && mat[i - 1].toInt() == AIR && closed(i - 1)) return i - 1
+        if (x < w - 1 && mat[i + 1].toInt() == AIR && closed(i + 1)) return i + 1
+        if (y < height - 1 && mat[i + w].toInt() == AIR && closed(i + w)) return i + w
+        return -1
+    }
+
+    /** Something that poisons living things (oil, oily ground, tar) lies beside [i]. */
+    internal fun poisoned(x: Int, y: Int, i: Int): Boolean {
+        val p = materials.poisons
+        val w = width
+        return (y > 0 && p[mat[i - w].toInt()]) || (y < height - 1 && p[mat[i + w].toInt()]) ||
+            (x > 0 && p[mat[i - 1].toInt()]) || (x < w - 1 && p[mat[i + 1].toInt()])
+    }
+
+    /**
+     * Up through its water from [i], past other animals and what floats in it (a dead fish), the first thing is a
+     * liquid that poisons: a film of oil.
+     */
+    internal fun filmAbove(i: Int, home: Int): Boolean {
+        val w = width
+        var j = i - w
+        while (j >= 0) {
+            val q = mat[j].toInt()
+            if (q != home && !materials.animal[q] && kindOf[q] != Kind.POWDER) return materials.poisons[q] && kindOf[q] == Kind.LIQUID
+            j -= w
+        }
+        return false
+    }
+
     // ------------------------------------------------------------------ level water (Phase 4b)
 
     private val levelSeen = IntArray(size)
@@ -3368,6 +3591,24 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         private const val CHAR_OVER = 80f
         private const val CHAR_CHANCE = 0.006f
         private const val SINK_CHANCE = 0.55f
+
+        // oil (Phase 4b)
+        /** Below this share of its usual thickness warm oil counts as thinned (for the discovery). */
+        private const val THINNED = 0.5f
+
+        /** Where water falling into burning oil throws it: up to this far to a side, this far up and as far again. */
+        private const val SPLASH_SIDE = 3
+        private const val SPLASH_UP = 3
+        private const val SPLASH_TRIES = 4
+
+        /** Chance per random tick that oily ground passes its oil on into clean ground below. */
+        private const val OIL_SINK = 0.08f
+
+        /** Chance per random tick that hot oil beside shut-in air gives off a cell of gas into it. */
+        private const val OUTGAS = 0.5f
+
+        /** Oil evaporates once more readily for every so many degrees above the surroundings. */
+        private const val EVAPORATE_WARM = 10f
         private const val DISSOLVE = 0.03f
         private const val ERODE = 0.08f
         private const val DRY_TEMP = 100f

@@ -74,6 +74,9 @@ object Pattern {
     const val CRYSTAL = 6
     const val MATTE = 7
     const val ICE = 8
+
+    /** Black, with a moving oily sheen at the surface; a film on water shimmers in rainbow colours (Phase 4b). */
+    const val OIL = 9
 }
 
 /** One entry of `materials.json`, exactly as written there. */
@@ -219,6 +222,42 @@ data class MaterialSpec(
     @SerialName("split_into") val splitInto: String? = null,
     /** How many cells of [splitInto] one cell gives. */
     @SerialName("split_yield") val splitYield: Int = 1,
+
+    // crude oil and what comes of it (Phase 4b)
+
+    /** Liquids: from this temperature on it flows as freely as water, from the surroundings' temperature up ever more freely (warm oil is thinner). */
+    @SerialName("thin_temp") val thinTemp: Float? = null,
+    /** Burning, water does not put it out: only lack of air does, or burning out. Water falling into it splashes it up. */
+    @SerialName("douse_proof") val douseProof: Boolean = false,
+    /** What its smoke is; plain smoke if not given (oil: thick black smoke). */
+    @SerialName("smoke_product") val smokeProduct: String? = null,
+    /** Liquids: loose grains do not sink into it but lie on top, so sand or earth can cover it. */
+    @SerialName("carries_powder") val carriesPowder: Boolean = false,
+    /** Liquids: chance per random tick of seeping into a grain beside or below that takes it up ([stainedProduct]). */
+    val stains: Float = 0f,
+    /** Powders: what it becomes when oil seeps into it (sand: oily sand). */
+    @SerialName("stained_product") val stainedProduct: String? = null,
+    /** Kills plants growing beside it and fish under a film of it. */
+    val poisons: Boolean = false,
+    /** Living things that die of what [poisons]: plants beside it, fish under a film of it on their water. */
+    @SerialName("dies_in_oil") val diesInOil: Boolean = false,
+    /** Liquids: chance per random tick that a cell at the open surface evaporates; the warmer, the more readily. */
+    val evaporates: Float = 0f,
+    /** What an evaporated cell leaves, as a share [evaporateShare] of them (oil: tar); the rest goes into the air. */
+    @SerialName("evaporate_product") val evaporateProduct: String? = null,
+    @SerialName("evaporate_share") val evaporateShare: Float = 0f,
+    /** Gives off this gas into shut-in air beside it from [outgasTemp] on (heated oil in a closed room). */
+    val outgas: String? = null,
+    @SerialName("outgas_temp") val outgasTemp: Float? = null,
+    /** Clings: it does not flow while it touches something firm, and grains lying on it do not slide off (tar). */
+    val sticky: Boolean = false,
+    /** Share of the cells that decay into [decayProduct]; the rest into air (black smoke leaves some soot). */
+    @SerialName("decay_share") val decayShare: Float = 1f,
+    /**
+     * Seconds something burning (flames, embers, a burning plank) must keep touching it before it catches fire,
+     * below its ignition heat: longer than a single flame lives, so a spark is not enough (oil).
+     */
+    @SerialName("catch_time") val catchTime: Float? = null,
 )
 
 @Serializable
@@ -277,6 +316,7 @@ class MaterialTable(val specs: List<MaterialSpec>, val ambient: Float) {
             "crystal" -> Pattern.CRYSTAL
             "matte" -> Pattern.MATTE
             "ice" -> Pattern.ICE
+            "oil" -> Pattern.OIL
             else -> error("${specs[it].id}: unknown pattern ${specs[it].pattern}")
         }
     }
@@ -348,6 +388,28 @@ class MaterialTable(val specs: List<MaterialSpec>, val ambient: Float) {
     val wind = FloatArray(count) { specs[it].wind }
     val emits = IntArray(count) { ref(specs[it].emits, -1) }
     val emitRate = FloatArray(count) { specs[it].emitRate }
+    val thinTemp = FloatArray(count) { specs[it].thinTemp ?: Float.MAX_VALUE }
+    val douseProof = BooleanArray(count) { specs[it].douseProof }
+    val smokeProduct = IntArray(count) { ref(specs[it].smokeProduct, idOrNull("smoke") ?: AIR) }
+    val carriesPowder = BooleanArray(count) { specs[it].carriesPowder }
+    val stains = FloatArray(count) { specs[it].stains }
+    val stainedProduct = IntArray(count) { ref(specs[it].stainedProduct, -1) }
+
+    /** What oily ground was before the oil seeped in: oily sand was sand; -1 for anything else. */
+    val unstained = IntArray(count) { -1 }.also { u -> for (m in 0 until count) if (stainedProduct[m] >= 0) u[stainedProduct[m]] = m }
+    val poisons = BooleanArray(count) { specs[it].poisons }
+    val diesInOil = BooleanArray(count) { specs[it].diesInOil }
+    val evaporates = FloatArray(count) { specs[it].evaporates }
+    val evaporateProduct = IntArray(count) { ref(specs[it].evaporateProduct, AIR) }
+    val evaporateShare = FloatArray(count) { specs[it].evaporateShare }
+    val outgas = IntArray(count) { ref(specs[it].outgas, -1) }
+    val outgasTemp = FloatArray(count) { specs[it].outgasTemp ?: Float.MAX_VALUE }
+    val sticky = BooleanArray(count) { specs[it].sticky }
+    val decayShare = FloatArray(count) { specs[it].decayShare }
+    val catchSteps = IntArray(count) { ((specs[it].catchTime ?: 0f) * STEPS_PER_SECOND).toInt() }
+
+    /** Something slow happens to it now and then (random ticks): oil seeps, evaporates, gives off gas; oily ground passes its oil down. */
+    val slow = BooleanArray(count) { stains[it] > 0f || evaporates[it] > 0f || outgas[it] >= 0 || unstained[it] >= 0 }
 
     /** Solid parts of plants (trunk, leaves, vine, dead wood): they form structures of their own, apart from built ones. */
     val plant = BooleanArray(count) { kind[it] == Kind.SOLID && ((organism[it] != Organism.NONE && !animal[it]) || roots[it]) }
@@ -412,7 +474,7 @@ class MaterialTable(val specs: List<MaterialSpec>, val ambient: Float) {
             listOfNotNull(
                 s.burnProduct, s.quenchProduct, s.meltProduct, s.boilProduct, s.boilResidue, s.freezeProduct, s.decayProduct,
                 s.dissolvedProduct, s.dissolvesIn, s.deathProduct, s.growsOn, s.livesIn, s.splitInto, s.shockProduct, s.compactProduct,
-                s.breakProduct, s.emits,
+                s.breakProduct, s.emits, s.smokeProduct, s.stainedProduct, s.evaporateProduct, s.outgas,
             )
                 .forEach { require(it in index) { "${s.id} refers to unknown material '$it'" } }
             if (s.flammable) require(s.igniteTemp != null && s.burnTime != null) { "${s.id} burns but has no ignite_temp or burn_time" }

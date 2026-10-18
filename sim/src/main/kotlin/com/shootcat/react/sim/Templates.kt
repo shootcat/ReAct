@@ -458,6 +458,22 @@ internal object Templates {
         }
         k.hollow(lx, ly, w * 0.06f, h * 0.04f, k.id("lava"), ly - h * 0.01f)
         k.heatAround(lx, ly, w * 0.06f, h * 0.04f, 1050f, reach = 1.4f)
+        // a pocket of crude oil deep down on the right, under solid rock (Phase 4b); a crack beside the gravel
+        // chamber lets oil seep out of the rock
+        val ox = w * 0.88f
+        val oy = h * 0.8f
+        for (y in (oy - h * 0.09f).toInt()..min(h - 1, (oy + h * 0.09f).toInt())) for (x in max(0, (ox - w * 0.11f).toInt())..min(w - 1, (ox + w * 0.11f).toInt())) {
+            val dx = (x - ox) / (w * 0.1f)
+            val dy = (y - oy) / (h * 0.08f)
+            if (dx * dx + dy * dy < 1f) k.put(x, y, rock)
+        }
+        k.hollow(ox, oy, w * 0.05f, h * 0.035f, k.id("oil"), level = 0f)
+        // (the right wall of the gravel chamber, just above its floor)
+        var sy = gy.toInt()
+        while (sy < h - 2 && k.at(gx.toInt(), sy + 1) == k.air) sy++
+        var sx = gx.toInt()
+        while (sx < w - 3 && k.at(sx + 1, sy - 1) == k.air) sx++
+        for (x in sx + 1..sx + 2) for (y in sy - 3..sy - 1) if (k.at(x, y) != -1) k.put(x, y, k.id("oil_spring"))
         k.grass(surface)
         k.trees(surface, (w * 0.05f).toInt(), (w * 0.95f).toInt(), (w * 0.12f).toInt())
     }

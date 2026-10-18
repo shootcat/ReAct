@@ -58,12 +58,14 @@ internal class Life(private val world: World) {
         val animal = mt.animal
         val compact = mt.compactProduct
         val emits = mt.emits
+        val slow = mt.slow
         repeat(size shr TICK_SHIFT) {
             val i = world.below(size)
             val m = mat[i].toInt()
             if (org[m] != Organism.NONE && !animal[m]) tick(i % w, i / w, i, m)
             else if (compact[m] >= 0) world.compact(i % w, i / w, i, m)
             else if (emits[m] >= 0) world.emitFrom(i % w, i / w, i, m)
+            else if (slow[m]) world.slowTick(i % w, i / w, i, m)
         }
     }
 
@@ -72,6 +74,12 @@ internal class Life(private val world: World) {
         if (f and Flag.BURNING != 0) return
         if (temp[i] > mt.diesAbove[m] || (mt.diesInSalt[m] && world.saltyNeighbour(x, y, i))) {
             world.note(if (temp[i] > mt.diesAbove[m]) Seen.DIE_HEAT else Seen.DIE_SALT, m)
+            convert(x, y, i, mt.deathProduct[m])
+            return
+        }
+        // oil in the ground or beside it kills plants (Phase 4b)
+        if (mt.diesInOil[m] && world.poisoned(x, y, i)) {
+            world.note(Seen.DIE_OIL, m)
             convert(x, y, i, mt.deathProduct[m])
             return
         }
@@ -378,6 +386,11 @@ internal class Life(private val world: World) {
             world.change(x, y, i, mt.deathProduct[m])
             return
         }
+        if (mt.diesInOil[m] && world.poisoned(x, y, i)) {
+            world.note(Seen.DIE_OIL, m)
+            world.change(x, y, i, mt.deathProduct[m])
+            return
+        }
         world.wake(x, y)
         when (mt.organism[m]) {
             Organism.FISH -> fish(x, y, i, m)
@@ -405,7 +418,18 @@ internal class Life(private val world: World) {
             if (!world.fall(x, y, i, m)) flop(x, y, i, home, FLOP)
             return
         }
-        life[i] = 0
+        if (mt.diesInOil[m] && world.filmAbove(i, home)) {
+            // under a film of oil on its water it slowly suffocates (Phase 4b)
+            val l = life[i] + 1
+            if (l > OIL_SUFFOCATE) {
+                world.note(Seen.DIE_OIL, m)
+                world.change(x, y, i, mt.deathProduct[m])
+                return
+            }
+            life[i] = l.toShort()
+        } else {
+            life[i] = 0
+        }
         if (!world.chance(mt.move[m])) return
         if (world.chance(TURN)) flags[i] = (flags[i].toInt() xor Flag.MARK).toByte()
         val dx = if (flags[i].toInt() and Flag.MARK != 0) 1 else -1
@@ -629,6 +653,9 @@ internal class Life(private val world: World) {
         const val SPREAD_DEATH = 0.5f
 
         const val SUFFOCATE = 240
+
+        /** Steps a fish lives on under a film of oil (Phase 4b): longer than out of the water, the film spreads first. */
+        const val OIL_SUFFOCATE = 900
         const val FLOP = 0.2f
         const val CRAWL = 0.01f
         const val TURN = 0.02f

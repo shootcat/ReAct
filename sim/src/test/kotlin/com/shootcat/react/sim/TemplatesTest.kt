@@ -26,7 +26,7 @@ class TemplatesTest {
                 Template.COAST -> assertTrue(world.has("saltwater") > world.size / 20 && world.has("sand") > 200 && world.has("trunk") > 10, what)
                 Template.MOUNTAIN -> assertTrue(world.has("snow") > 200 && world.has("ice") > 20, what)
                 Template.VOLCANO -> assertTrue(world.has("lava") > 300 && world.has("basalt") > 300 && world.has("saltwater") > 500, what)
-                Template.CAVES -> assertTrue(world.has("gas_vent") > 0 && world.has("firedamp") > 20 && world.has("firefly") > 0 && world.has("water") > 100, what)
+                Template.CAVES -> assertTrue(world.has("gas_vent") > 0 && world.has("firedamp") > 20 && world.has("firefly") > 0 && world.has("water") > 100 && world.has("oil") > 20 && world.has("oil_spring") > 0, what)
                 Template.FOREST -> assertTrue(world.has("water") > world.size / 30 && world.has("trunk") > 30 && world.has("stone") > 100 && world.has("deadwood") > 0 && world.has("wood") > 0, what)
                 Template.LAKE -> assertTrue(world.has("water") > world.size / 30 && world.has("stone") > 50 && world.has("deadwood") > 40 && world.has("wood") > 40 && world.has("cloud") > 200, what)
             }

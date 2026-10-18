@@ -174,6 +174,11 @@ class DiscoveryWatch(private val book: Discoveries, known: Set<String>) {
                     val b = mat[i + w].toInt()
                     if (mt.kind[b] == Kind.LIQUID && mt.density[b] > mt.density[m]) world.note(Seen.FLOAT, m)
                 }
+                // a light liquid lying on a heavier one: oil on water (Phase 4b)
+                if (k == Kind.LIQUID && y < h - 1) {
+                    val b = mat[i + w].toInt()
+                    if (b != m && mt.kind[b] == Kind.LIQUID && mt.density[b] > mt.density[m]) world.note(Seen.FLOAT, m)
+                }
                 if (k == Kind.SOLID && mt.conductivity[m] >= GOOD_CONDUCTOR && t > CARRIED && carried(world, x, y, i, m)) world.note(Seen.CONDUCT, m)
                 if (mt.animal[m] && mt.emitsLight[m] > 0f && world.lightAt(x, y) < IN_THE_DARK) world.note(Seen.SHINE, m)
                 if (mt.flammable[m] && mt.wetBlocksBurning[m] && f and Flag.WET != 0 && !burning && t >= mt.igniteTemp[m]) world.note(Seen.WET_NO_FIRE, m)
