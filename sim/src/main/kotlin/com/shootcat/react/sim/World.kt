@@ -10,6 +10,12 @@ object Flag {
     /** A cell of a structure that is falling right now: it does not catch hold of anchored ground on the way. */
     const val FALLING = 4
 
+    /**
+     * Rain or snow out of a cloud, still falling through the air (Phase 4c); the same bit as [FALLING], which only
+     * solid cells carry.
+     */
+    const val SKY = FALLING
+
     /** Anchored level ground, whatever its material: structures touching it stand (3.1). */
     const val ANCHORED = 8
 
@@ -1538,6 +1544,13 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
 
     /** Falls up to 1 + speed / 2 cells through air and gases; a liquid below slows it down. Returns whether it moved. */
     internal fun fall(x: Int, y: Int, i: Int, m: Int): Boolean {
+        // snow out of a cloud (Phase 4c), as long as it falls through the air: the air holds the flake back, it
+        // drifts down slowly. Landed (on anything but another flake or drop still in the air) it is snow like any other
+        if (flags[i].toInt() and Flag.SKY != 0) {
+            val landed = y >= height - 1 || (kindOf[mat[i + width].toInt()] != Kind.GAS && flags[i + width].toInt() and Flag.SKY == 0)
+            if (landed) flags[i] = (flags[i].toInt() and Flag.SKY.inv()).toByte()
+            else if (m == snowId && kindOf[mat[i + width].toInt()] == Kind.GAS) return flutter(x, y, i, m)
+        }
         if (y >= height - 1) return false
         val w = width
         val below = i + w
@@ -1572,6 +1585,35 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         }
         swap(i, j, x, y, x, ny)
         setVelocity(j, minOf(7, v + 1))
+        return true
+    }
+
+    /** Cell [i] is a drop of rain or a flake of snow still falling through the air (Phase 4c). */
+    fun inFlight(i: Int): Boolean {
+        val k = kindOf[mat[i].toInt()]
+        return flags[i].toInt() and Flag.SKY != 0 && (k == Kind.LIQUID || k == Kind.POWDER)
+    }
+
+    /**
+     * A snowflake out of a cloud, in the air (Phase 4c): it sinks a cell now and then, and flutters or goes with
+     * the wind to a side. So snow falls as a slow drift of flakes, not as fast as a grain of sand.
+     */
+    private fun flutter(x: Int, y: Int, i: Int, m: Int): Boolean {
+        val gust = windNow * windOf[m]
+        val d = when {
+            gust != 0f && chance(if (gust > 0f) gust else -gust) -> if (gust > 0f) 1 else -1
+            chance(FLAKE_SWAY) -> if (coin()) 1 else -1
+            else -> 0
+        }
+        val down = chance(FLAKE_SINK)
+        val nx = x + d
+        val ny = if (down) y + 1 else y
+        if ((d != 0 || down) && ny < height && nx in 0 until width && yields(m, mat[ny * width + nx].toInt())) {
+            swap(i, ny * width + nx, x, y, nx, ny)
+            setVelocity(ny * width + nx, 0)
+        } else {
+            wake(x, y)
+        }
         return true
     }
 
@@ -2352,6 +2394,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         val snow = temp[i] <= SNOW_TEMP
         note(if (snow) Seen.SNOWFALL else Seen.RAIN, cloudId)
         change(x, y, i, if (snow) snowId else waterId)
+        flags[i] = (flags[i].toInt() or Flag.SKY).toByte()
         events[Event.RAIN]++
         wake(x, y)
     }
@@ -2405,11 +2448,20 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         hit(bestX, bestY)
     }
 
-    /** Ground at (x, y) that bears itself: fixed or solid, or loose and lying on something, not falling through the air. */
+    /**
+     * Ground at (x, y) that bears itself: fixed or solid, or loose and lying on such ground, not falling through the
+     * air. (Two drops falling one above the other are no ground: the upper one lies on the lower, but that one is in
+     * the air, Phase 4c.)
+     */
     private fun supported(x: Int, y: Int): Boolean {
-        val k = kindOf[mat[y * width + x].toInt()]
-        if (k == Kind.STATIC || k == Kind.SOLID || k == Kind.LIFE) return true
-        return y >= height - 1 || kindOf[mat[(y + 1) * width + x].toInt()] != Kind.GAS
+        var yy = y
+        while (yy < height) {
+            val k = kindOf[mat[yy * width + x].toInt()]
+            if (k == Kind.STATIC || k == Kind.SOLID || k == Kind.LIFE) return true
+            if (k == Kind.GAS) return false
+            yy++
+        }
+        return true
     }
 
     /** How much more readily lightning strikes here than the bare height says: metal, a tree, water. */
@@ -3631,6 +3683,10 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         private const val CHAR_OVER = 80f
         private const val CHAR_CHANCE = 0.006f
         private const val SINK_CHANCE = 0.55f
+
+        /** A snowflake out of a cloud sinks a cell with this chance a step, and flutters to a side with this one (Phase 4c). */
+        private const val FLAKE_SINK = 0.3f
+        private const val FLAKE_SWAY = 0.2f
 
         // oil (Phase 4b)
         /** Below this share of its usual thickness warm oil counts as thinned (for the discovery). */

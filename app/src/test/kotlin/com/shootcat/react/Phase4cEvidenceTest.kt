@@ -22,8 +22,11 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
+import com.shootcat.react.data.Settings
 import com.shootcat.react.sim.Kind
 import com.shootcat.react.sim.MaterialTable
+import com.shootcat.react.sim.Seen
+import com.shootcat.react.sim.SimRunner
 import com.shootcat.react.sim.World
 import com.shootcat.react.ui.AppViewModel
 import org.junit.Assert.assertTrue
@@ -189,78 +192,121 @@ class Phase4cEvidenceTest {
 
     // ------------------------------------------------------------------ 2. rain and snow
 
-    /** A cloud painted into the sky over the meadow rains. */
+    /**
+     * A cloud painted into the sky of the meadow rains. Over the sand on its right: a cloud this deep is a thundercloud
+     * (3c), and lightning out of it would set the trees and the wood further left on fire and hide the rain in smoke.
+     * Landscape, so that the whole width of the meadow is on screen.
+     */
     @Test
-    fun paintedCloudRains(): Unit = sandbox("MEADOW") {
+    @Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xxhdpi")
+    fun paintedCloudRains(): Unit = sandbox("MEADOW", quiet = true) {
         val base = world.cloudBase
+        val ground = (SKY_X0..SKY_X1).maxOf { surface(it) }
+        val fell = Fell("water")
         paintCloud(base)
-        var most = 0f
         var seen = 0
-        film("4c_2a_wolke_regen", "Gemalte Wolke, 20 °C: Regen", 190, base - 18, 300, base + 60) {
-            val rate = rate()
-            val air = falling("water", base)
-            most = maxOf(most, rate)
+        film(
+            "4c_2a_wolke_regen", "Gemalte Wolke, 20 °C: Regen", SKY_X0 - 15, base - 16, SKY_X1 + 15, ground + 3,
+            seconds = listOf(0, 1, 2, 3, 10), zoom = 3,
+        ) {
+            val air = falling("water", base, SKY_X0 - 15, SKY_X1 + 15, ground)
             seen = maxOf(seen, air)
-            "Niederschlag %.0f/s, %d Tropfen in der Luft".format(rate, air)
+            fell.note() + ", %d Tropfen in der Luft".format(air)
         }
-        assertTrue("it rained: at most %.0f drops a second, %d in the air at once".format(most, seen), most >= 5f && seen >= 3)
+        assertTrue("it rained: ${fell.total} drops in 10 s, at most $seen in the air at once", fell.total >= 40 && seen >= 3)
         cloudDebugShot("4c_2a_wolkenansicht", base)
     }
 
-    /** Frost from the weather controls: the painted cloud snows. */
+    /** Frost from the weather controls: the painted cloud snows, flakes drifting down (the same place as the rain). */
     @Test
-    fun coldCloudSnows(): Unit = sandbox("MEADOW") {
+    @Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xxhdpi")
+    fun coldCloudSnows(): Unit = sandbox("MEADOW", quiet = true) {
         openWeather()
         compose.onNodeWithTag("weather_temp").performSemanticsAction(SemanticsActions.SetProgress) { it(-10f) }
         compose.onNodeWithTag("weather_apply").performClick()
         steps(120)
         val base = world.cloudBase
+        val ground = (SKY_X0..SKY_X1).maxOf { surface(it) }
+        val fell = Fell("snow")
         paintCloud(base)
-        var most = 0f
         var seen = 0
-        film("4c_2b_wolke_schnee", "Gemalte Wolke bei −10 °C: Schnee", 190, base - 18, 300, base + 60) {
-            val rate = rate()
-            val air = falling("snow", base)
-            most = maxOf(most, rate)
+        var rain = 0
+        film(
+            "4c_2b_wolke_schnee", "Gemalte Wolke bei −10 °C: Schnee", SKY_X0 - 15, base - 16, SKY_X1 + 15, ground + 3,
+            seconds = listOf(0, 1, 2, 3, 10), zoom = 3,
+        ) {
+            val air = falling("snow", base, SKY_X0 - 15, SKY_X1 + 15, ground)
+            val drops = falling("water", base, SKY_X0 - 15, SKY_X1 + 15, ground)
             seen = maxOf(seen, air)
-            "Niederschlag %.0f/s, %d Flocken in der Luft, %d Tropfen".format(rate, air, falling("water", base))
+            rain = maxOf(rain, drops)
+            fell.note() + ", %d Flocken in der Luft, %d Tropfen".format(air, drops)
         }
-        assertTrue("it snowed: at most %.0f flakes a second, %d in the air at once".format(most, seen), most >= 5f && seen >= 3)
+        assertTrue("it snowed: ${fell.total} flakes in 10 s, at most $seen in the air at once", fell.total >= 40 && seen >= 10)
+        assertTrue("no rain in frost: $rain drops", rain == 0)
         cloudDebugShot("4c_2b_wolkenansicht", base)
     }
 
-    /** Lava poured into the sea of the coast: the sea boils, the steam rises into clouds, and they rain. */
+    /**
+     * Lava poured into the sea of the coast: the sea boils, the steam rises into clouds, and they rain. The first picture
+     * is from before the lava: no cloud in the sky.
+     */
     @Test
-    fun seaBoiledByLavaRains(): Unit = sandbox("COAST") {
+    fun seaBoiledByLavaRains(): Unit = sandbox("COAST", quiet = true) {
         val base = world.cloudBase
         var shore = 0
         while (shore < world.width && (0 until world.height).none { world.material(shore, it) == mt.id("saltwater") }) shore++
         var sea = 0
         while (world.material(shore + 8, sea) != mt.id("saltwater")) sea++
+        val area = intArrayOf(shore - 40, base - 18, shore + 60, sea + 6)
+        val before = crop(screen(), area[0], area[1], area[2], area[3]) to "Dampf %d, Wolke %d".format(world.count("steam"), world.count("cloud"))
+        val fell = Fell("water")
         // lava poured along the sea and back, a finger drawn over it
         pick("Hitze", "Lava", brush = 4)
         stroke(listOf(shore + 6 to sea - 8, shore + 50 to sea - 8, shore + 6 to sea - 8), restMillis = 0)
-        var most = 0f
         film(
-            "4c_2c_meer_lava_regen", "Lava ins Meer: Dampf, Wolken, Regen", shore - 40, base - 18, shore + 60, sea + 6,
-            seconds = listOf(0, 1, 2, 3, 10, 20),
+            "4c_2c_meer_lava_regen", "Lava ins Meer: Dampf, Wolken, Regen", area[0], area[1], area[2], area[3],
+            seconds = listOf(0, 1, 2, 3, 10, 20), before = before,
         ) {
-            val rate = rate()
-            most = maxOf(most, rate)
-            "Dampf %d, Wolke %d, Niederschlag %.0f/s".format(world.count("steam"), world.count("cloud"), rate)
+            "Dampf %d, Wolke %d, ".format(world.count("steam"), world.count("cloud")) + fell.note()
         }
-        assertTrue("the steam made clouds that rained: at most %.0f drops a second".format(most), most >= 3f)
+        assertTrue("the steam made clouds that rained: ${fell.total} drops in 20 s", fell.total >= 30)
     }
 
-    /** Drops of rain or flakes of snow that fell in the last second, as the developer view of the clouds shows it. */
-    private fun rate(): Float = vm.world.value!!.stats.dropsPerSecond
+    /**
+     * Rain ([what] water) or snow ([what] snow) fallen out of the clouds since this was made, as the world counts it
+     * (the discoveries are off: they would clear the counts), and per second of the world's time since the last note.
+     */
+    private inner class Fell(what: String) {
+        private val kind = if (what == "snow") Seen.SNOWFALL else Seen.RAIN
+        private val start = count()
+        private var lastCount = start
+        private var lastStep = world.step
+        var total = 0
+            private set
 
-    /** Cells of [what] falling through open air under the clouds (air above and below them). */
-    private fun falling(what: String, base: Int): Int {
+        private fun count(): Int = onSim { it.seen[kind * mt.count + mt.id("cloud")] }
+
+        fun note(): String {
+            val now = count()
+            val step = world.step
+            total = now - start
+            val rate = if (step > lastStep) (now - lastCount) * 60f / (step - lastStep) else 0f
+            lastCount = now
+            lastStep = step
+            val what = if (kind == Seen.SNOWFALL) "Flocken" else "Tropfen"
+            return "%d %s gefallen (%.0f je s)".format(total, what, rate)
+        }
+    }
+
+    /**
+     * Cells of [what] falling through open air under the clouds (air above and below them), in columns [x0]..[x1] down
+     * to row [y1] (by default everywhere).
+     */
+    private fun falling(what: String, base: Int, x0: Int = 0, x1: Int = world.width - 1, y1: Int = world.height - 2): Int {
         val m = mt.id(what)
         return onSim { w ->
             var n = 0
-            for (y in base + 1 until w.height - 1) for (x in 0 until w.width) {
+            for (y in base + 1..minOf(y1, w.height - 2)) for (x in maxOf(x0, 0)..minOf(x1, w.width - 1)) {
                 val i = y * w.width + x
                 if (w.mat[i].toInt() == m && w.mat[i - w.width].toInt() == MaterialTable.AIR && w.mat[i + w.width].toInt() == MaterialTable.AIR) n++
             }
@@ -270,21 +316,22 @@ class Phase4cEvidenceTest {
 
     // ------------------------------------------------------------------ playing
 
-    private fun sandbox(template: String, play: () -> Unit) {
+    /**
+     * The sandbox with a new world from [template] (medium size). The settings an earlier test left behind (in build
+     * 111 the caves of the tree test and the performance figures over the world) are set back to the
+     * defaults first. [quiet]: no discoveries, their banners would lie over the sky.
+     */
+    private fun sandbox(template: String, quiet: Boolean = false, play: () -> Unit) {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             compose.waitForIdle()
+            scenario.onActivity {
+                vm = ViewModelProvider(it)[AppViewModel::class.java]
+                vm.updateSettings(Settings(template = template, worldSize = "MEDIUM"))
+            }
             compose.onNodeWithText("Spielplatz").performClick()
             run(500)
-            scenario.onActivity { vm = ViewModelProvider(it)[AppViewModel::class.java] }
-            if (template != "MEADOW") {
-                compose.onNodeWithContentDescription("Menü").performClick()
-                compose.onNodeWithText("Neue Welt …").performClick()
-                compose.waitForIdle()
-                compose.onNodeWithTag("template_$template").performScrollTo().performClick()
-                compose.onNodeWithTag("size_MEDIUM").performScrollTo().performClick()
-                compose.onNodeWithTag("create_world").performClick()
-                run(300)
-            }
+            if (quiet) vm.world.value!!.watch = null
+            println("4C world $template ${world.width} × ${world.height}, clouds from row ${world.cloudBase}")
             steps(60)
             play()
         }
@@ -327,7 +374,7 @@ class Phase4cEvidenceTest {
 
     private fun paintCloud(base: Int) {
         pick("Flüssig", "Wolke", brush = 4)
-        stroke(listOf(215 to base - 4, 265 to base - 4), restMillis = 0)
+        stroke(listOf(SKY_X0 to base - 4, SKY_X1 to base - 4), restMillis = 0)
     }
 
     /** The screen position of world cell (x, y): the world fills the height of its view, centred. */
@@ -418,21 +465,36 @@ class Phase4cEvidenceTest {
 
     /**
      * Pictures of the screen at [seconds] of world time from now, cut to cells ([x0], [y0])–([x1], [y1]) and
-     * enlarged, side by side in one picture [name] with the time and [state] under each; each also on its own.
+     * enlarged [zoom] times, side by side in one picture [name] with the time and [state] under each; each also on its
+     * own. [before]: a picture taken before, and what was there, put first ("vorher"). For each picture the world is
+     * paused: the picture and what is written under it are of the same step.
      */
     private fun film(
         name: String, title: String, x0: Int, y0: Int, x1: Int, y1: Int,
-        seconds: List<Int> = listOf(0, 1, 2, 3), state: () -> String,
+        seconds: List<Int> = listOf(0, 1, 2, 3), zoom: Int = 2, before: Pair<Bitmap, String>? = null, state: () -> String,
     ) {
         val start = world.step
         val panels = ArrayList<Bitmap>()
+        val labels = ArrayList<String>()
         val notes = ArrayList<String>()
+        if (before != null) {
+            panels += before.first
+            labels += "vorher"
+            notes += "vorher: ${before.second}"
+        }
+        val runner = vm.world.value!!
         for (t in seconds) {
             val target = start + t * 60
             if (world.step < target) steps(target - world.step)
-            val screen = screen()
-            val crop = crop(screen, x0, y0, x1, y1)
-            notes += "${t} s (Schritt ${world.step - start}): ${state()}"
+            runner.speed = SimRunner.Speed.PAUSE
+            onSim { }
+            run(200)
+            val note = state()
+            val at = world.step - start
+            val crop = crop(screen(), x0, y0, x1, y1, zoom)
+            runner.speed = SimRunner.Speed.NORMAL
+            notes += "${t} s (Schritt $at): $note"
+            labels += "$t s"
             File(dir(), "${name}_${t}s.png").outputStream().use { crop.compress(Bitmap.CompressFormat.PNG, 100, it) }
             panels += crop
         }
@@ -450,9 +512,9 @@ class Phase4cEvidenceTest {
         val small = Paint(paint).apply { textSize = 20f }
         c.drawText(title, 12f, 32f, paint)
         for ((k, p) in panels.withIndex()) {
-            c.drawBitmap(p, (k * (pw + GAP)).toFloat(), label.toFloat(), null)
-            c.drawText("${seconds[k]} s", k * (pw + GAP) + 12f, label + ph + 32f, paint)
-            c.drawText(notes[k].substringAfter("): "), k * (pw + GAP) + 12f, label + ph + 68f, small)
+            c.drawBitmap(p, null, Rect(k * (pw + GAP), label, k * (pw + GAP) + pw, label + ph), null)
+            c.drawText(labels[k], k * (pw + GAP) + 12f, label + ph + 32f, paint)
+            c.drawText(notes[k].substringAfter(": "), k * (pw + GAP) + 12f, label + ph + 68f, small)
         }
         File(dir(), "$name.png").outputStream().use { strip.compress(Bitmap.CompressFormat.PNG, 100, it) }
         val text = "$name – $title\n" + notes.joinToString("\n") { "  $it" } + "\n"
@@ -468,7 +530,9 @@ class Phase4cEvidenceTest {
         compose.onNodeWithTag("cloud_debug").assertExists()
         val screen = screen()
         File(dir(), "$name.png").outputStream().use { screen.compress(Bitmap.CompressFormat.PNG, 100, it) }
-        File(dir(), "${name}_ausschnitt.png").outputStream().use { crop(screen, 170, base - 18, 310, base + 40).compress(Bitmap.CompressFormat.PNG, 100, it) }
+        File(dir(), "${name}_ausschnitt.png").outputStream().use {
+            crop(screen, SKY_X0 - 25, base - 18, SKY_X1 + 25, base + 30, zoom = 3).compress(Bitmap.CompressFormat.PNG, 100, it)
+        }
         compose.onNodeWithContentDescription("Menü").performClick()
         compose.onNodeWithText("Wolkenansicht aus").performClick()
         compose.waitForIdle()
@@ -482,8 +546,8 @@ class Phase4cEvidenceTest {
         return bitmap
     }
 
-    /** The part of [screen] that shows world cells ([x0], [y0])–([x1], [y1]), twice as large. */
-    private fun crop(screen: Bitmap, x0: Int, y0: Int, x1: Int, y1: Int): Bitmap {
+    /** The part of [screen] that shows world cells ([x0], [y0])–([x1], [y1]), [zoom] times as large. */
+    private fun crop(screen: Bitmap, x0: Int, y0: Int, x1: Int, y1: Int, zoom: Int = 2): Bitmap {
         val node = compose.onNodeWithTag("world").fetchSemanticsNode()
         val r = node.boundsInWindow
         val s = r.height / world.height
@@ -493,7 +557,7 @@ class Phase4cEvidenceTest {
         val top = (oy + y0 * s).toInt().coerceIn(r.top.toInt(), r.bottom.toInt() - 1)
         val right = (ox + (x1 + 1) * s).toInt().coerceIn(left + 1, r.right.toInt())
         val bottom = (oy + (y1 + 1) * s).toInt().coerceIn(top + 1, r.bottom.toInt())
-        val out = Bitmap.createBitmap((right - left) * 2, (bottom - top) * 2, Bitmap.Config.ARGB_8888)
+        val out = Bitmap.createBitmap((right - left) * zoom, (bottom - top) * zoom, Bitmap.Config.ARGB_8888)
         Canvas(out).drawBitmap(screen, Rect(left, top, right, bottom), Rect(0, 0, out.width, out.height), null)
         return out
     }
@@ -513,6 +577,10 @@ class Phase4cEvidenceTest {
         /** Cells a stroke starts with in one quick move. */
         const val FAST = 12
         const val GAP = 8
+
+        /** Where the clouds are painted over the meadow (medium world): over the sand on its right. */
+        const val SKY_X0 = 330
+        const val SKY_X1 = 380
 
         /** The lone tree on the flat top of the caves (Template.CAVES, medium world): its trunk and the cell at its foot. */
         const val TREE_X = 291

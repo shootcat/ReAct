@@ -69,6 +69,39 @@ class RainTest {
     }
 
     @Test
+    fun `snow out of a cloud drifts down slowly, rain and a lump of snow fall as before`() {
+        /** Steps from the first flake or drop out of the cloud until it lies on the floor (row 73), 52 rows below. */
+        fun fallTime(lab: Lab, name: String, kind: Int): Int {
+            var born = -1
+            for (n in 1..3000) {
+                lab.world.run(1)
+                if (born < 0 && lab.world.seen[kind * mt.count + mt.id("cloud")] > 0) born = n
+                if (born >= 0 && lab.countIn(name, 0, 73, 95, 73) > 0) return n - born
+            }
+            return -1
+        }
+        val cold = lab(ambient = -10f)
+        cold.rect("cloud", 20, 10, 75, 20, -10f)
+        cold.world.wakeAll()
+        val flake = fallTime(cold, "snow", Seen.SNOWFALL)
+        val warm = lab()
+        warm.rect("cloud", 20, 10, 75, 20)
+        warm.world.wakeAll()
+        val drop = fallTime(warm, "water", Seen.RAIN)
+        val lump = lab(ambient = -10f)
+        lump.rect("snow", 28, 17, 32, 21, -10f)
+        lump.world.wakeAll()
+        var heap = 0
+        while (lump.countIn("snow", 0, 73, 95, 73) == 0 && heap < 3000) {
+            lump.world.run(1)
+            heap++
+        }
+        println("52 rows down: a flake out of the cloud in $flake steps, a drop in $drop, a lump of snow in $heap")
+        assertTrue(flake > 3 * heap, "the flake drifts down far slower than the lump: $flake against $heap steps")
+        assertTrue(drop < 40 && flake > 3 * drop, "the drop falls fast, the flake slowly: $drop and $flake steps")
+    }
+
+    @Test
     fun `rain takes its water out of the cloud, it makes none`() {
         val lab = lab()
         lab.rect("cloud", 20, 8, 75, 20)

@@ -581,7 +581,8 @@ class Session(
         for (k in 0 until h.size) {
             val px = x + h.dx[k]
             val py = y + h.dy[k]
-            if (!w.inside(px, py) || !free(w.index(px, py))) return tell("Kein Platz zum Ablegen")
+            // (a drop of rain or a flake falling through there is no obstacle: it lands on what is put down, Phase 4c)
+            if (!w.inside(px, py) || !(free(w.index(px, py)) || w.inFlight(w.index(px, py)))) return tell("Kein Platz zum Ablegen")
             if (!open(w.index(px, py))) return tell(OUT_OF_REACH)
         }
         if ((0 until h.size).all { materials.kind[h.mat[it].toInt()] == Kind.SOLID }) {
