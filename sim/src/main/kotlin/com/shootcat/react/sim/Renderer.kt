@@ -94,6 +94,9 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
     /** Clear liquids drawn with depth and a moving surface edge: water and salt water. */
     private val clearLiquid = BooleanArray(mt.count) { mt.kind[it] == Kind.LIQUID && mt.emitsLight[it] == 0f && mt.opacity[it] < 1f }
 
+    /** Air and the gases: what a falling drop of rain has above and below it. */
+    private val airy = BooleanArray(mt.count) { it == AIR || mt.kind[it] == Kind.GAS }
+
     init {
         require(backdrop.size == world.size)
         for (m in 0 until mt.count) {
@@ -258,6 +261,9 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
                 val down = if (i < size - w) mat[i + w].toInt() else AIR
                 out[i] = if ((clearLiquid[up] || up == fire) && down == up) {
                     if (up == fire) mix(flameRamp[FLAME_STEPS / 3], bg, 0.5f) else mix(scale(palette[up * SHADES + 8], s), bg, 0.35f)
+                } else if (clearLiquid[down] && i + 2 * w < size && airy[mat[i + 2 * w].toInt()]) {
+                    // the streak a falling drop of rain leaves above it (Phase 4c)
+                    mix(RAIN_DROP, bg, RAIN_TRAIL)
                 } else if (down == grass && (variant[i + w].toInt() and 3) != 0) {
                     // blades of grass stick up into the air; in the wind a lighter wave runs over them
                     val lean = windDir != 0 && ((x * 2 - windRun) and 31) < 6 + (windAbs * 10f).toInt()
@@ -267,6 +273,12 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
                 } else {
                     bg
                 }
+                continue
+            }
+            if (clearLiquid[m] && (i < w || airy[mat[i - w].toInt()]) && i + w < size && airy[mat[i + w].toInt()]) {
+                // a drop of rain falling through the air: a clear blue, not the pale surface of a pond, which the sky
+                // would swallow (Phase 4c)
+                out[i] = mix(RAIN_DROP, if (sa < 0.995f) darken(backdrop[i], maxOf(sa, backdropMin)) else backdrop[i], RAIN_SEE)
                 continue
             }
             val v = variant[i].toInt() and 0xFF
@@ -1096,6 +1108,11 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
         private const val STORM_RANGE = 8f
 
         /** Wind streaks from this wind on, so many of 1024 cells per unit of wind (3c.3). */
+        /** A drop of rain in the air (Phase 4c): its colour, how much of the sky shows through it and its streak. */
+        private const val RAIN_DROP = 0xFF3C78CC.toInt()
+        private const val RAIN_SEE = 0.1f
+        private const val RAIN_TRAIL = 0.55f
+
         private const val STREAK_WIND = 0.15f
         private const val STREAK_DENSITY = 40f
 

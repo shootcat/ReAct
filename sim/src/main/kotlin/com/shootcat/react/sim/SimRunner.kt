@@ -30,7 +30,7 @@ class SimRunner(val session: Session, backdrop: IntArray) {
      * One finished picture: the cells, the soft cloud, haze and glow layers and the flame layer. Only the cells
      * from ([x0], [y0]) to ([x1], [y1]) were drawn: the part of the world on screen.
      */
-    class Frame(size: Int, layerSize: Int, flameSize: Int, cloudSize: Int) {
+    class Frame(size: Int, width: Int, layerSize: Int, flameSize: Int, cloudSize: Int) {
         val pixels = IntArray(size)
         val clouds = IntArray(cloudSize)
         val haze = IntArray(layerSize)
@@ -44,6 +44,16 @@ class SimRunner(val session: Session, backdrop: IntArray) {
         val sprites = ArrayList<BodySprite>()
         var spriteCount = 0
         var interval = 0L
+
+        /**
+         * The clouds as the weather saw them (Phase 4c, for the developer view): per column the cloud cells in the band
+         * (from [World.RAIN_DEPTH] on it rains) and their mean temperature; the condensation height (-1: no clouds) and
+         * the top of the band.
+         */
+        val cloudDensity = IntArray(width)
+        val cloudTemp = FloatArray(width)
+        var cloudBase = -1
+        var cloudTop = 0
         var x0 = 0
         var y0 = 0
         var x1 = 0
@@ -106,7 +116,7 @@ class SimRunner(val session: Session, backdrop: IntArray) {
     val flameHeight get() = renderer.flameHeight
     val cloudWidth get() = renderer.cloudWidth
     val cloudHeight get() = renderer.cloudHeight
-    private fun newFrame() = Frame(session.world.size, renderer.layerWidth * renderer.layerHeight, renderer.flameWidth * renderer.flameHeight, renderer.cloudWidth * renderer.cloudHeight)
+    private fun newFrame() = Frame(session.world.size, session.world.width, renderer.layerWidth * renderer.layerHeight, renderer.flameWidth * renderer.flameHeight, renderer.cloudWidth * renderer.cloudHeight)
     private var back = newFrame()
     private var ready = newFrame()
     private var front = newFrame()
@@ -139,6 +149,11 @@ class SimRunner(val session: Session, backdrop: IntArray) {
         val notice: String = "",
         val noticeCount: Int = 0,
         val weather: Weather = Weather(),
+        /** Drops of rain and flakes of snow that fell per second (Phase 4c, for the developer view of the clouds). */
+        val dropsPerSecond: Float = 0f,
+        /** The densest column of cloud (cells in the band), and the mean temperature of all cloud in the band. */
+        val cloudDensest: Int = 0,
+        val cloudTemp: Float = 0f,
     )
 
     /** The weather of the world (3c), for the weather controls of the sandbox. */
@@ -241,6 +256,8 @@ class SimRunner(val session: Session, backdrop: IntArray) {
         var shownSps = 0f
         var shownStep = 0f
         var shownRender = 0f
+        var shownDrops = 0f
+        var dropCount = 0
         var dirty = true
         var shown: IntArray? = null
         while (running) {
@@ -268,6 +285,7 @@ class SimRunner(val session: Session, backdrop: IntArray) {
                     synchronized(eventSums) {
                         for (e in 0 until Event.COUNT) eventSums[e] += world.events[e]
                     }
+                    dropCount += world.events[Event.RAIN]
                     world.events.fill(0)
                     acc -= stepNs
                     k++
@@ -317,6 +335,12 @@ class SimRunner(val session: Session, backdrop: IntArray) {
                 back.interval = if (lastRender == 0L) FRAME_NANOS else minOf(after - lastRender, MAX_INTERVAL)
                 renderer.renderLayers(back.haze, back.light)
                 renderer.renderFlames(back.flames)
+                back.cloudBase = world.cloudBase
+                back.cloudTop = world.cloudTop()
+                for (x in 0 until w) {
+                    back.cloudDensity[x] = world.cloudDensity(x)
+                    back.cloudTemp[x] = world.cloudTemp(x)
+                }
                 synchronized(lock) {
                     val t = back
                     back = ready
@@ -332,6 +356,8 @@ class SimRunner(val session: Session, backdrop: IntArray) {
             if (after - windowStart >= 1_000_000_000L) {
                 val secs = (after - windowStart) / 1e9f
                 shownSps = stepCount / secs
+                shownDrops = dropCount / secs
+                dropCount = 0
                 shownStep = if (stepCount > 0) stepNanos / 1e6f / stepCount else 0f
                 shownRender = if (renders > 0) renderNanos / 1e6f / renders else shownRender
                 stepCount = 0
@@ -339,6 +365,15 @@ class SimRunner(val session: Session, backdrop: IntArray) {
                 renderNanos = 0L
                 renders = 0
                 windowStart = after
+            }
+            var densest = 0
+            var cloudCells = 0
+            var cloudWarmth = 0f
+            for (x in 0 until world.width) {
+                val d = world.cloudDensity(x)
+                if (d > densest) densest = d
+                cloudCells += d
+                cloudWarmth += world.cloudTemp(x) * d
             }
             stats = Stats(
                 stepsPerSecond = shownSps,
@@ -359,6 +394,9 @@ class SimRunner(val session: Session, backdrop: IntArray) {
                 notice = session.notice,
                 noticeCount = session.noticeCount,
                 weather = weatherOf(world, stats.weather),
+                dropsPerSecond = shownDrops,
+                cloudDensest = densest,
+                cloudTemp = if (cloudCells > 0) cloudWarmth / cloudCells else world.ambient,
             )
 
             // sleep until the next step is due (or a frame, or, when paused, until input arrives)

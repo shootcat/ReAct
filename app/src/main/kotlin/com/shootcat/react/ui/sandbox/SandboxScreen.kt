@@ -69,6 +69,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
@@ -327,6 +328,14 @@ fun SandboxScreen(
                         },
                     )
                     DropdownMenuItem(
+                        text = { Text(if (settings.cloudDebug) "Wolkenansicht aus" else "Wolkenansicht an", color = Palette.text) },
+                        onClick = {
+                            menu = false
+                            onSettings(settings.copy(cloudDebug = !settings.cloudDebug))
+                        },
+                        modifier = Modifier.testTag("menu_cloud_debug"),
+                    )
+                    DropdownMenuItem(
                         text = { Text("Einstellungen", color = Palette.text) },
                         onClick = {
                             menu = false
@@ -403,6 +412,14 @@ fun SandboxScreen(
                         },
                     )
                     DropdownMenuItem(
+                        text = { Text(if (settings.cloudDebug) "Wolkenansicht aus" else "Wolkenansicht an", color = Palette.text) },
+                        onClick = {
+                            menu = false
+                            onSettings(settings.copy(cloudDebug = !settings.cloudDebug))
+                        },
+                        modifier = Modifier.testTag("menu_cloud_debug"),
+                    )
+                    DropdownMenuItem(
                         text = { Text("Alles leeren", color = Palette.text) },
                         onClick = {
                             menu = false
@@ -431,6 +448,7 @@ fun SandboxScreen(
                 goalAreas = level?.play?.level?.spec?.goals?.map { it.area } ?: emptyList(),
                 // a level begins with all of it on screen: the player sees what there is before zooming in
                 fitOnStart = level != null,
+                cloudDebug = settings.cloudDebug,
                 onInspect = { x, y ->
                     infoHeld = true
                     runner.inspect(x, y)
@@ -440,6 +458,7 @@ fun SandboxScreen(
             if (level != null && hud) LevelHud(level.play, stats, Modifier.align(Alignment.TopStart).padding(8.dp).width(300.dp).blockTouches())
             info?.let { InfoCard(it, materials, stats.supply == Session.Supply.PROCURE, Modifier.align(Alignment.BottomStart).padding(8.dp).blockTouches()) }
             if (settings.performance) PerformanceOverlay(stats, Modifier.align(Alignment.TopStart).padding(8.dp))
+            if (settings.cloudDebug) CloudDebugOverlay(stats, Modifier.align(Alignment.TopEnd).padding(8.dp))
             notice?.let { NoticeBanner(it, Modifier.align(Alignment.TopCenter).padding(top = 40.dp, start = 16.dp, end = 16.dp)) }
             // speed and the shape of the brush, small, in a corner of the world (4a.5)
             CornerControls(
@@ -615,6 +634,7 @@ private fun WorldView(
     modifier: Modifier,
     goalAreas: List<List<List<Int>>> = emptyList(),
     fitOnStart: Boolean = false,
+    cloudDebug: Boolean = false,
     onInspect: (Int, Int) -> Unit = { _, _ -> },
     onInspectDone: () -> Unit = {},
 ) {
@@ -970,6 +990,7 @@ private fun WorldView(
         drawImage(flameImage, dstOffset = dstOffset, dstSize = dstSize, filterQuality = FilterQuality.Low)
         drawImage(lightImage, dstOffset = dstOffset, dstSize = dstSize, filterQuality = FilterQuality.Low)
         if (goalAreas.isNotEmpty()) drawGoalAreas(goalAreas, o, s)
+        if (cloudDebug) shownFrame?.let { f -> drawCloudDebug(f, o, s) }
         preview?.let { (a, b) -> drawPreview(a, b, mode, radius, tool, materials, o, s) }
         val h = held
         handAt?.let { (x, y) -> if (h != null) drawHeld(h, x, y, materials, o, s) }
@@ -1016,6 +1037,64 @@ private fun DrawScope.drawBodies(f: SimRunner.Frame, images: Map<Int, BodyImage>
             drawImage(img, filterQuality = FilterQuality.Low)
         }
     }
+}
+
+/**
+ * The developer view of the clouds (Phase 4c): under the band of clouds, per column, a bar as long as the column holds
+ * cloud cells, grey below the threshold, blue where it rains, white where it snows; a red line at the threshold (a
+ * bar reaching it rains), a yellow one at the condensation height, the top of the band dotted.
+ */
+private fun DrawScope.drawCloudDebug(f: SimRunner.Frame, o: Offset, s: Float) {
+    val base = f.cloudBase
+    if (base < 0) return
+    val w = f.cloudDensity.size
+    val y0 = o.y + (base + 1) * s
+    for (x in 0 until w) {
+        val d = f.cloudDensity[x]
+        if (d == 0) continue
+        val c = when {
+            d < World.RAIN_DEPTH -> Color(0xB0A0A8B0)
+            f.cloudTemp[x] <= World.SNOW_TEMP -> Color(0xE0FFFFFF)
+            else -> Color(0xD02F7FE0)
+        }
+        drawRect(c, Offset(o.x + x * s, y0), Size(s, d * s))
+    }
+    val right = o.x + w * s
+    drawLine(Color(0xFFE53935), Offset(o.x, y0 + World.RAIN_DEPTH * s), Offset(right, y0 + World.RAIN_DEPTH * s), strokeWidth = maxOf(1.5f, s * 0.25f))
+    drawLine(Color(0xFFFFD54F), Offset(o.x, y0), Offset(right, y0), strokeWidth = maxOf(1f, s * 0.15f))
+    drawLine(
+        Color(0x90FFD54F), Offset(o.x, o.y + f.cloudTop * s), Offset(right, o.y + f.cloudTop * s),
+        strokeWidth = maxOf(1f, s * 0.1f), pathEffect = PathEffect.dashPathEffect(floatArrayOf(s * 2f, s * 2f)),
+    )
+}
+
+/** The legend of the developer view of the clouds. */
+@Composable
+private fun CloudDebugOverlay(stats: SimRunner.Stats, modifier: Modifier) {
+    val base = stats.weather.cloudBase
+    val text = if (base < 0) {
+        "Wolkenansicht\nKeine Kondensationshöhe: keine Wolken"
+    } else {
+        val t = stats.cloudTemp
+        "Wolkenansicht\n" +
+            "Kondensationshöhe: Zeile $base (gelb)\n" +
+            "Schwelle: ${World.RAIN_DEPTH} Zellen je Spalte (rot)\n" +
+            "Dichteste Spalte: ${stats.cloudDensest} Zellen\n" +
+            "Wolkentemperatur: %.0f °C (Schnee ab %.0f °C)\n".format(t, World.SNOW_TEMP) +
+            "Niederschlag: %.0f/s %s".format(stats.dropsPerSecond, if (stats.dropsPerSecond < 0.5f) "" else if (t <= World.SNOW_TEMP) "Schnee" else "Regen")
+    }
+    Text(
+        text,
+        color = Color.White,
+        fontFamily = FontFamily.Monospace,
+        fontSize = 11.sp,
+        lineHeight = 14.sp,
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color(0xAA000000))
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .testTag("cloud_debug"),
+    )
 }
 
 /** The held object where it would be put down, half transparent. */

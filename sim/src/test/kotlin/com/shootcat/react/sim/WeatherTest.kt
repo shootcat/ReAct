@@ -181,6 +181,9 @@ class WeatherTest {
         val lab = Lab(96, 64)
         lab.world.setWeather(cloudBase = 16)
         lab.rect("cloud", 4, 4, 91, 16)
+        // since 4c a bank of cloud this dense rains itself thin within half a minute: the lab is in a thunderstorm,
+        // as a level with storm_seconds is, which keeps its clouds deep while it lasts
+        lab.world.startStorm(60 * 60)
         return lab
     }
 

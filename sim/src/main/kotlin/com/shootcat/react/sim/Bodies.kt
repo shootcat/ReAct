@@ -218,6 +218,99 @@ internal class Bodies(private val world: World) {
         return b
     }
 
+    /**
+     * [b] takes in the [n] world cells [cells] (built on to it, frozen on to a floe) and the bodies among [others]
+     * that now hold together with it (Phase 4c): each cell goes into its own frame where it lies in the world, so
+     * it keeps its place, its turn and its motion, shared out over the new mass. Made anew from the grid instead,
+     * it would stand square and still after every growth, and never fall over.
+     */
+    fun grow(b: Body, cells: IntArray, n: Int, others: IntArray, otherCount: Int) {
+        if (b.carrier != 0) getOff(b)
+        dropRiders(b)
+        var mx = b.vx * b.mass
+        var my = b.vy * b.mass
+        val spin = b.w * b.inertia
+        var add = n
+        for (t in 0 until otherCount) {
+            val o = body(others[t]) ?: continue
+            if (o === b) continue
+            add += o.n
+        }
+        val from = IntArray(add)
+        cells.copyInto(from, 0, 0, n)
+        var j = n
+        for (t in 0 until otherCount) {
+            val o = body(others[t]) ?: continue
+            if (o === b) continue
+            o.at.copyInto(from, j, 0, o.n)
+            j += o.n
+            mx += o.vx * o.mass
+            my += o.vy * o.mass
+            remove(o)
+        }
+        add = j
+        val taken = HashSet<Long>(2 * (b.n + add))
+        for (k in 0 until b.n) taken.add(localKey(b.lx[k], b.ly[k]))
+        val total = b.n + add
+        val lx = b.lx.copyOf(total)
+        val ly = b.ly.copyOf(total)
+        val at = b.at.copyOf(total)
+        val w = width
+        var k = b.n
+        for (q in 0 until add) {
+            val c = from[q]
+            val rx = c % w - b.px
+            val ry = c / w - b.py
+            val fx = b.cs * rx + b.sn * ry + b.comX
+            val fy = -b.sn * rx + b.cs * ry + b.comY
+            // the nearest cell of its own frame that is still free
+            var bx = 0
+            var by = 0
+            var bd = Float.MAX_VALUE
+            val gx = kotlin.math.floor(fx + 0.5f).toInt()
+            val gy = kotlin.math.floor(fy + 0.5f).toInt()
+            for (r in 0..GROW_REACH) {
+                for (dy in -r..r) for (dx in -r..r) {
+                    if (maxOf(if (dx < 0) -dx else dx, if (dy < 0) -dy else dy) != r) continue
+                    if (taken.contains(localKey(gx + dx, gy + dy))) continue
+                    val ex = gx + dx - fx
+                    val ey = gy + dy - fy
+                    val d = ex * ex + ey * ey
+                    if (d < bd) {
+                        bd = d
+                        bx = gx + dx
+                        by = gy + dy
+                    }
+                }
+                if (bd < Float.MAX_VALUE) break
+            }
+            if (bd == Float.MAX_VALUE) continue
+            taken.add(localKey(bx, by))
+            lx[k] = bx
+            ly[k] = by
+            at[k] = c
+            bodyAt[c] = b.id
+            val m = mat[c].toInt()
+            if (!plantOf[m]) b.plant = false
+            flags[c] = (flags[c].toInt() and (Flag.MARK or Flag.FALLING or Flag.VEL_MASK).inv()).toByte()
+            k++
+        }
+        b.n = k
+        b.lx = lx
+        b.ly = ly
+        b.at = at
+        massProps(b)
+        bounds(b)
+        b.vx = mx / b.mass
+        b.vy = my / b.mass
+        b.w = spin / b.inertia
+        b.asleep = false
+        b.still = 0
+        b.stuck = 0
+    }
+
+    private fun localKey(x: Int, y: Int) = (x.toLong() shl 32) or (y.toLong() and 0xffffffffL)
+
     /** Mass, centre of weight and inertia from the cells; the body stays where it is. */
     private fun massProps(b: Body) {
         var m = 0f
@@ -706,30 +799,56 @@ internal class Bodies(private val world: World) {
      * weight does the rest: it tips slowly at first, then faster and faster. Lying on nothing (floating,
      * held at the sides) it stands.
      */
+    /** The last body [unsupported] looked at stands only because it leans against something. */
+    private var leans = false
+
     private fun standing(b: Body): Boolean {
+        val side = unsupported(b, b.at)
+        if (side == 0f) return true
+        b.w += side * NUDGE
+        return false
+    }
+
+    /**
+     * Whether [b], with its cells in the world cells [cells], stands (0) or which way its weight takes it over
+     * (1 or -1). Leaning (Phase 4c), it stands if its weight lies between its foot and what holds it at the side:
+     * a stick against a wall, a tree whose crown rests on a roof.
+     */
+    private fun unsupported(b: Body, cells: IntArray): Float {
+        leans = false
         val w = width
-        val id = b.id
         var minX = Int.MAX_VALUE
         var maxX = Int.MIN_VALUE
+        // what holds it at the side, leftmost on the left and rightmost on the right (a wall, a trunk, another body)
+        var leanL = Int.MAX_VALUE
+        var leanR = Int.MIN_VALUE
+        var x0 = Int.MAX_VALUE
+        var x1 = Int.MIN_VALUE
         for (k in 0 until b.n) {
-            val c = b.at[k]
-            val u = c + w
-            if (u >= size || bodyAt[u] == id || !hard(b, u)) continue
+            val c = cells[k]
             val x = c % w
+            if (x < x0) x0 = x
+            if (x > x1) x1 = x
+            if (x > 0 && x < leanL && hard(b, c - 1)) leanL = x
+            if (x < w - 1 && x > leanR && hard(b, c + 1)) leanR = x
+            val u = c + w
+            if (u >= size || !hard(b, u)) continue
             if (x < minX) minX = x
             if (x > maxX) maxX = x
         }
-        if (minX > maxX) return true
+        if (minX > maxX) return 0f
         val foot = maxX - minX + 1
-        val reach = b.x1 - b.x0 + 1
-        val centre = (minX + maxX) * 0.5f
-        val off = b.px - centre
+        val reach = x1 - x0 + 1
         val over = b.px >= minX - 0.5f + OVER_EDGE && b.px <= maxX + 0.5f - OVER_EDGE
         val tip = foot * TIP_RATIO < reach && foot <= TIP_FOOT
-        if (over && !tip) return true
-        val side = if (off > 0.05f) 1f else if (off < -0.05f) -1f else if (id and 1 == 0) 1f else -1f
-        b.w += side * NUDGE
-        return false
+        leans = false
+        if (over && !tip) return 0f
+        leans = true
+        if (leanR > maxX && b.px >= minX - 0.5f + OVER_EDGE && b.px <= leanR + 0.5f) return 0f
+        if (leanL < minX && b.px <= maxX + 0.5f - OVER_EDGE && b.px >= leanL - 0.5f) return 0f
+        leans = false
+        val off = b.px - (minX + maxX) * 0.5f
+        return if (off > 0.05f) 1f else if (off < -0.05f) -1f else if (b.id and 1 == 0) 1f else -1f
     }
 
     /** The one body [b] stands on, if all it stands on is that body and it moves (floats, slides), not a rider itself. */
@@ -2179,6 +2298,9 @@ internal class Bodies(private val world: World) {
         }
         bestValid = false
         if (!tryPose(b, b.px, b.py, cs, sn)) return
+        // leaning on something it stays as it leans: set square it would stand free of it, fall against it again at
+        // every waking, and so shake on the spot (Phase 4c)
+        if (unsupported(b, best) != 0f || leans) return
         b.cs = cs
         b.sn = sn
         var moved = false
@@ -2416,6 +2538,9 @@ internal class Bodies(private val world: World) {
         private const val TIP_FOOT = 2
         private const val TIP_RATIO = 4
         private const val NUDGE = 0.002f
+
+        /** How far (cells of its frame) a cell built on to a body may be put from where it lies, if that place is taken. */
+        private const val GROW_REACH = 3
 
         /** A body lying within this (sine of the angle, about 3.5°) of square is laid square when it sleeps. */
         private const val SQUARE = 0.06f

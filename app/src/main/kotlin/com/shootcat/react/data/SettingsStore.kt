@@ -10,6 +10,8 @@ data class Settings(
     val music: Boolean = true,
     /** Steps per second, timings and awake chunks over the world. */
     val performance: Boolean = false,
+    /** The developer view of the clouds (Phase 4c): density per column, the threshold for rain, temperature. */
+    val cloudDebug: Boolean = false,
     /** Thickness of the brush in cells. */
     val brush: Int = 3,
     /** The landscape and size a new sandbox world starts from (Leitfaden V3, 4a.5): names of Template and WorldSize. */
@@ -29,6 +31,7 @@ class SettingsStore(context: Context) {
             sound = prefs.getBoolean(KEY_SOUND, defaults.sound),
             music = prefs.getBoolean(KEY_MUSIC, defaults.music),
             performance = prefs.getBoolean(KEY_PERFORMANCE, defaults.performance),
+            cloudDebug = prefs.getBoolean(KEY_CLOUD_DEBUG, defaults.cloudDebug),
             brush = prefs.getInt(KEY_BRUSH, defaults.brush),
             template = prefs.getString(KEY_TEMPLATE, defaults.template) ?: defaults.template,
             worldSize = prefs.getString(KEY_SIZE, defaults.worldSize) ?: defaults.worldSize,
@@ -42,6 +45,7 @@ class SettingsStore(context: Context) {
             .putBoolean(KEY_SOUND, settings.sound)
             .putBoolean(KEY_MUSIC, settings.music)
             .putBoolean(KEY_PERFORMANCE, settings.performance)
+            .putBoolean(KEY_CLOUD_DEBUG, settings.cloudDebug)
             .putInt(KEY_BRUSH, settings.brush)
             .putString(KEY_TEMPLATE, settings.template)
             .putString(KEY_SIZE, settings.worldSize)
@@ -54,6 +58,7 @@ class SettingsStore(context: Context) {
         const val KEY_SOUND = "sound"
         const val KEY_MUSIC = "music"
         const val KEY_PERFORMANCE = "performance"
+        const val KEY_CLOUD_DEBUG = "cloud_debug"
         const val KEY_BRUSH = "brush"
         const val KEY_TEMPLATE = "template"
         const val KEY_SIZE = "world_size"

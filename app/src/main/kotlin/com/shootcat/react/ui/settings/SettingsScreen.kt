@@ -58,6 +58,14 @@ fun SettingsScreen(
                     color = Palette.textDim,
                     modifier = Modifier.padding(bottom = 6.dp),
                 )
+                ToggleRow("Wolkenansicht für Entwickler", settings.cloudDebug) { onChange(settings.copy(cloudDebug = it)) }
+                Text(
+                    "Zeigt unter jeder Wolke, wie dicht sie in dieser Spalte ist, die Schwelle, ab der es regnet, " +
+                        "ihre Temperatur (Schnee bei 0 °C und darunter) und wie viele Tropfen in der Sekunde fallen.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Palette.textDim,
+                    modifier = Modifier.padding(bottom = 6.dp),
+                )
             }
 
             Text(

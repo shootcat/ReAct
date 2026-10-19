@@ -16,8 +16,9 @@ import kotlin.test.assertTrue
  *
  * Lightning seeks metal and runs down it to its foot (3c.4): a post stood in the slot on top of the woodpile
  * kindles it; a post stood in the old post hole in the rock beside it takes the lightning away and keeps it, too
- * hot to touch; one stood on the heap of sand makes glass under it. The storm lasts a little over two
- * minutes, its rain wets the wood.
+ * hot to touch; one stood on the heap of sand makes glass under it. The storm lasts two and a half minutes
+ * (4c: it draws in moist air and keeps its clouds as deep as a thunderstorm needs while it lasts), its rain wets
+ * the wood.
  *
  * Phase 4: the posts are bodies. Stood on a single cell a post falls over, so the pile has a slot one cell wide
  * between its top logs and the rock an old post hole; the plateau drains through a crack into a cave below
@@ -139,9 +140,9 @@ class GewitterfeuerTest {
     @Test
     fun `a post stood on the pile even later, as long as the storm lasts, bronze`() {
         // the plateau drains into the cave (Phase 4): the rain wets the wood only on top, it still burns. Whether
-        // a stroke still kindles it this late is chance. Measured (4b, clouds in their band): a post put there at
-        // 95, 100, 105, 115, 120, 125 or 130 s kindles it; at 110 s the strokes went into the posts in the rock
-        val (_, r) = lateOnPile(120, 180)
+        // a stroke still kindles it this late is chance. Measured (4c, rain by the density of the cloud, the storm
+        // 150 s): a post put there at 95, 100, 105, 115, 125, 135 or 145 s kindles it; at 110, 120, 130 or 140 s not
+        val (_, r) = lateOnPile(125, 180)
         assertEquals(Medal.BRONZE, assertNotNull(r).medal)
     }
 
@@ -182,10 +183,11 @@ class GewitterfeuerTest {
 
     @Test
     fun `a post on the ridge is a lightning rod up there, the woodpile stays cold`() {
-        // it falls over on the ridge (Phase 4) and lies there; the lightning finds it all the same
+        // it falls over on the ridge (Phase 4) and lies there; the lightning finds it all the same. Since 4c the first
+        // minute rains harder, and the puddles on the ridge take strokes too (measured: 5 of the first 23 into the post)
         val (play, r, strikes) = solve("grat", "wait 30\nhand 142 79\nhand 16 44")
         assertNull(r)
-        assertTrue(strikes.count { it.material == "metal" && it.x < 30 } > 10, "${strikes.map { it.x }}")
+        assertTrue(strikes.count { it.material == "metal" && it.x < 30 } >= 5, "${strikes.map { it.x }}")
         assertTrue(strikes.all { it.x < 100 }, "nothing on the plateau: ${strikes.map { it.x }}")
         assertEquals(72, count(play, "wood"))
     }

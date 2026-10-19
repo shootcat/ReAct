@@ -154,6 +154,13 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     private var drawing = 0
     private var nextPiece = 1
 
+    /**
+     * The piece of the stroke the finger is still drawing (Phase 4c): it stays where it is painted until the finger
+     * lifts, then it comes loose as one body in the shape it was drawn. Made a body while it still grows, it would be
+     * made anew from the grid at every step, upright and still, and never fall over.
+     */
+    private var heldPiece = 0
+
     /** The step mark at which the particle in this cell last moved. */
     internal val stamp = IntArray(size)
 
@@ -314,10 +321,10 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     private val moltenMetalId = materials.idOrNull("molten_metal") ?: AIR
     private val windOf = materials.wind
 
-    /** Per column in the band of clouds: how many cloud cells, and the lowest of them. */
+    /** Per column in the band of clouds: how many cloud cells, the lowest of them, and their mean temperature. */
     private val colClouds = IntArray(width)
     private val colBottom = IntArray(width)
-    private val colRun = IntArray(width)
+    private val colTemp = FloatArray(width)
     private val colCover = IntArray(width)
     private val spanX0 = IntArray(width / 2 + 1)
     private val spanX1 = IntArray(width / 2 + 1)
@@ -460,7 +467,10 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
 
     /** What is set from now on is the world's own again (piece 0). */
     fun endPiece() {
+        // the finished stroke is looked at as a whole: loose, it falls now
+        if (drawing != 0) structuresDirty = true
         drawing = 0
+        heldPiece = 0
     }
 
     fun index(x: Int, y: Int) = y * width + x
@@ -508,7 +518,8 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
                 if (fill < 1f && !chance(fill)) continue
                 // cloud is painted as a billow (Phase 4b): full in the middle, bulging and frayed at the rim
                 if (material == cloudId && radius > 1 && billow.value(x / BILLOW, y / BILLOW) < BILLOW_EDGE * (dx * dx + dy * dy) / r2) continue
-                spawn(x, y, i, material, materials.spawnTemp[material])
+                // a cloud takes the temperature of the air it is painted into (Phase 4c: in frost it snows at once)
+                spawn(x, y, i, material, if (material == cloudId) ambient else materials.spawnTemp[material])
                 n++
             }
         }
@@ -710,6 +721,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         // what the world makes in the step is its own, even while a stroke of the player goes on
         val stroke = drawing
         drawing = 0
+        heldPiece = stroke
         val t = awake
         awake = pending
         pending = t
@@ -2016,7 +2028,14 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
 
     /** The top row of the band the clouds hang in: [CLOUD_BAND] rows over the condensation height, never closer to
      *  the top of the world than [CLOUD_CEILING] (Phase 4b: clouds do not pile up under the top of the world). */
-    private fun cloudTop(): Int = maxOf(CLOUD_CEILING, cloudBase - CLOUD_BAND)
+    fun cloudTop(): Int = maxOf(CLOUD_CEILING, cloudBase - CLOUD_BAND)
+
+    /**
+     * What the last look at the weather found in column [x] (Phase 4c, for the developer view of the clouds): the
+     * cloud cells in the band (its density; from [RAIN_DEPTH] on it rains) and their mean temperature.
+     */
+    fun cloudDensity(x: Int): Int = colClouds[x]
+    fun cloudTemp(x: Int): Float = colTemp[x]
 
     /**
      * A cloud (3c.1, 4b) hangs in its band of the sky, from the condensation height up to [cloudTop]: below the
@@ -2139,6 +2158,19 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         return true
     }
 
+    /** A cell of cloud more on top of the cloud in column [x] (a thunderstorm drawing in moist air), if there is room in the band. */
+    private fun feedCloud(x: Int) {
+        val w = width
+        val limit = cloudTop()
+        var k = cloudBase
+        while (k > limit && mat[k * w + x].toInt() != cloudId) k--
+        while (k > limit && mat[k * w + x].toInt() == cloudId) k--
+        val i = k * w + x
+        if (mat[i].toInt() != AIR || closed(i)) return
+        spawn(x, k, i, cloudId, ambient)
+        stamp[i] = mark
+    }
+
     /** Cloud cell [i] at (x, y) under a column of cloud moves to the top of that column, if there is room in the band. */
     private fun joinOnTop(x: Int, y: Int, i: Int): Boolean {
         val w = width
@@ -2203,25 +2235,18 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         }
         colClouds.fill(0)
         colBottom.fill(-1)
-        colRun.fill(0)
+        colTemp.fill(0f)
         val stir = windNow != 0f
         val windDir = if (windNow > 0f) 1 else if (windNow < 0f) -1 else 0
         for (y in top..bottom) {
             val row = y * w
             for (x in 0 until w) {
                 val i = row + x
-                if (mat[i].toInt() != cloudId) {
-                    colRun[x] = 0
-                    continue
-                }
+                if (mat[i].toInt() != cloudId) continue
                 colClouds[x]++
                 colBottom[x] = y
-                val run = ++colRun[x]
-                // rain falls out of the underside of a cloud, where it is thick enough (3c.2): a thick cloud
-                // rains for long, a thin one not at all
-                if (run >= RAIN_DEPTH && (y + 1 >= height || mat[i + w].toInt() != cloudId) && chance(RAIN_CHANCE)) {
-                    precipitate(x, y, i)
-                } else if (windDir != 0 && x + windDir in 0 until w && pressedAgainst(i + windDir) && chance(UPSLOPE_RAIN)) {
+                colTemp[x] += temp[i]
+                if (windDir != 0 && x + windDir in 0 until w && pressedAgainst(i + windDir) && chance(UPSLOPE_RAIN)) {
                     // driven by the wind against a mountain the air rises and rains out on the windward side (Phase 4b)
                     precipitate(x, y, i)
                 } else if (stir) {
@@ -2231,6 +2256,18 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
                     if (cloudAround(x, y) < 8) wake(x, y)
                 }
             }
+        }
+        // rain falls out of the underside of a cloud where the column of cloud over it is dense enough (Phase 4c): the
+        // more cloud it holds above [RAIN_DEPTH], the harder it rains, with the square of it (in a dense cloud the
+        // droplets run together into drops); a thin cloud does not rain at all. A thunderstorm draws in moist air as
+        // it rains: its raining clouds grow back at the top up to [STORM_DEPTH]
+        for (cx in 0 until w) {
+            val n = colClouds[cx]
+            if (n > 0) colTemp[cx] /= n
+            val excess = n - RAIN_DEPTH + 1
+            if (excess <= 0) continue
+            if (chance(minOf(RAIN_MAX, RAIN_RATE * excess * excess))) precipitate(cx, colBottom[cx], colBottom[cx] * w + cx)
+            if (storm > 0 && n <= STORM_DEPTH && chance(STORM_FEED)) feedCloud(cx)
         }
         // thunderstorms: a bank of cloud at least STORM_WIDTH wide and on average STORM_DEPTH deep (raining
         // makes it patchy: a column with half that still belongs to it, and so does a thin column among deep
@@ -2306,9 +2343,13 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         return k != Kind.GAS && k != Kind.LIQUID && mat[j].toInt() != AIR
     }
 
-    /** A drop of rain, or a flake of snow in frost, out of a dense cloud: the cloud cell becomes it and falls. */
+    /**
+     * A drop of rain, or a flake of snow where the cloud is at or below [SNOW_TEMP], out of the underside of a cloud: the
+     * cloud cell becomes it and falls. One cell of cloud is one drop: rain takes the water out of the cloud, it does
+     * not make any.
+     */
     private fun precipitate(x: Int, y: Int, i: Int) {
-        val snow = temp[i] <= 0f
+        val snow = temp[i] <= SNOW_TEMP
         note(if (snow) Seen.SNOWFALL else Seen.RAIN, cloudId)
         change(x, y, i, if (snow) snowId else waterId)
         events[Event.RAIN]++
@@ -3121,7 +3162,9 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
                 if (c < size - w) visit(c + w, id, plant, c)
             }
             val rooted = rootFrom > rootStart[rootPlants]
-            if (fillAnchored || rooted) {
+            // the stroke the finger is still drawing holds where it is, as if anchored
+            val held = fillPiece.toInt() != 0 && fillPiece.toInt() == heldPiece
+            if (fillAnchored || rooted || held) {
                 // a standing structure: remember its cells, to forget their owner at the next search
                 if (standingCount + count > standing.size) standing = standing.copyOf(maxOf(standing.size * 2, standingCount + count))
                 fillCells.copyInto(standing, standingCount, 0, count)
@@ -3143,30 +3186,19 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
      * water froze onto a floe), part of them, moving on as they moved.
      */
     private fun looseFound(count: Int) {
-        var n = count
-        var cells = fillCells
         if (fillTouches > 0) {
-            var extra = 0
-            for (t in 0 until fillTouches) extra += bodies.body(fillTouch[t])?.n ?: 0
-            cells = fillCells.copyOf(count + extra)
-            var px = 0f
-            var py = 0f
-            var m = 0f
+            // the biggest of the bodies it touches takes in the new cells and the others, and goes on as it went (Phase 4c)
+            var base: Body? = null
             for (t in 0 until fillTouches) {
                 val b = bodies.body(fillTouch[t]) ?: continue
-                b.at.copyInto(cells, n, 0, b.n)
-                n += b.n
-                px += b.vx * b.mass
-                py += b.vy * b.mass
-                m += b.mass
-                bodies.forget(b)
+                if (base == null || b.n > base.n) base = b
             }
-            cells.sort(0, n)
-            val total = m + count * 0.5f
-            bodies.create(cells, n, px / total, py / total)
-            return
+            if (base != null) {
+                bodies.grow(base, fillCells, count, fillTouch, fillTouches)
+                return
+            }
         }
-        bodies.create(cells, n)
+        bodies.create(fillCells, count)
     }
 
     /**
@@ -3485,9 +3517,16 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         private const val COLD_SURFACE = 60f
         /** Rain, snow, lightning are looked at every so many steps. */
         private const val WEATHER_EVERY = 10
-        /** The underside of a cloud at least this many cells thick rains (or snows), with this chance per look. */
-        private const val RAIN_DEPTH = 4
-        private const val RAIN_CHANCE = 0.01f
+        /**
+         * Rain (Phase 4c): a column with at least [RAIN_DEPTH] cells of cloud in the band rains (or snows) out of its
+         * underside, with the chance [RAIN_RATE] per look times the square of the cells from the threshold up. Cloud at
+         * or below [SNOW_TEMP] snows.
+         */
+        const val RAIN_DEPTH = 4
+        const val RAIN_RATE = 0.001f
+        /** The chance per look a column rains at most, however dense: a cloud rains out over tens of seconds, not at once. */
+        const val RAIN_MAX = 0.05f
+        const val SNOW_TEMP = 0f
         /** Cloud driven by the wind against a mountain rains on its windward side with this chance per look (Phase 4b). */
         private const val UPSLOPE_RAIN = 0.01f
         /** Cloud: chance per step to rise into its band from below, to sink back into it from above. */
@@ -3548,6 +3587,8 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         /** A thunderstorm: a bank of cloud this wide (columns) and deep (cloud cells per column). */
         private const val STORM_WIDTH = 24
         private const val STORM_DEPTH = 6
+        /** Chance per look that a raining column of a thunderstorm not as deep as [STORM_DEPTH] grows a cell back (Phase 4c). */
+        private const val STORM_FEED = 0.05f
         /** Columns to either side over which the depth of a bank of cloud is evened out (Phase 4b). */
         private const val STORM_SPAN = 4
         /** Chance per look that a thunderstorm strikes; more in a storm called up; never sooner than this after the last stroke. */
