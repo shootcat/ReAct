@@ -45,6 +45,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.abs
+import kotlin.math.ceil
 
 /**
  * The proof of Phase 4c from the running app: each case played with the finger in the sandbox as on the device,
@@ -370,12 +371,15 @@ class Phase4cEvidenceTest {
             val n = maxOf(abs(b.first - a.first), abs(b.second - a.second))
             for (k in 1..n) path += (a.first + (b.first - a.first) * k / n) to (a.second + (b.second - a.second) * k / n)
         }
+        // (in landscape a cell is only about 4 pixels: as many cells as make some 100 pixels, well past the touch slop)
+        val cellPx = compose.onNodeWithTag("world").fetchSemanticsNode().size.height / world.height.toFloat()
+        val fast = if (FAST * cellPx >= 72f) FAST else ceil(100f / cellPx).toInt()
         compose.onNodeWithTag("world").performTouchInput {
             down(cell(path[0].first, path[0].second))
-            for (k in 1 until minOf(FAST, path.size)) moveTo(cell(path[k].first, path[k].second))
+            for (k in 1 until minOf(fast, path.size)) moveTo(cell(path[k].first, path[k].second))
         }
         run(40)
-        for (k in FAST until path.size) {
+        for (k in fast until path.size) {
             compose.onNodeWithTag("world").performTouchInput { moveTo(cell(path[k].first, path[k].second)) }
             run(35)
         }
@@ -386,6 +390,9 @@ class Phase4cEvidenceTest {
     private fun paintCloud(base: Int) {
         pick("Flüssig", "Wolke", brush = 4)
         stroke(listOf(SKY_X0 to base - 4, SKY_X1 to base - 4), restMillis = 0)
+        val cloud = world.count("cloud")
+        println("4C painted: $cloud cells of cloud, ${compose.onAllNodesWithTag("info").fetchSemanticsNodes().size} info cards")
+        assertTrue("the stroke painted a cloud: $cloud cells", cloud > 200)
     }
 
     /** The screen position of world cell (x, y): the world fills the height of its view, centred. */

@@ -2,7 +2,7 @@
 
 Phase 4c: Körper kippen im Spiel wirklich um, und es regnet und schneit sichtbar. Dazu der Nachweis aus der laufenden App: Bildfolgen bei 0, 1, 2 und 3 Sekunden für jeden Fall.
 
-**Build:** [beta-114](https://github.com/shootcat/ReAct/releases/tag/beta-114) (Bilder geprüft an [beta-113](https://github.com/shootcat/ReAct/releases/tag/beta-113))
+**Build:** [beta-115](https://github.com/shootcat/ReAct/releases/tag/beta-115) (Bilder geprüft an [beta-113](https://github.com/shootcat/ReAct/releases/tag/beta-113) und beta-115)
 
 ## Überblick
 
@@ -139,7 +139,14 @@ Geprüft an den Bildern von Build 113; jedes Release enthält sie neu. Unter jed
 | 2c Lava ins Meer der Küste | `4c_2c_meer_lava_regen.png` (vorher, 0, 1, 2, 3, 10, 20 s) | Vorher kein Dampf, keine Wolke. Schon während des Gießens steigt Dampf auf: 578 Wolkenzellen bei 0 s, 950 bei 10 s. Regen: 7, 11, 13, 17, 59, 141 Tropfen gefallen. Nach 20 s ist die Lava zu Stein erstarrt. |
 | Entwickleransicht | `4c_2a_wolkenansicht.png`, `4c_2b_wolkenansicht.png` (je mit `_ausschnitt`) | Balken je Spalte unter der Wolke: blau = Regen, weiß = Schnee. Dazu Schwelle, Kondensationshöhe und Werte. |
 
-Noch ein Fehler im Test, nicht in der App: Im Querformat traf der simulierte Fingertipp auf „Übernehmen“ im Wetterdialog nicht (Build 112, der Schneetest malte danach keine Wolke). Auf dem Bild des Dialogs ist der Knopf sichtbar. Der Test löst ihn jetzt über seine Aktion aus und prüft danach Kondensationshöhe (48) und Lufttemperatur (−10 °C).
+Fehler im Test, nicht in der App:
+- In Build 112 und 114 malte der Schneetest keine Wolke: 0 Flocken, 0 Tropfen. In Build 113 lief er.
+- Im Querformat ist eine Zelle nur etwa 4 Pixel groß. Der schnelle Anfang des Strichs (11 Zellen, etwa 45 Pixel) blieb unter der Bewegungsschwelle. Lief die Testmaschine dann langsam, galt der Finger nach 450 ms als langer Druck. Ein langer Druck fragt nur ab, was dort ist, und malt nichts.
+- Der Schneetest läuft als erster der Klasse und ist darum am langsamsten.
+- Behoben:
+  - Der schnelle Anfang umfasst jetzt gut 100 Pixel, im Querformat 25 Zellen.
+  - Der Test prüft nach dem Malen, dass die Wolke in der Welt ist.
+  - Den Knopf „Übernehmen“ im Wetterdialog löst der Test über seine Aktion aus. Danach prüft er Kondensationshöhe (48) und Lufttemperatur (−10 °C).
 
 ## 4. Level und Leistung
 
