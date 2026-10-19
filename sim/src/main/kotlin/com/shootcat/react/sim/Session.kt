@@ -719,8 +719,11 @@ class Session(
         if (world.placeAnimal(tool, x, y)) lastAnimal = (x shl 16) or (y and 0xFFFF)
     }
 
+    /** A cloud is painted full, as a billow (Phase 4c: painted thin like smoke, it hardly ever rained). */
+    private val cloud = materials.idOrNull("cloud") ?: MaterialTable.AIR
+
     /** Loose material is poured scattered, solid material is drawn as a closed shape; a one-cell brush is exact. */
-    private fun fillFor(m: Int): Float = if (radius == 0) 1f else when (materials.kind[m]) {
+    private fun fillFor(m: Int): Float = if (radius == 0 || m == cloud) 1f else when (materials.kind[m]) {
         Kind.POWDER -> 0.3f
         Kind.LIQUID -> 0.4f
         Kind.GAS -> if (materials.spawnBurning[m]) 0.8f else 0.35f

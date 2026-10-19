@@ -81,6 +81,7 @@ class Phase4cEvidenceTest {
             val b = bodies().firstOrNull { it.id == stick }
             if (b == null) "kein Körper" else "Winkel %.0f°, %s".format(b.angle, if (b.asleep) "liegt still" else "bewegt sich")
         }
+        assertTrue("a body was made", stick != 0)
         val b = bodies().first { it.id == stick }
         assertTrue("the slanting stick fell flat: turned ${b.angle}°", abs(b.angle) > 35f && b.asleep)
     }
@@ -94,13 +95,15 @@ class Phase4cEvidenceTest {
         stroke(listOf(x to gy - 2, x to gy - 18), restMillis = 200)
         steps(60)
         val upright = bodyNear(x, gy - 10)
-        val before = bodies().first { it.id == upright }
-        assertTrue("the upright stick stands: ${before.angle}°", abs(before.angle) < 3f)
+        val before = bodies().firstOrNull { it.id == upright }
+        println("4C upright before the push: ${before?.angle}")
         stroke(listOf(x - 15 to gy - 2, x - 6 to gy - 16), restMillis = 0)
         film("4c_1b_stab_senkrecht_stoss", "Senkrechter Stab, ein zweiter fällt dagegen", x - 26, gy - 26, x + 26, gy + 4) {
             val b = bodies().firstOrNull { it.id == upright }
             if (b == null) "kein Körper" else "Winkel des senkrechten Stabs %.0f°, %s".format(b.angle, if (b.asleep) "liegt still" else "bewegt sich")
         }
+        assertTrue("the upright stick stood: ${before?.angle}°", before != null && abs(before.angle) < 3f)
+        assertTrue("a body was made", upright != 0)
         val b = bodies().first { it.id == upright }
         assertTrue("the pushed stick fell over: ${b.angle}°", abs(b.angle) > 60f)
     }
@@ -124,6 +127,7 @@ class Phase4cEvidenceTest {
             val b = bodies().firstOrNull { it.id == log }
             if (b == null) "kein Körper" else "Winkel %.0f°, %s".format(b.angle, if (b.asleep) "liegt still" else "bewegt sich")
         }
+        assertTrue("a body was made", log != 0)
         val b = bodies().first { it.id == log }
         assertTrue("the log tipped onto the slope: ${b.angle}°", abs(b.angle) > 15f)
     }
@@ -134,6 +138,7 @@ class Phase4cEvidenceTest {
         val x = TREE_X
         val foot = TREE_FOOT
         assertTrue("a tree stands there", mt.spec(world.material(x, foot)).id == "trunk")
+        println("4C around the foot of the tree: " + ((foot - 2)..(foot + 1)).joinToString(" / ") { y -> ((x - 3)..(x + 3)).joinToString(",") { mt.spec(world.material(it, y)).id.take(4) } })
         pick("Hitze", "Glut", brush = 1)
         compose.onNodeWithTag("world").performTouchInput {
             down(cell(x - 1, foot))
@@ -146,6 +151,7 @@ class Phase4cEvidenceTest {
             waited += 10
         }
         val tree = plantBodyNear(x, foot)
+        println("4C the tree came loose after ${waited / 60f} s: " + bodies().filter { mt.plant[it.material] }.joinToString { "#${it.id} ${mt.spec(it.material).id} ${it.cells} at %.0f,%.0f".format(it.x, it.y) })
         assertTrue("the trunk burnt through within ${waited / 60} s", tree != 0)
         var tipped = 0f
         var settled = false
@@ -202,18 +208,12 @@ class Phase4cEvidenceTest {
         while (shore < world.width && (0 until world.height).none { world.material(shore, it) == mt.id("saltwater") }) shore++
         var sea = 0
         while (world.material(shore + 8, sea) != mt.id("saltwater")) sea++
-        val lx = shore + 12
         val rain0 = world.seenTotal("rain")
+        // lava poured along the sea and back, a finger drawn over it
         pick("Hitze", "Lava", brush = 4)
-        compose.onNodeWithTag("world").performTouchInput {
-            down(cell(lx, sea - 8))
-            moveBy(Offset(0f, WIPE))
-            moveBy(Offset(0f, -WIPE))
-        }
-        steps(120)
-        compose.onNodeWithTag("world").performTouchInput { up() }
+        stroke(listOf(shore + 6 to sea - 8, shore + 50 to sea - 8, shore + 6 to sea - 8), restMillis = 0)
         film(
-            "4c_2c_meer_lava_regen", "Lava ins Meer: Dampf, Wolken, Regen", shore - 50, base - 18, shore + 50, sea + 6,
+            "4c_2c_meer_lava_regen", "Lava ins Meer: Dampf, Wolken, Regen", shore - 40, base - 18, shore + 60, sea + 6,
             seconds = listOf(0, 1, 2, 3, 10, 20),
         ) {
             "Dampf ${world.count("steam")}, Wolke ${world.count("cloud")}, Tropfen bisher ${world.seenTotal("rain") - rain0}"
@@ -253,19 +253,26 @@ class Phase4cEvidenceTest {
         compose.waitForIdle()
     }
 
-    /** A finger drawn slowly through the cells [points], a move every couple of steps, resting [restMillis] at the end. */
+    /**
+     * A finger drawn through the cells [points], resting [restMillis] at the end. The first [FAST] cells go quickly, as a
+     * finger starts a stroke: slower, the app would take the still finger for a long press that asks what is there (3b.1).
+     * Then a cell every couple of steps.
+     */
     private fun stroke(points: List<Pair<Int, Int>>, restMillis: Long) {
-        val (x0, y0) = points.first()
-        compose.onNodeWithTag("world").performTouchInput { down(cell(x0, y0)) }
-        run(40)
+        val path = ArrayList<Pair<Int, Int>>()
+        path += points.first()
         for ((a, b) in points.zipWithNext()) {
             val n = maxOf(abs(b.first - a.first), abs(b.second - a.second))
-            for (k in 1..n) {
-                compose.onNodeWithTag("world").performTouchInput {
-                    moveTo(cell(a.first + (b.first - a.first) * k / n, a.second + (b.second - a.second) * k / n))
-                }
-                run(35)
-            }
+            for (k in 1..n) path += (a.first + (b.first - a.first) * k / n) to (a.second + (b.second - a.second) * k / n)
+        }
+        compose.onNodeWithTag("world").performTouchInput {
+            down(cell(path[0].first, path[0].second))
+            for (k in 1 until minOf(FAST, path.size)) moveTo(cell(path[k].first, path[k].second))
+        }
+        run(40)
+        for (k in FAST until path.size) {
+            compose.onNodeWithTag("world").performTouchInput { moveTo(cell(path[k].first, path[k].second)) }
+            run(35)
         }
         if (restMillis > 0) run(restMillis)
         compose.onNodeWithTag("world").performTouchInput { up() }
@@ -316,14 +323,16 @@ class Phase4cEvidenceTest {
         return world.height
     }
 
-    /** The biggest body around (x, y), waiting a little for it to be found. */
+    /** The biggest body (of wood) around (x, y), waiting a little for it to be found; 0 if there is none. */
     private fun bodyNear(x: Int, y: Int): Int {
+        val wood = mt.id("wood")
         repeat(20) {
-            val b = bodies().filter { abs(it.x - x) < 12 && abs(it.y - y) < 14 && it.cells > 5 }.maxByOrNull { it.cells }
+            val b = bodies().filter { it.material == wood && abs(it.x - x) < 12 && abs(it.y - y) < 14 && it.cells > 5 }.maxByOrNull { it.cells }
             if (b != null) return b.id
             steps(2)
         }
-        throw AssertionError("no body near $x, $y")
+        println("4C no body near $x, $y: " + bodies().joinToString { "#${it.id} ${it.cells} at %.0f,%.0f".format(it.x, it.y) })
+        return 0
     }
 
     /** The bodies as the simulation thread sees them between two steps. */
@@ -347,7 +356,7 @@ class Phase4cEvidenceTest {
     }
 
     private fun plantBodyNear(x: Int, y: Int): Int =
-        bodies().filter { mt.plant[it.material] && it.cells > 20 && abs(it.x - x) < 15 && abs(it.y - y) < 30 }.maxByOrNull { it.cells }?.id ?: 0
+        bodies().filter { mt.plant[it.material] && it.cells > 50 && abs(it.x - x) < 15 && abs(it.y - y) < 30 }.maxByOrNull { it.cells }?.id ?: 0
 
     private fun World.seenTotal(kind: String): Int {
         val k = if (kind == "rain") Seen.RAIN else Seen.SNOWFALL
@@ -405,7 +414,9 @@ class Phase4cEvidenceTest {
             c.drawText(notes[k].substringAfter("): "), k * (pw + GAP) + 12f, label + ph + 68f, small)
         }
         File(dir(), "$name.png").outputStream().use { strip.compress(Bitmap.CompressFormat.PNG, 100, it) }
-        File(dir(), "4c_nachweis.txt").appendText("$name – $title\n" + notes.joinToString("\n") { "  $it" } + "\n")
+        val text = "$name – $title\n" + notes.joinToString("\n") { "  $it" } + "\n"
+        File(dir(), "4c_nachweis.txt").appendText(text)
+        println("4C $text")
     }
 
     /** The developer view of the clouds switched on, one picture, and off again. */
@@ -457,6 +468,9 @@ class Phase4cEvidenceTest {
 
     private companion object {
         const val WIPE = 60f
+
+        /** Cells a stroke starts with in one quick move. */
+        const val FAST = 12
         const val GAP = 8
 
         /** The lone tree on the flat top of the caves (Template.CAVES, medium world): its trunk and the cell at its foot. */

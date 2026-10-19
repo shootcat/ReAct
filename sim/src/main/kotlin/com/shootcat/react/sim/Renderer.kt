@@ -97,6 +97,25 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
     /** Air and the gases: what a falling drop of rain has above and below it. */
     private val airy = BooleanArray(mt.count) { it == AIR || mt.kind[it] == Kind.GAS }
 
+    /**
+     * How many cells above a falling drop of rain the air cell [i] is (1 to [RAIN_STREAK]), through open air, or 0: a
+     * drop falls several cells a step, and is seen as a short streak (Phase 4c).
+     */
+    private fun rainTrail(i: Int): Int {
+        val w = world.width
+        val size = world.size
+        val mat = world.mat
+        var j = i
+        for (k in 1..RAIN_STREAK) {
+            j += w
+            if (j + w >= size) return 0
+            val m = mat[j].toInt()
+            if (clearLiquid[m]) return if (airy[mat[j + w].toInt()]) k else 0
+            if (m != AIR) return 0
+        }
+        return 0
+    }
+
     init {
         require(backdrop.size == world.size)
         for (m in 0 until mt.count) {
@@ -259,11 +278,12 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
                 // gaps inside falling water or a flame are drawn filled, so streams and flames hold together
                 val up = if (i >= w) mat[i - w].toInt() else AIR
                 val down = if (i < size - w) mat[i + w].toInt() else AIR
+                val trail = if (down == AIR || clearLiquid[down]) rainTrail(i) else 0
                 out[i] = if ((clearLiquid[up] || up == fire) && down == up) {
                     if (up == fire) mix(flameRamp[FLAME_STEPS / 3], bg, 0.5f) else mix(scale(palette[up * SHADES + 8], s), bg, 0.35f)
-                } else if (clearLiquid[down] && i + 2 * w < size && airy[mat[i + 2 * w].toInt()]) {
-                    // the streak a falling drop of rain leaves above it (Phase 4c)
-                    mix(RAIN_DROP, bg, RAIN_TRAIL)
+                } else if (trail > 0) {
+                    // the streak a falling drop of rain draws above it, fainter further up (Phase 4c)
+                    mix(RAIN_DROP, bg, RAIN_TRAIL + (trail - 1) * RAIN_FADE)
                 } else if (down == grass && (variant[i + w].toInt() and 3) != 0) {
                     // blades of grass stick up into the air; in the wind a lighter wave runs over them
                     val lean = windDir != 0 && ((x * 2 - windRun) and 31) < 6 + (windAbs * 10f).toInt()
@@ -1111,7 +1131,9 @@ class Renderer(private val world: World, private val backdrop: IntArray) {
         /** A drop of rain in the air (Phase 4c): its colour, how much of the sky shows through it and its streak. */
         private const val RAIN_DROP = 0xFF3C78CC.toInt()
         private const val RAIN_SEE = 0.1f
-        private const val RAIN_TRAIL = 0.55f
+        private const val RAIN_TRAIL = 0.45f
+        private const val RAIN_FADE = 0.15f
+        private const val RAIN_STREAK = 3
 
         private const val STREAK_WIND = 0.15f
         private const val STREAK_DENSITY = 40f

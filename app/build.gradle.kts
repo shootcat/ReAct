@@ -57,6 +57,8 @@ android {
                 it.maxHeapSize = "2g"
                 it.testLogging {
                     events("failed")
+                    // the proof of Phase 4c writes what the world did, picture by picture, into the log
+                    showStandardStreams = true
                     exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
                 }
             }
