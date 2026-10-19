@@ -11,6 +11,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -221,10 +222,20 @@ class Phase4cEvidenceTest {
     @Test
     @Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xxhdpi")
     fun coldCloudSnows(): Unit = sandbox("MEADOW", quiet = true) {
+        println("4C weather before: clouds from row ${world.cloudBase}, ${world.ambient} °C; the controls start from ${vm.world.value!!.stats.weather}")
         openWeather()
         compose.onNodeWithTag("weather_temp").performSemanticsAction(SemanticsActions.SetProgress) { it(-10f) }
-        compose.onNodeWithTag("weather_apply").performClick()
+        compose.waitForIdle()
+        // the weather controls as they are set, a picture of its own (the dialog is a window of its own)
+        val panel = (compose.onNodeWithTag("weather_panel").fetchSemanticsNode().root as ViewRootForTest).view.rootView
+        val controls = Bitmap.createBitmap(panel.width, panel.height, Bitmap.Config.ARGB_8888)
+        panel.draw(Canvas(controls))
+        File(dir(), "4c_2b_wetterregler.png").outputStream().use { controls.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        // (in landscape the dialog is taller than the screen: its button is pressed by what it does, not by where it is)
+        compose.onNodeWithTag("weather_apply").performSemanticsAction(SemanticsActions.OnClick)
         steps(120)
+        println("4C weather after: clouds from row ${world.cloudBase}, ${world.ambient} °C, the controls ${if (compose.onAllNodesWithTag("weather_panel").fetchSemanticsNodes().isEmpty()) "closed" else "still open"}")
+        assertTrue("the weather controls kept the clouds and set the frost: row ${world.cloudBase}, ${world.ambient} °C", world.cloudBase >= 0 && world.ambient < 0f)
         val base = world.cloudBase
         val ground = (SKY_X0..SKY_X1).maxOf { surface(it) }
         val fell = Fell("snow")
