@@ -24,7 +24,6 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import com.shootcat.react.sim.Kind
 import com.shootcat.react.sim.MaterialTable
-import com.shootcat.react.sim.Seen
 import com.shootcat.react.sim.World
 import com.shootcat.react.ui.AppViewModel
 import org.junit.Assert.assertTrue
@@ -153,19 +152,39 @@ class Phase4cEvidenceTest {
         val tree = plantBodyNear(x, foot)
         println("4C the tree came loose after ${waited / 60f} s: " + bodies().filter { mt.plant[it.material] }.joinToString { "#${it.id} ${mt.spec(it.material).id} ${it.cells} at %.0f,%.0f".format(it.x, it.y) })
         assertTrue("the trunk burnt through within ${waited / 60} s", tree != 0)
-        var tipped = 0f
-        var settled = false
+        // where the tree is: the middle of its trunk and leaves, and its top (a body made anew after it fell has a new
+        // frame and reads 0°, so its turn tells nothing; where its cells are does)
+        val upright = treeAt(x, foot)
+        var last = upright
         film("4c_1d_baum_durchgebrannt", "Baum, Stamm am Fuß durchgebrannt (0 s: der Stamm ist durch)", x - 26, foot - 26, x + 26, foot + 6) {
-            val b = bodies().firstOrNull { it.id == tree }
-            if (b == null) {
-                settled = true
-                "liegt, hat wieder Wurzeln geschlagen"
-            } else {
-                tipped = maxOf(tipped, abs(b.angle))
-                "Winkel %.0f°, %s".format(b.angle, if (b.asleep) "liegt still" else "bewegt sich")
-            }
+            last = treeAt(x, foot)
+            "Krone bei %.0f,%.0f, Spitze Reihe %d (stehend %.0f,%.0f, %d)".format(last[0], last[1], last[2].toInt(), upright[0], upright[1], upright[2].toInt())
         }
-        assertTrue("the tree fell over: turned $tipped°", tipped > 45f || settled)
+        assertTrue(
+            "the tree lies: its middle from %.0f,%.0f to %.0f,%.0f, its top from row %.0f to %.0f".format(upright[0], upright[1], last[0], last[1], upright[2], last[2]),
+            abs(last[0] - upright[0]) > 4f && last[2] - upright[2] >= 4f,
+        )
+    }
+
+    /** The middle (x, y) of the trunk and leaf cells around a tree with its foot at ([x], [foot]), and its highest row. */
+    private fun treeAt(x: Int, foot: Int): FloatArray {
+        val trunk = mt.id("trunk")
+        val leaves = mt.id("leaves")
+        return onSim { w ->
+            var n = 0
+            var sx = 0f
+            var sy = 0f
+            var top = Int.MAX_VALUE
+            for (y in maxOf(0, foot - 30)..minOf(w.height - 1, foot + 4)) for (xx in maxOf(0, x - 25)..minOf(w.width - 1, x + 25)) {
+                val m = w.material(xx, y)
+                if (m != trunk && m != leaves) continue
+                n++
+                sx += xx
+                sy += y
+                if (y < top) top = y
+            }
+            if (n == 0) floatArrayOf(0f, 0f, 0f) else floatArrayOf(sx / n, sy / n, top.toFloat())
+        }
     }
 
     // ------------------------------------------------------------------ 2. rain and snow
@@ -174,12 +193,17 @@ class Phase4cEvidenceTest {
     @Test
     fun paintedCloudRains(): Unit = sandbox("MEADOW") {
         val base = world.cloudBase
-        val rain0 = world.seenTotal("rain")
         paintCloud(base)
+        var most = 0f
+        var seen = 0
         film("4c_2a_wolke_regen", "Gemalte Wolke, 20 °C: Regen", 190, base - 18, 300, base + 60) {
-            "Tropfen bisher: ${world.seenTotal("rain") - rain0}"
+            val rate = rate()
+            val air = falling("water", base)
+            most = maxOf(most, rate)
+            seen = maxOf(seen, air)
+            "Niederschlag %.0f/s, %d Tropfen in der Luft".format(rate, air)
         }
-        assertTrue("it rained", world.seenTotal("rain") - rain0 > 10)
+        assertTrue("it rained: at most %.0f drops a second, %d in the air at once".format(most, seen), most >= 5f && seen >= 3)
         cloudDebugShot("4c_2a_wolkenansicht", base)
     }
 
@@ -191,12 +215,17 @@ class Phase4cEvidenceTest {
         compose.onNodeWithTag("weather_apply").performClick()
         steps(120)
         val base = world.cloudBase
-        val snow0 = world.seenTotal("snowfall")
         paintCloud(base)
+        var most = 0f
+        var seen = 0
         film("4c_2b_wolke_schnee", "Gemalte Wolke bei −10 °C: Schnee", 190, base - 18, 300, base + 60) {
-            "Flocken bisher: ${world.seenTotal("snowfall") - snow0}"
+            val rate = rate()
+            val air = falling("snow", base)
+            most = maxOf(most, rate)
+            seen = maxOf(seen, air)
+            "Niederschlag %.0f/s, %d Flocken in der Luft, %d Tropfen".format(rate, air, falling("water", base))
         }
-        assertTrue("it snowed", world.seenTotal("snowfall") - snow0 > 10)
+        assertTrue("it snowed: at most %.0f flakes a second, %d in the air at once".format(most, seen), most >= 5f && seen >= 3)
         cloudDebugShot("4c_2b_wolkenansicht", base)
     }
 
@@ -208,17 +237,35 @@ class Phase4cEvidenceTest {
         while (shore < world.width && (0 until world.height).none { world.material(shore, it) == mt.id("saltwater") }) shore++
         var sea = 0
         while (world.material(shore + 8, sea) != mt.id("saltwater")) sea++
-        val rain0 = world.seenTotal("rain")
         // lava poured along the sea and back, a finger drawn over it
         pick("Hitze", "Lava", brush = 4)
         stroke(listOf(shore + 6 to sea - 8, shore + 50 to sea - 8, shore + 6 to sea - 8), restMillis = 0)
+        var most = 0f
         film(
             "4c_2c_meer_lava_regen", "Lava ins Meer: Dampf, Wolken, Regen", shore - 40, base - 18, shore + 60, sea + 6,
             seconds = listOf(0, 1, 2, 3, 10, 20),
         ) {
-            "Dampf ${world.count("steam")}, Wolke ${world.count("cloud")}, Tropfen bisher ${world.seenTotal("rain") - rain0}"
+            val rate = rate()
+            most = maxOf(most, rate)
+            "Dampf %d, Wolke %d, Niederschlag %.0f/s".format(world.count("steam"), world.count("cloud"), rate)
         }
-        assertTrue("the steam made clouds that rained", world.seenTotal("rain") - rain0 > 20)
+        assertTrue("the steam made clouds that rained: at most %.0f drops a second".format(most), most >= 3f)
+    }
+
+    /** Drops of rain or flakes of snow that fell in the last second, as the developer view of the clouds shows it. */
+    private fun rate(): Float = vm.world.value!!.stats.dropsPerSecond
+
+    /** Cells of [what] falling through open air under the clouds (air above and below them). */
+    private fun falling(what: String, base: Int): Int {
+        val m = mt.id(what)
+        return onSim { w ->
+            var n = 0
+            for (y in base + 1 until w.height - 1) for (x in 0 until w.width) {
+                val i = y * w.width + x
+                if (w.mat[i].toInt() == m && w.mat[i - w.width].toInt() == MaterialTable.AIR && w.mat[i + w.width].toInt() == MaterialTable.AIR) n++
+            }
+            n
+        }
     }
 
     // ------------------------------------------------------------------ playing
@@ -357,12 +404,6 @@ class Phase4cEvidenceTest {
 
     private fun plantBodyNear(x: Int, y: Int): Int =
         bodies().filter { mt.plant[it.material] && it.cells > 50 && abs(it.x - x) < 15 && abs(it.y - y) < 30 }.maxByOrNull { it.cells }?.id ?: 0
-
-    private fun World.seenTotal(kind: String): Int {
-        val k = if (kind == "rain") Seen.RAIN else Seen.SNOWFALL
-        val cloud = mt.id("cloud")
-        return onSim { it.seen[k * mt.count + cloud] }
-    }
 
     private fun World.count(id: String): Int {
         val m = mt.id(id)
