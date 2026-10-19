@@ -986,6 +986,8 @@ private fun WorldView(
         @Suppress("UNUSED_EXPRESSION")
         displayNanos
         shownFrame?.let { f -> drawBodies(f, bodyImages, arrived, o, s) }
+        // the inhabitants and their village (Phase 5), under smoke and flames, lit like the world round them
+        shownFrame?.let { f -> drawFolk(f, o, s) }
         drawImage(cloudImage, dstOffset = dstOffset, dstSize = dstSize, filterQuality = FilterQuality.Low)
         drawImage(hazeImage, dstOffset = dstOffset, dstSize = dstSize, filterQuality = FilterQuality.Low)
         drawImage(flameImage, dstOffset = dstOffset, dstSize = dstSize, filterQuality = FilterQuality.Low)
@@ -1148,6 +1150,11 @@ private fun ToolBar(materials: MaterialTable, stats: SimRunner.Stats, tool: Int,
                 MaterialChip("Hand", if (held != null) "${materials.spec(held.main).name} ${held.size}" else "leer", tool == Session.HAND, { onTool(Session.HAND) }) {
                     HandIcon(if (held != null) Color(materials.color[held.main]) else null)
                 }
+            }
+            // the inhabitants (Phase 5): one tap puts one down; the village they go home to
+            if (tools == null) {
+                MaterialChip("Bewohner", "${stats.folk} da", tool == Session.FOLK, { onTool(Session.FOLK) }) { FolkIcon() }
+                MaterialChip("Dorf", if (stats.village) "${stats.folkHome} daheim" else "setzen", tool == Session.VILLAGE, { onTool(Session.VILLAGE) }) { VillageIcon() }
             }
             // loose material from the bucket into the store, to build with (3b.5)
             if (held == null && stats.supply == Session.Supply.PROCURE && stats.bucketAmount > 0 &&
@@ -1599,6 +1606,8 @@ private fun CurrentTool(materials: MaterialTable, tool: Int, stats: SimRunner.St
         Session.SCOOP -> "Schöpfen"
         Session.POUR -> "Gießen"
         Session.HAND -> "Hand"
+        Session.FOLK -> "Bewohner"
+        Session.VILLAGE -> "Dorf"
         else -> if (tool >= 0) materials.spec(tool).name else ""
     }
     Row(modifier.testTag("current_tool"), verticalAlignment = Alignment.CenterVertically) {
@@ -1606,6 +1615,8 @@ private fun CurrentTool(materials: MaterialTable, tool: Int, stats: SimRunner.St
             tool >= 0 -> Swatch(materials.color[tool], materials.colorVariance[tool], tool)
             tool == Session.SCOOP || tool == Session.POUR -> BucketIcon(stats, materials, tool == Session.POUR)
             tool == Session.HAND -> HandIcon(stats.held?.let { Color(materials.color[it.main]) })
+            tool == Session.FOLK -> FolkIcon()
+            tool == Session.VILLAGE -> VillageIcon()
             else -> Box(Modifier.size(30.dp).clip(RoundedCornerShape(8.dp)).border(2.dp, Palette.textDim, RoundedCornerShape(8.dp)))
         }
         Spacer(Modifier.width(8.dp))

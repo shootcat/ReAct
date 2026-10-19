@@ -194,6 +194,16 @@ class Session(
             if (held == null) grab(x, y) else drop(x, y)
             return
         }
+        // one tap, one inhabitant; the village where the finger is (a stroke does not put down more)
+        if (tool == FOLK) {
+            if (world.folk.add(x, y) == 0) tell("Kein Platz für einen Bewohner")
+            return
+        }
+        if (tool == VILLAGE) {
+            world.folk.setHome(x, y)
+            tell("Das Dorf ist hier")
+            return
+        }
         down = true
         bx = x
         by = y
@@ -747,6 +757,12 @@ class Session(
 
         /** The hand: picks up, or puts down what it holds. */
         const val HAND = -4
+
+        /** An inhabitant (Phase 5): one tap puts one down. */
+        const val FOLK = -5
+
+        /** The village (Phase 5): where the inhabitants go home to, and the goal. */
+        const val VILLAGE = -6
 
         const val MAX_UNDO = 25
         const val BUCKET_SIZE = 200

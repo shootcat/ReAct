@@ -54,6 +54,23 @@ class SimRunner(val session: Session, backdrop: IntArray) {
         val cloudTemp = FloatArray(width)
         var cloudBase = -1
         var cloudTop = 0
+
+        /**
+         * The inhabitants (Phase 5): for each of the first [folkCount], where its feet are, its direction, state,
+         * the step count of that state and its number; and the village (-1: none).
+         */
+        var folkCount = 0
+        var folkX = IntArray(16)
+        var folkY = IntArray(16)
+        var folkDir = IntArray(16)
+        var folkState = IntArray(16)
+        var folkTimer = IntArray(16)
+        var folkId = IntArray(16)
+        var homeX = -1
+        var homeY = -1
+
+        /** The step of the world this picture shows (for the walk of the figures). */
+        var step = 0
         var x0 = 0
         var y0 = 0
         var x1 = 0
@@ -154,6 +171,10 @@ class SimRunner(val session: Session, backdrop: IntArray) {
         /** The densest column of cloud (cells in the band), and the mean temperature of all cloud in the band. */
         val cloudDensest: Int = 0,
         val cloudTemp: Float = 0f,
+        /** The inhabitants (Phase 5): how many there are, how many are in the village, and whether there is one. */
+        val folk: Int = 0,
+        val folkHome: Int = 0,
+        val village: Boolean = false,
     )
 
     /** The weather of the world (3c), for the weather controls of the sandbox. */
@@ -337,6 +358,29 @@ class SimRunner(val session: Session, backdrop: IntArray) {
                 renderer.renderFlames(back.flames)
                 back.cloudBase = world.cloudBase
                 back.cloudTop = world.cloudTop()
+                val folk = world.folk
+                val nf = folk.count
+                if (back.folkX.size < nf) {
+                    val c = maxOf(nf, back.folkX.size * 2)
+                    back.folkX = IntArray(c)
+                    back.folkY = IntArray(c)
+                    back.folkDir = IntArray(c)
+                    back.folkState = IntArray(c)
+                    back.folkTimer = IntArray(c)
+                    back.folkId = IntArray(c)
+                }
+                for (k in 0 until nf) {
+                    back.folkX[k] = folk.x(k)
+                    back.folkY[k] = folk.y(k)
+                    back.folkDir[k] = folk.dir(k)
+                    back.folkState[k] = folk.state(k)
+                    back.folkTimer[k] = folk.timer(k)
+                    back.folkId[k] = folk.id(k)
+                }
+                back.folkCount = nf
+                back.homeX = folk.homeX
+                back.homeY = folk.homeY
+                back.step = world.step
                 for (x in 0 until w) {
                     back.cloudDensity[x] = world.cloudDensity(x)
                     back.cloudTemp[x] = world.cloudTemp(x)
@@ -397,6 +441,9 @@ class SimRunner(val session: Session, backdrop: IntArray) {
                 dropsPerSecond = shownDrops,
                 cloudDensest = densest,
                 cloudTemp = if (cloudCells > 0) cloudWarmth / cloudCells else world.ambient,
+                folk = world.folk.count,
+                folkHome = world.folk.atHomeCount(),
+                village = world.folk.homeX >= 0,
             )
 
             // sleep until the next step is due (or a frame, or, when paused, until input arrives)

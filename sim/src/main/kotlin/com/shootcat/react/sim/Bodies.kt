@@ -100,6 +100,13 @@ internal class Body(val id: Int) {
     /** In its last step it waited for another body to move out of its way. */
     var waited = false
     var riderCount = 0
+
+    /**
+     * Figures standing on it (Phase 5): their weight, as cells of water, and its moment about the body's centre
+     * (weight times the distance to the side). Laid on anew by the folk in every step.
+     */
+    var folkMass = 0f
+    var folkMoment = 0f
 }
 
 /**
@@ -2044,6 +2051,11 @@ internal class Bodies(private val world: World) {
             mass += o.mass
             inertia += o.inertia + o.mass * (dx * dx + dy * dy)
             load += o.mass * dx
+        }
+        // figures standing on it weigh on it like riders (Phase 5)
+        if (b.folkMass > 0f) {
+            mass += b.folkMass
+            load += b.folkMoment
         }
         // gravity pulls the riders and the carrier down alike; the riders' weight beside the centre turns it
         if (mass > b.mass) b.w += load * G / inertia

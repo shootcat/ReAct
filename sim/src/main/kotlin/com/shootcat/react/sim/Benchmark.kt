@@ -21,6 +21,9 @@ object Benchmark {
         val movingBodies: Int = 0,
         /** Of that, heat (Phase 4b). */
         val heatMs: Double = 0.0,
+        /** Of that, the inhabitants (Phase 5), and how many there were. */
+        val folkMs: Double = 0.0,
+        val folk: Int = 0,
     )
 
     fun emptyWorld(materials: MaterialTable, width: Int, height: Int): World = World(width, height, materials, 1L)
@@ -129,6 +132,22 @@ object Benchmark {
         return world
     }
 
+    /**
+     * Like [bodyWorld], and [count] inhabitants (Phase 5) put down along the width over the churning world, with a
+     * village in the middle: they fall, walk, swim, run from bodies, faint and are brought back.
+     */
+    fun folkWorld(materials: MaterialTable, width: Int, height: Int, count: Int = 50): World {
+        val world = bodyWorld(materials, width, height)
+        world.folk.setHome(width / 2, height / 3)
+        // each in the highest spot of its column with room for it (the churning world is full to the brim in places)
+        for (k in 0 until count) {
+            val x = 8 + k * (width - 16) / count
+            var y = Folk.HEIGHT
+            while (world.folk.add(x, y) == 0 && y < height - 2) y += 8
+        }
+        return world
+    }
+
     /** Measures [steps] steps after [warmup] steps, so the just-in-time compiler has settled (on the phone as well). */
     fun measure(name: String, world: World, steps: Int, warmup: Int = 300): Result {
         world.run(warmup)
@@ -137,6 +156,7 @@ object Benchmark {
         var moving = 0L
         val b0 = world.bodyNanos
         val h0 = world.heatNanos
+        val f0 = world.folkNanos
         val t0 = System.nanoTime()
         repeat(steps) {
             world.step()
@@ -149,6 +169,7 @@ object Benchmark {
         return Result(
             name, steps, steps / secs, ns / 1e6 / steps, awake / steps, world.chunksX * world.chunksY,
             (world.bodyNanos - b0) / 1e6 / steps, (bodies / steps).toInt(), (moving / steps).toInt(), (world.heatNanos - h0) / 1e6 / steps,
+            (world.folkNanos - f0) / 1e6 / steps, world.folk.count,
         )
     }
 
@@ -187,6 +208,7 @@ object Benchmark {
             measure("Größte Welt $size, Wiese mit Feuer, Sand und Wasser", sandboxWorld(materials, big.width, big.height), steps),
             measure("Größte Welt $size, dieselbe Wiese mit Wind, Wolken und Gewitter", weatherWorld(materials, big.width, big.height), steps),
             measure("Größte Welt $size, voll aktiv belebt, dazu 150 Körper", bodyWorld(materials, big.width, big.height), steps),
+            measure("Größte Welt $size, voll aktiv belebt, 150 Körper und 50 Bewohner", folkWorld(materials, big.width, big.height), steps),
         )
     }
 
@@ -241,7 +263,8 @@ object Benchmark {
         appendLine("Gerät: $device")
         for (r in results) {
             appendLine(
-                "%s: %.0f Schritte/s (%.2f ms pro Schritt, %d von %d Chunks wach, %d Schritte gemessen; Körper %.2f ms, %d Körper, %d bewegt; Wärme %.2f ms)"
+                ("%s: %.0f Schritte/s (%.2f ms pro Schritt, %d von %d Chunks wach, %d Schritte gemessen; Körper %.2f ms, %d Körper, %d bewegt; Wärme %.2f ms" +
+                    (if (r.folk > 0) "; Bewohner %.2f ms, %d Bewohner)".format(r.folkMs, r.folk) else ")"))
                     .format(r.name, r.stepsPerSecond, r.msPerStep, r.awakeChunks, r.chunks, r.steps, r.bodyMs, r.bodies, r.movingBodies, r.heatMs),
             )
         }

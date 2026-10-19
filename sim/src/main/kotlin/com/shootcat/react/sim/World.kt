@@ -396,6 +396,9 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
 
     /** The bodies (Phase 4): every loose structure falls, tips, turns and rolls as a rigid body. */
     internal val bodies = Bodies(this)
+
+    /** The inhabitants (Phase 5): figures that walk the world, not cells of it. */
+    val folk = Folk(this)
     internal val bodyAt = bodies.bodyAt
 
     /** How many bodies there are, and how many moved in the last step. */
@@ -456,6 +459,10 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
 
     /** Time spent on heat so far (Phase 4b), for the benchmark. */
     var heatNanos = 0L
+        private set
+
+    /** Time spent on the inhabitants so far (Phase 5), for the benchmark. */
+    var folkNanos = 0L
         private set
 
     /** How many structures are not anchored: since Phase 4 each of them is a body. */
@@ -760,6 +767,11 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         if (structuresDirty) findStructures()
         bodies.step()
         bodyNanos += System.nanoTime() - tb
+        if (folk.count > 0) {
+            val tf = System.nanoTime()
+            folk.step()
+            folkNanos += System.nanoTime() - tf
+        }
         if (step % WEATHER_EVERY == 0 && (cloudBase >= 0 || randomWeather || storm > 0)) weather()
         if (storm > 0) storm--
         if (step % PRESSURE_EVERY == 0) {
@@ -3454,6 +3466,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         internal val piece: ShortArray,
         internal val nextPiece: Int,
         internal val recent: BooleanArray,
+        internal val folk: Folk.Saved,
     ) {
         val bytes: Int get() = mat.size * 11 + light.size * 4
     }
@@ -3466,6 +3479,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         piece.copyOf(),
         nextPiece,
         recent.copyOf(),
+        folk.save(),
     )
 
     fun restore(s: Snapshot) {
@@ -3493,6 +3507,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         ambient = s.weatherFloats[2]
         cloudDrift = s.weatherFloats[3]
         bodies.restore(s.bodies)
+        folk.restore(s.folk)
         boltAge = 0
         flash = 0
         stamp.fill(0)
@@ -3518,6 +3533,7 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
             mix(piece[i].toInt())
         }
         bodies.hash(::mix)
+        folk.hash(::mix)
         mix(nextPiece)
         mix(rng)
         mix(step)
