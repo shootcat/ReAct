@@ -6,7 +6,7 @@ REACT wird ein Physik-Puzzle mit fein simulierter Materie, im Stil von Noita ode
 - Sand rieselt, Wasser fließt, Holz brennt, Lava erstarrt, Dampf steigt auf.
 - Was passiert, ergibt sich aus den **Eigenschaften** der Materialien (Dichte, Zündpunkt, Wärmeleitung …), nicht aus Rezepten.
 
-**Stand: Phase 4b (Optik und Bewegungsgefühl, dazu Erdöl) ist fertig: weiche Wolken in ihrer Höhenschicht, Schatten nur auf Oberflächen, waagerechtes Wasser, Körper kippen, rollen und schwimmen glaubhaft und werden als gedrehte, geglättete Bilder gezeichnet; neues Material Erdöl; neue Vorlage „See, Hang und Wolken“. Phase 5 (Bewohner) ist nicht begonnen.** Berichte: [`docs/PHASE1.md`](docs/PHASE1.md), [`docs/PHASE2.md`](docs/PHASE2.md), [`docs/PHASE3.md`](docs/PHASE3.md), [`docs/PHASE3B.md`](docs/PHASE3B.md), [`docs/PHASE3C.md`](docs/PHASE3C.md), [`docs/PHASE4.md`](docs/PHASE4.md), [`docs/PHASE4B.md`](docs/PHASE4B.md).
+**Stand: Phase 4c ist fertig: Körper kippen im Spiel wirklich um (ein Strich wird erst beim Loslassen ein Körper), es regnet und schneit sichtbar (Schneeflocken treiben langsam), mit Entwickleransicht der Wolken und Bildfolgen aus der laufenden App als Nachweis. Davor 4b: weiche Wolken, Schatten nur auf Oberflächen, waagerechtes Wasser, Körper als gedrehte, geglättete Bilder, Erdöl. Phase 5 (Bewohner) ist nicht begonnen.** Berichte: [`docs/PHASE1.md`](docs/PHASE1.md), [`docs/PHASE2.md`](docs/PHASE2.md), [`docs/PHASE3.md`](docs/PHASE3.md), [`docs/PHASE3B.md`](docs/PHASE3B.md), [`docs/PHASE3C.md`](docs/PHASE3C.md), [`docs/PHASE4.md`](docs/PHASE4.md), [`docs/PHASE4B.md`](docs/PHASE4B.md), [`docs/PHASE4C.md`](docs/PHASE4C.md).
 
 Die Raster-Version mit Leveln (Leitfaden V1 und V2) ist nicht mehr Teil dieses Branches. Sie liegt hier:
 - Commit `a7fc414` (Tag `grid-legacy`),
@@ -243,6 +243,7 @@ docs/phase3/                Bilder der Lösungswege je Level
 docs/PHASE3B.md, PHASE3C.md Berichte zu 3b (Bedienung, Glühen, warme Luft) und 3c (Wetter, Level 4 und 5)
 docs/PHASE4.md              Bericht zu Phase 4: Körperphysik, geänderte Level, Leistung
 docs/PHASE4B.md             Bericht zu Phase 4b: Wolken, Licht, Wasser, Kippen, Körperbilder, Holz, Leistung, Erdöl
+docs/PHASE4C.md             Bericht zu Phase 4c: Umkippen, Regen und Schnee, Nachweis aus der App, Level, Leistung
 docs/ELEMENTE.md            Vorschläge, die noch nicht umgesetzt sind (Schwarzpulver; Brücken, Gelenke, Seile, Strömung; ein Öl-Level)
 docs/v2/                    Unterlagen der Raster-Version (Leitfaden V2)
 ```

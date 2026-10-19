@@ -456,9 +456,10 @@ fun SandboxScreen(
                 onInspectDone = { infoHeld = false },
             )
             if (level != null && hud) LevelHud(level.play, stats, Modifier.align(Alignment.TopStart).padding(8.dp).width(300.dp).blockTouches())
+            // (at the foot of the world: the clouds hang at its top; what a held finger found lies over it)
+            if (settings.cloudDebug) CloudDebugOverlay(stats, Modifier.align(Alignment.BottomStart).padding(8.dp))
             info?.let { InfoCard(it, materials, stats.supply == Session.Supply.PROCURE, Modifier.align(Alignment.BottomStart).padding(8.dp).blockTouches()) }
             if (settings.performance) PerformanceOverlay(stats, Modifier.align(Alignment.TopStart).padding(8.dp))
-            if (settings.cloudDebug) CloudDebugOverlay(stats, Modifier.align(Alignment.TopEnd).padding(8.dp))
             notice?.let { NoticeBanner(it, Modifier.align(Alignment.TopCenter).padding(top = 40.dp, start = 16.dp, end = 16.dp)) }
             // speed and the shape of the brush, small, in a corner of the world (4a.5)
             CornerControls(
