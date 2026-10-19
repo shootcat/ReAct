@@ -112,6 +112,16 @@ object Pictures {
                     cell(x, y - 3, skin, 0.1f, 0.9f)
                     cell(x, y - 3, hair, 0.1f, 0.9f, 0f, 0.35f)
                 }
+                Folk.KINDLE -> {
+                    // kneeling, a flame in the hand held out
+                    val d = folk.dir(k)
+                    cell(x, y - 2, skin, 0.1f, 0.9f)
+                    cell(x, y - 2, hair, 0.1f, 0.9f, 0f, 0.35f)
+                    cell(x, y - 1, tunic, 0.05f, 0.95f)
+                    cell(x, y, legs, 0.1f, 0.9f, 0f, 0.6f)
+                    cell(x + d, y, skin, 0.3f, 0.7f, 0.4f, 0.7f)
+                    cell(x + d, y - 1, 0xFFFF9F2E.toInt(), 0.25f, 0.75f, 0.35f, 1f)
+                }
                 else -> {
                     cell(x, y - 3, skin, 0.1f, 0.9f)
                     cell(x, y - 3, hair, 0.1f, 0.9f, 0f, 0.35f)
@@ -120,7 +130,20 @@ object Pictures {
                     cell(x, y - 1, legs, 0.15f, 0.85f, 0.6f)
                     cell(x, y, legs, 0.1f, 0.4f)
                     cell(x, y, legs, 0.6f, 0.9f)
+                    // at a fire, the hands held out to it
+                    if (folk.state(k) == Folk.WARM) cell(x + folk.dir(k), y - 2, skin, 0f, 0.7f, 0.35f, 0.65f)
                 }
+            }
+            // what it lacks, over its head: blue for cold (dark blue edge when it walks slower), a drop for thirst, grey for air
+            val needs = folk.needs(k)
+            val icons = ArrayList<Int>()
+            if (needs and Folk.Need.COLD != 0) icons += if (needs and Folk.Need.FROZEN != 0) 0xFF1F4FB0.toInt() else 0xFF5FA8FF.toInt()
+            if (needs and Folk.Need.THIRST != 0) icons += 0xFF11B4D8.toInt()
+            if (needs and Folk.Need.AIR != 0) icons += 0xFF6E6A66.toInt()
+            for ((j, c) in icons.withIndex()) {
+                val ix = x + j * 2 - (icons.size - 1)
+                cell(ix, y - 6, 0xFFFFFFFF.toInt(), 0f, 1f, 0f, 1f)
+                cell(ix, y - 6, c, 0.2f, 0.8f, 0.2f, 0.8f)
             }
         }
     }

@@ -29,7 +29,16 @@ data class DiscoverySpec(
     val roof: Boolean = false,
     /** The weather of the scene (3c); none: no clouds, no wind. */
     val weather: SceneWeather? = null,
+    /** Whose property it is when it is no material's: "Bewohner" (Phase 5); the book groups such entries under it. */
+    val subject: String? = null,
+    /** Inhabitants in the scene (Phase 5), and their village (x, y). */
+    val folk: List<SceneFigure> = emptyList(),
+    val village: List<Int>? = null,
 )
+
+/** An inhabitant in a scene: where it is put down, which way it looks, how cold and thirsty it is already. */
+@Serializable
+data class SceneFigure(val x: Int, val y: Int, val dir: Int = 1, val cold: Int = 0, val thirst: Int = 0)
 
 /** The weather of a scene: where clouds form, the wind, the temperature of the air, a thunderstorm. */
 @Serializable
@@ -53,13 +62,13 @@ class Discoveries(val materials: MaterialTable, val entries: List<DiscoverySpec>
     class Entry(val spec: DiscoverySpec, val material: Int, val kind: Int, val name: String) {
         val id get() = spec.id
 
-        /** The sentence as the book and the notice show it: "Sand behält Wärme". */
+        /** The sentence as the book and the notice show it: "Sand behält Wärme", "Bewohner trinken kein Salzwasser". */
         val sentence get() = "$name ${spec.text}"
     }
 
     val all: List<Entry> = entries.map { s ->
         val m = materials.id(s.material)
-        Entry(s, m, Seen.parse(s.seen), materials.spec(m).name)
+        Entry(s, m, Seen.parse(s.seen), s.subject ?: materials.spec(m).name)
     }
 
     private val byTrigger = HashMap<Int, MutableList<Entry>>()
@@ -104,6 +113,12 @@ class Discoveries(val materials: MaterialTable, val entries: List<DiscoverySpec>
         if (weather != null) {
             w.setWeather(cloudBase = weather.cloudBase, wind = weather.wind)
             if (weather.storm) w.callStorm(SCENE_W / 2)
+        }
+        entry.spec.village?.let { w.folk.setHome(it[0], it[1]) }
+        for (f in entry.spec.folk) {
+            val id = w.folk.add(f.x, f.y)
+            w.folk.face(id, f.dir)
+            w.folk.setNeeds(id, cold = f.cold, thirst = f.thirst)
         }
         w.wakeAll()
         return w

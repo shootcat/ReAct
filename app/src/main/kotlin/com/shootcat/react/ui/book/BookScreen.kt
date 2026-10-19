@@ -31,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.asImageBitmap
@@ -42,7 +43,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.shootcat.react.sim.Discoveries
 import com.shootcat.react.sim.Renderer
+import com.shootcat.react.sim.World
 import com.shootcat.react.ui.components.TopBar
+import com.shootcat.react.ui.sandbox.FolkIcon
+import com.shootcat.react.ui.sandbox.drawFolk
 import com.shootcat.react.ui.theme.Palette
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
@@ -50,12 +54,13 @@ import kotlin.math.roundToInt
 /**
  * The discovery book (Leitfaden V3, 4.3): for each material the properties the player has seen for
  * themselves, as plain statements ("Sand behält Wärme"), never as "X + Y → Z". Each entry plays its little
- * scene when tapped. What has not been seen yet stays a question mark.
+ * scene when tapped. What has not been seen yet stays a question mark. The ways of the inhabitants (Phase 5) have a
+ * group of their own.
  */
 @Composable
 fun BookScreen(book: Discoveries, found: Set<String>, onBack: () -> Unit) {
     var open by rememberSaveable { mutableStateOf<String?>(null) }
-    val byMaterial = remember(book) { book.all.groupBy { it.material }.toList() }
+    val groups = remember(book) { book.all.groupBy { it.spec.subject ?: "m${it.material}" }.toList() }
     Column(Modifier.fillMaxSize()) {
         TopBar(
             title = "Entdeckungsbuch",
@@ -67,8 +72,10 @@ fun BookScreen(book: Discoveries, found: Set<String>, onBack: () -> Unit) {
             Modifier.fillMaxSize().padding(horizontal = 16.dp).testTag("book"),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            items(byMaterial, key = { it.first }) { (m, entries) ->
+            items(groups, key = { it.first }) { (_, entries) ->
                 val seen = entries.filter { it.id in found }
+                val m = entries.first().material
+                val subject = entries.first().spec.subject
                 Column(
                     Modifier
                         .fillMaxWidth()
@@ -77,10 +84,14 @@ fun BookScreen(book: Discoveries, found: Set<String>, onBack: () -> Unit) {
                         .padding(12.dp),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Canvas(Modifier.size(18.dp).clip(RoundedCornerShape(4.dp))) { drawRect(Color(book.materials.color[m])) }
+                        if (subject != null) {
+                            FolkIcon()
+                        } else {
+                            Canvas(Modifier.size(18.dp).clip(RoundedCornerShape(4.dp))) { drawRect(Color(book.materials.color[m])) }
+                        }
                         Spacer(Modifier.size(8.dp))
                         Text(
-                            if (seen.isEmpty()) "???" else book.materials.spec(m).name,
+                            if (seen.isEmpty()) "???" else subject ?: book.materials.spec(m).name,
                             color = Palette.text,
                             fontWeight = FontWeight.SemiBold,
                             style = MaterialTheme.typography.titleMedium,
@@ -117,11 +128,14 @@ private fun SceneView(book: Discoveries, entry: Discoveries.Entry) {
     val bitmap = remember(entry.id) { Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888) }
     val image = remember(bitmap) { bitmap.asImageBitmap() }
     var frames by remember { mutableIntStateOf(0) }
+    // the scene's world, for its inhabitants (drawn over the picture, as in the sandbox)
+    var scene by remember { mutableStateOf<World?>(null) }
     LaunchedEffect(entry.id) {
         val pixels = IntArray(w * h)
         val sky = IntArray(w * h) { if (it / w < h / 2) 0xFF9CC3E0.toInt() else 0xFF3A302A.toInt() }
         while (true) {
             val world = book.scene(entry)
+            scene = world
             val renderer = Renderer(world, sky).also { it.ambient = BOOK_AMBIENT }
             while (world.step < Discoveries.SCENE_STEPS) {
                 world.step()
@@ -144,12 +158,14 @@ private fun SceneView(book: Discoveries, entry: Discoveries.Entry) {
         @Suppress("UNUSED_EXPRESSION")
         frames
         val s = minOf(size.width / w, size.height / h)
+        val o = IntOffset(((size.width - w * s) / 2f).roundToInt(), ((size.height - h * s) / 2f).roundToInt())
         drawImage(
             image,
-            dstOffset = IntOffset(((size.width - w * s) / 2f).roundToInt(), ((size.height - h * s) / 2f).roundToInt()),
+            dstOffset = o,
             dstSize = IntSize((w * s).roundToInt(), (h * s).roundToInt()),
             filterQuality = FilterQuality.None,
         )
+        scene?.let { if (it.folk.count > 0 || it.folk.homeX >= 0) drawFolk(it.folk, it.step, Offset(o.x.toFloat(), o.y.toFloat()), s) }
     }
 }
 

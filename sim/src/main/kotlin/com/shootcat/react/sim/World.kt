@@ -113,7 +113,23 @@ object Seen {
     const val EVAPORATE = 48
     const val STICK = 49
     const val THIN = 50
-    const val COUNT = 51
+
+    /**
+     * The inhabitants (Phase 5): turned back from what they saw, fainted from a fall, tired out swimming, ran from a
+     * body; froze, warmed themselves at a fire, kindled wood at a flame, drank fresh water, would not drink salt
+     * water, choked in smoke or firedamp.
+     */
+    const val FOLK_TURN = 51
+    const val FOLK_FALL = 52
+    const val FOLK_TIRED = 53
+    const val FOLK_DODGE = 54
+    const val FOLK_COLD = 55
+    const val FOLK_WARM = 56
+    const val FOLK_KINDLE = 57
+    const val FOLK_DRINK = 58
+    const val FOLK_NO_SALT = 59
+    const val FOLK_CHOKE = 60
+    const val COUNT = 61
 
     val NAMES = listOf(
         "ignite", "burn_out", "douse", "suffocate", "char", "melt", "salt_melt", "boil", "residue", "set", "condense",
@@ -121,6 +137,8 @@ object Seen {
         "hold_heat", "glow", "float", "conduct", "shine", "wet_no_fire", "crack", "permeate", "compact", "avalanche",
         "burst", "explode", "cloud", "rain", "snowfall", "blown", "lightning", "fulgurite", "shatter", "topple", "roll",
         "burn_on_water", "splash", "stain", "die_oil", "outgas", "evaporate", "stick", "thin",
+        "folk_turn", "folk_fall", "folk_tired", "folk_dodge", "folk_cold", "folk_warm", "folk_kindle", "folk_drink",
+        "folk_no_salt", "folk_choke",
     )
 
     fun parse(name: String): Int = NAMES.indexOf(name).also { require(it >= 0) { "unknown observation '$name'" } }

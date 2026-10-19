@@ -9,19 +9,20 @@ import javax.imageio.ImageIO
 import kotlin.test.Test
 
 /**
- * Pictures of the inhabitants' ways (Phase 5a) for the report: each scene as a row of pictures at the given seconds,
- * with what the figures did written under each ("build/pictures/5a_*.png").
+ * Pictures of the inhabitants' ways (Phase 5a) and needs (5b) for the report: each scene as a row of pictures at the
+ * given seconds, with what the figures did written under each ("build/pictures/5a_*.png", "5b_*.png").
  */
 class FolkPicturesTest {
 
-    private fun lab(ground: Int = 70): Lab {
+    private fun lab(ground: Int = 70, ambient: Float = 20f): Lab {
         val lab = Lab(160, 80)
-        lab.rect("rock", 2, ground, 157, 77)
+        lab.world.setAmbient(ambient)
+        lab.rect("rock", 2, ground, 157, 77, t = ambient)
         return lab
     }
 
     /** Pictures of [lab] at [seconds] (cut to [area], [scale] times), side by side with [note] under each. */
-    private fun strip(name: String, title: String, lab: Lab, area: IntArray, seconds: List<Float>, scale: Int = 5, note: (Lab) -> String) {
+    private fun strip(name: String, title: String, lab: Lab, area: IntArray, seconds: List<Float>, scale: Int = 5, phase: String = "5a", note: (Lab) -> String) {
         val sky = IntArray(lab.world.size) { 0xFF9CC3E0.toInt() }
         val frames = ArrayList<Pair<BufferedImage, String>>()
         var at = 0
@@ -29,7 +30,7 @@ class FolkPicturesTest {
             val target = (t * 60).toInt()
             lab.world.run(target - at)
             at = target
-            val f = Pictures.write(lab.world, sky, "5a_${name}_$at", scale = scale, area = area)
+            val f = Pictures.write(lab.world, sky, "${phase}_${name}_$at", scale = scale, area = area)
             frames += ImageIO.read(f) to "${"%.1f".format(t)} s: ${note(lab)}"
         }
         val pw = frames[0].first.width
@@ -49,21 +50,29 @@ class FolkPicturesTest {
             g.drawString(f.second, k * (pw + 8) + 6, 30 + ph + 20)
         }
         g.dispose()
-        val file = File("build/pictures/5a_$name.png")
+        val file = File("build/pictures/${phase}_$name.png")
         ImageIO.write(out, "png", file)
-        println("5A ${file.name}: " + frames.joinToString(" | ") { it.second })
+        println("${phase.uppercase()} ${file.name}: " + frames.joinToString(" | ") { it.second })
     }
 
-    private fun Lab.say(): String = world.folk.figures().joinToString("; ") { f ->
+    private fun Lab.say(): String = world.folk.figures().withIndex().joinToString("; ") { (k, f) ->
         val what = when (f.state) {
             Folk.WALK -> if (f.home) "im Dorf" else "geht"
             Folk.FALL -> "fällt"
             Folk.SWIM -> "schwimmt"
             Folk.SINK -> "geht unter"
             Folk.FAINT -> "ohnmächtig"
+            Folk.WARM -> "wärmt sich"
+            Folk.KINDLE -> "zündet an"
             else -> "kommt zurück"
         }
-        "$what (${f.x},${f.y})"
+        val needs = world.folk.needs(k)
+        val lacks = listOfNotNull(
+            if (needs and Folk.Need.FROZEN != 0) "friert sehr" else if (needs and Folk.Need.COLD != 0) "friert" else null,
+            if (needs and Folk.Need.THIRST != 0) "durstig" else null,
+            if (needs and Folk.Need.AIR != 0) "Atemnot" else null,
+        )
+        "$what${if (lacks.isEmpty()) "" else ", " + lacks.joinToString(", ")} (${f.x},${f.y})"
     }
 
     @Test
@@ -108,5 +117,61 @@ class FolkPicturesTest {
         bridge.rect("wood", 76, 59, 103, 59)
         bridge.world.folk.add(70, 58)
         strip("bruecke", "Über die Brücke", bridge, intArrayOf(66, 46, 110, 70), listOf(0f, 2f, 4f), scale = 8) { it.say() }
+    }
+
+    @Test
+    fun needs() {
+        // hard frost: it freezes, walks slower, faints and comes back warm
+        val frost = lab(ambient = -20f)
+        frost.world.folk.add(40, 69)
+        strip("frost", "Frost −20 °C: friert nach 5 s, langsamer nach 10 s, Ohnmacht nach 20 s", frost, intArrayOf(30, 56, 110, 72), listOf(0f, 6f, 12f, 20.5f), scale = 5, phase = "5b") { it.say() }
+
+        // freezing, it goes up to a campfire and warms itself
+        val fire = lab(ambient = -20f)
+        fire.rect("wood", 100, 66, 102, 69, t = 400f)
+        fire.world.folk.add(70, 69)
+        fire.world.folk.setNeeds(1, cold = 700)
+        strip("feuer", "Frierend ans Lagerfeuer, aufgewärmt, wieder weg", fire, intArrayOf(66, 54, 108, 72), listOf(0f, 2f, 4f, 7f), scale = 7, phase = "5b") { it.say() }
+
+        // freezing, it kindles a log at a burning post
+        val kindle = lab(ambient = -20f)
+        kindle.rect("wood", 80, 68, 82, 69)
+        kindle.rect("wood", 96, 62, 97, 69, t = 400f)
+        kindle.world.folk.add(60, 69)
+        kindle.world.folk.setNeeds(1, cold = 700)
+        strip("anzuenden", "Frierend: zündet den Holzklotz am brennenden Pfahl an, wärmt sich daran", kindle, intArrayOf(56, 54, 102, 72), listOf(0f, 2.2f, 3.5f, 5.5f), scale = 7, phase = "5b") { it.say() }
+
+        // thirsty: it wades into the pond and drinks
+        val pond = lab()
+        pond.rect("air", 80, 70, 95, 71)
+        pond.rect("water", 80, 70, 95, 71)
+        pond.world.folk.add(66, 69)
+        pond.world.folk.setNeeds(1, thirst = Folk.THIRSTY + 100)
+        strip("trinken", "Durstig: watet in den Teich und trinkt", pond, intArrayOf(62, 58, 98, 73), listOf(0f, 1.5f, 2.5f), scale = 8, phase = "5b") { it.say() }
+
+        // thirsty at salt water: it does not drink
+        val salt = lab()
+        salt.rect("air", 80, 70, 95, 71)
+        salt.rect("saltwater", 80, 70, 95, 71)
+        salt.world.folk.add(66, 69)
+        salt.world.folk.setNeeds(1, thirst = Folk.THIRSTY + 100)
+        strip("salzwasser", "Durstig am Salzwasser: trinkt nicht", salt, intArrayOf(62, 58, 98, 73), listOf(0f, 2.5f, 5f), scale = 8, phase = "5b") { it.say() }
+
+        // firedamp under the roof of a gallery: it runs out into clean air
+        val gas = lab()
+        gas.rect("rock", 2, 40, 157, 63)
+        gas.rect("rock", 120, 64, 157, 69)
+        gas.rect("firedamp", 70, 64, 119, 67)
+        gas.world.folk.add(100, 69)
+        strip("grubengas", "Grubengas in der Strecke (gelblich, oben): Atemnot, läuft ins Freie", gas, intArrayOf(56, 58, 122, 72), listOf(0f, 1f, 2f, 4f), scale = 6, phase = "5b") { it.say() }
+
+        // shut in with firedamp: no clean air, it faints
+        val shut = lab()
+        shut.rect("rock", 2, 40, 157, 63)
+        shut.rect("rock", 120, 64, 157, 69)
+        shut.rect("rock", 2, 64, 69, 69)
+        shut.rect("firedamp", 70, 64, 119, 69)
+        shut.world.folk.add(100, 69)
+        strip("grubengas_zu", "Eingeschlossen im Grubengas: Ohnmacht nach 8 s", shut, intArrayOf(66, 58, 122, 72), listOf(0f, 4f, 8.2f), scale = 6, phase = "5b") { it.say() }
     }
 }

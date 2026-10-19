@@ -14,6 +14,12 @@ package com.shootcat.react.sim
  * No one dies (7a): a fainted figure lies still a moment and is then brought back to the village (or, without one, to
  * where it was put down), stylised, never shown hurt.
  *
+ * It needs warmth, water and air (5b, see [needs]): in the cold it freezes, walks slower and at last faints; a fire
+ * it sees it goes up to and warms itself at; with no fire near it kindles firewood at a flame that is already there,
+ * never from nothing; thirsty, it drinks fresh water it comes to, never salt water; in smoke or firedamp it runs for
+ * clean air. These are its only doings of its own: the player can use them, they never come by chance and never
+ * solve a puzzle by themselves.
+ *
  * Everything follows rules, in the order of the figures, without chance: the same world and the same actions give the
  * same figures on every device.
  */
@@ -43,6 +49,37 @@ class Folk internal constructor(private val world: World) {
     /** A liquid one can swim in (water, salt water, oil); in anything thicker one only sinks. */
     private val swimmable = BooleanArray(mt.count) { kind[it] == Kind.LIQUID && !fearsome[it] && mt.viscosity[it] < World.LEVEL_VISCOSITY }
 
+    /** Fearsome to see but giving no warmth: smoke and steam. */
+    private val murky = BooleanArray(mt.count) { m ->
+        val id = mt.spec(m).id
+        id == "smoke" || id == "black_smoke" || id == "steam"
+    }
+
+    /** Air one cannot breathe (5b): smoke, firedamp, the gas oil gives off. */
+    private val foul = BooleanArray(mt.count) { m ->
+        val id = mt.spec(m).id
+        id == "smoke" || id == "black_smoke" || id == "firedamp" || id == "oil_gas"
+    }
+
+    /** Warmth one feels a few cells off (5b): flames, embers, lava, molten metal. */
+    private val warming = BooleanArray(mt.count) { m ->
+        val id = mt.spec(m).id
+        mt.spawnBurning[m] || id == "ember" || id == "lava" || id == "molten_metal" || id == "magma"
+    }
+
+    /** Firewood (5b): wood, dead wood, charcoal, withered plants. */
+    private val firewood = BooleanArray(mt.count) { m ->
+        val id = mt.spec(m).id
+        id == "wood" || id == "deadwood" || id == "charcoal" || id == "dead_plant"
+    }
+
+    /** A flame one can carry over to firewood: fire and embers (and anything burning). */
+    private val flame = BooleanArray(mt.count) { m -> mt.spawnBurning[m] || mt.spec(m).id == "ember" }
+
+    private val waterId = mt.id("water")
+    private val saltId = mt.id("saltwater")
+    private val blackSmokeId = mt.id("black_smoke")
+
     // ------------------------------------------------------------------ the figures, in slots
 
     private var cap = 16
@@ -65,6 +102,20 @@ class Folk internal constructor(private val world: World) {
     private var faintCounts = IntArray(cap)
     private var causes = IntArray(cap)
     private var stood = BooleanArray(cap)
+
+    // needs (5b): cold and thirst count up, breath counts down; steps until it may kindle again; chilled (1): it froze
+    // and seeks warmth until it is quite warm again
+    private var colds = IntArray(cap)
+    private var chills = IntArray(cap)
+    private var thirsts = IntArray(cap)
+    private var breaths = IntArray(cap)
+    private var waits = IntArray(cap)
+
+    // found anew in every step before they are read: the warmth it feels (a material, -1 none) and from which side,
+    // foul air at its head
+    private var warmBy = IntArray(cap)
+    private var warmSide = IntArray(cap)
+    private var fouled = BooleanArray(cap)
 
     /** How many figures there are. */
     var count = 0
@@ -94,10 +145,14 @@ class Folk internal constructor(private val world: World) {
         val home: Boolean,
         /** Swimming: steps of breath it has left; on land the full [SWIM_STAMINA]. */
         val stamina: Int,
+        /** Cold (0 to [COLD_MAX]), thirst (0 to [THIRST_MAX]), breath ([BREATH_MAX] down to 0). */
+        val cold: Int,
+        val thirst: Int,
+        val breath: Int,
     )
 
     fun figures(): List<Figure> = (0 until count).map { k ->
-        Figure(ids[k], xs[k], ys[k], dirs[k], states[k], faintCounts[k], causes[k], atHome(k), staminas[k])
+        Figure(ids[k], xs[k], ys[k], dirs[k], states[k], faintCounts[k], causes[k], atHome(k), staminas[k], colds[k], thirsts[k], breaths[k])
     }
 
     /** For drawing: position (feet), direction, state and timer of figure [k] in slot order. */
@@ -107,6 +162,34 @@ class Folk internal constructor(private val world: World) {
     fun state(k: Int) = states[k]
     fun timer(k: Int) = timers[k]
     fun id(k: Int) = ids[k]
+
+    /** What figure [k] lacks, to show over its head: [Need] bits. */
+    fun needs(k: Int): Int {
+        var n = 0
+        if (states[k] == FAINT || states[k] == BACK) return 0
+        if (chills[k] != 0) n = n or Need.COLD
+        if (colds[k] >= COLD_SLOW) n = n or Need.FROZEN
+        if (thirsts[k] >= THIRSTY) n = n or Need.THIRST
+        if (fouled[k] || breaths[k] < BREATH_SHOW) n = n or Need.AIR
+        return n
+    }
+
+    /** Sets the needs of the figure with [id] (for scenes and tests); -1 leaves one as it is. */
+    fun setNeeds(id: Int, cold: Int = -1, thirst: Int = -1, breath: Int = -1) {
+        for (k in 0 until count) if (ids[k] == id) {
+            if (cold >= 0) {
+                colds[k] = cold.coerceAtMost(COLD_MAX)
+                chills[k] = if (colds[k] >= COLD_SHOW) 1 else 0
+            }
+            if (thirst >= 0) thirsts[k] = thirst.coerceAtMost(THIRST_MAX)
+            if (breath >= 0) breaths[k] = breath.coerceAtMost(BREATH_MAX)
+        }
+    }
+
+    /** Turns the figure with [id] to look left (-1) or right (1). */
+    fun face(id: Int, dir: Int) {
+        for (k in 0 until count) if (ids[k] == id) dirs[k] = if (dir < 0) -1 else 1
+    }
 
     /** How many figures are in the village. */
     fun atHomeCount(): Int {
@@ -151,6 +234,14 @@ class Folk internal constructor(private val world: World) {
         rides[k] = 0
         faintCounts[k] = 0
         causes[k] = Cause.NONE
+        colds[k] = 0
+        chills[k] = 0
+        thirsts[k] = 0
+        breaths[k] = BREATH_MAX
+        waits[k] = 0
+        warmBy[k] = -1
+        warmSide[k] = 0
+        fouled[k] = false
         return ids[k]
     }
 
@@ -190,6 +281,14 @@ class Folk internal constructor(private val world: World) {
         faintCounts = faintCounts.copyOf(cap)
         causes = causes.copyOf(cap)
         stood = stood.copyOf(cap)
+        colds = colds.copyOf(cap)
+        chills = chills.copyOf(cap)
+        thirsts = thirsts.copyOf(cap)
+        breaths = breaths.copyOf(cap)
+        waits = waits.copyOf(cap)
+        warmBy = warmBy.copyOf(cap)
+        warmSide = warmSide.copyOf(cap)
+        fouled = fouled.copyOf(cap)
     }
 
     // ------------------------------------------------------------------ what the grid is to a figure
@@ -264,6 +363,7 @@ class Folk internal constructor(private val world: World) {
         val rode = rides[k]
         ride(k)
         if (hurt(k)) return
+        if (needs(k, step)) return
         val x = xs[k]
         val y = ys[k]
         // up to the chest in a liquid: swimming (or sinking, in tar)
@@ -281,6 +381,8 @@ class Folk internal constructor(private val world: World) {
             FALL -> fall(k)
             SWIM -> swim(k, step)
             SINK -> sink(k)
+            WARM -> warm(k, step)
+            KINDLE -> kneel(k)
         }
         if (runs[k] > 0) runs[k]--
     }
@@ -351,19 +453,101 @@ class Folk internal constructor(private val world: World) {
         if ((step + ids[k]) % DODGE_EVERY == 0) {
             val from = threat(k)
             if (from != 0) {
-                if (dirs[k] == from) did[Did.DODGE]++
+                if (dirs[k] == from) {
+                    did[Did.DODGE]++
+                    world.note(Seen.FOLK_DODGE, threatOf)
+                }
                 dirs[k] = -from
                 runs[k] = RUN_STEPS
             }
         }
-        // what it sees ahead
-        if ((step + ids[k]) % LOOK_EVERY == 0 && sees(k)) {
-            dirs[k] = -dirs[k]
-            did[Did.TURN]++
+        // foul air at its head for a while: it runs towards the nearer clean air, as long as it is in it
+        if (fouled[k] && breaths[k] <= BREATH_MAX - FLEE_AFTER && (step + ids[k]) % DODGE_EVERY == 0) {
+            val to = clean(k)
+            if (to != 0 && to != dirs[k]) {
+                dirs[k] = to
+                did[Did.FLEE]++
+            }
+            runs[k] = maxOf(runs[k], FLEE_RUN)
         }
-        val every = if (runs[k] > 0) RUN_EVERY else WALK_EVERY
+        // freezing and it feels warmth: it stops and warms itself, facing the fire
+        val chilled = chills[k] != 0
+        if (chilled && warmBy[k] >= 0 && runs[k] == 0) {
+            if (warmSide[k] != 0) dirs[k] = warmSide[k]
+            states[k] = WARM
+            return
+        }
+        // freezing, it looks out for the glow of a fire on either side and turns towards it
+        if (chilled && runs[k] == 0 && (step + ids[k]) % LOOK_EVERY == 0) {
+            val to = glow(k)
+            if (to != 0 && to != dirs[k]) {
+                dirs[k] = to
+                did[Did.TURN]++
+            }
+        }
+        // what it sees ahead; out of breath it runs through smoke and steam rather than back into them
+        if ((step + ids[k]) % LOOK_EVERY == 0) {
+            val d = sees(k, murk = breaths[k] >= BREATH_MAX)
+            if (chilled && sawFire > 0) {
+                // freezing, it goes up to a fire, past its smoke, and warms itself a little way off
+                if (sawFire <= WARM_STOP) {
+                    states[k] = WARM
+                    return
+                }
+            } else if (d > 0) {
+                dirs[k] = -dirs[k]
+                did[Did.TURN]++
+                world.note(Seen.FOLK_TURN, sawWhat)
+            }
+        }
+        // freezing with no fire near: it kindles firewood at a flame
+        if (chilled && warmBy[k] < 0 && waits[k] == 0 && (step + ids[k]) % LOOK_EVERY == 0 && kindle(k)) return
+        val every = if (runs[k] > 0) RUN_EVERY else if (colds[k] >= COLD_SLOW) COLD_WALK_EVERY else WALK_EVERY
         if ((step + ids[k]) % every != 0) return
         if (!stride(k)) dirs[k] = -dirs[k]
+    }
+
+    /** At a fire, warming itself: until it is warm, the fire is out or comes too near, or a body comes at it. */
+    private fun warm(k: Int, step: Int) {
+        if (!bearsAt(xs[k], ys[k] + 1) || colds[k] == 0) {
+            states[k] = WALK
+            return
+        }
+        if ((step + ids[k]) % DODGE_EVERY == 0) {
+            val from = threat(k)
+            if (from != 0) {
+                did[Did.DODGE]++
+                dirs[k] = -from
+                runs[k] = RUN_STEPS
+                states[k] = WALK
+                return
+            }
+        }
+        // it keeps an eye on the fire every step
+        sees(k, murk = true)
+        if (sawFire in 1..WARM_CLOSE) {
+            // flames or hot air came up to it: back at running pace, still facing the fire; with no room behind, it goes
+            if ((step + ids[k]) % RUN_EVERY != 0) return
+            if (free(xs[k] - dirs[k], ys[k]) && bearsAt(xs[k] - dirs[k], ys[k] + 1)) {
+                xs[k] -= dirs[k]
+            } else {
+                dirs[k] = -dirs[k]
+                states[k] = WALK
+            }
+        } else if (warmBy[k] < 0 && (sawFire == 0 || sawFire > WARM_STOP)) {
+            // the fire is out, or drew back (it goes after it)
+            states[k] = WALK
+        }
+    }
+
+    /** Kneeling at the firewood it kindled; then it warms itself at it (or steps back at once if the fire comes at it). */
+    private fun kneel(k: Int) {
+        if (!bearsAt(xs[k], ys[k] + 1)) {
+            states[k] = WALK
+            return
+        }
+        sees(k, murk = true)
+        if (--timers[k] <= 0 || sawFire in 1..WARM_CLOSE) states[k] = WARM
     }
 
     /** One step in its direction: on, up a step, or down off an edge it need not fear. Returns whether it went. */
@@ -416,25 +600,57 @@ class Folk internal constructor(private val world: World) {
         return false
     }
 
-    /** Fire, lava, smoke or anything scorching within [SIGHT] cells ahead, as far as nothing blocks the view. */
-    private fun sees(k: Int): Boolean {
+    /**
+     * What [sees] saw last: the material of the nearest fearsome thing, and how far off the nearest sign of a fire is
+     * (0: none): flames, embers, anything burning or glowing, and the hot air round a fire.
+     */
+    private var sawWhat = 0
+    private var sawFire = 0
+
+    /** How far off [sees] saw flames, embers or anything burning or glowing itself (0: none). */
+    private var sawFlame = 0
+
+    /**
+     * Fire, lava, smoke or anything scorching within [SIGHT] cells ahead, as far as nothing blocks the view (smoke
+     * and hot air do not): the distance to the nearest (0: nothing). With [murk] false smoke and steam do not count.
+     * It also looks for the nearest sign of a fire ([sawFire]), which a freezing figure goes up to.
+     */
+    private fun sees(k: Int, murk: Boolean): Int {
         val x = xs[k]
         val y = ys[k]
         val d = dirs[k]
+        var best = 0
+        sawFire = 0
+        sawFlame = 0
         for (r in -1 until HEIGHT + 1) {
             val yy = y - r
             for (s in 1..SIGHT) {
                 val xx = x + d * s
                 if (xx < 0 || xx >= w || yy < 0 || yy >= h) break
-                if (fearsomeAt(xx, yy)) {
-                    did[Did.SEE]++
-                    return true
+                val i = at(xx, yy)
+                val m = world.mat[i].toInt()
+                if (fearsomeAt(xx, yy) && (murk || !murky[m]) && (best == 0 || s < best)) {
+                    best = s
+                    sawWhat = m
+                }
+                val t = world.temp[i]
+                val lit = flame[m] || world.flags[i].toInt() and Flag.BURNING != 0 || t >= GLOWING
+                if (lit || (kind[m] == Kind.GAS && !murky[m] && t >= SCORCHING)) {
+                    if (sawFire == 0 || s < sawFire) sawFire = s
+                    if (lit) {
+                        if (sawFlame == 0 || s < sawFlame) sawFlame = s
+                        break
+                    }
                 }
                 if (bearsAt(xx, yy)) break
             }
         }
-        return false
+        if (best > 0) did[Did.SEE]++
+        return best
     }
+
+    /** The material of the body [threat] found last. */
+    private var threatOf = 0
 
     /**
      * A body on the move that would hit it: falling from above over its column, or rolling or sliding at it along
@@ -452,15 +668,277 @@ class Folk internal constructor(private val world: World) {
             // from above: over its head and coming down towards it
             if (b.vy > 0f && b.y1 < y - HEIGHT + 1 && y - b.y1 < DODGE_ABOVE && x >= b.x0 - DODGE_MARGIN && x <= b.x1 + DODGE_MARGIN) {
                 from = side
+                threatOf = b.main
                 return@each
             }
             // along the ground: at its height and coming its way
             if (b.y1 >= y - HEIGHT + 1 && b.y0 <= y + 1) {
                 val gap = if (side > 0) b.x0 - x else x - b.x1
-                if (gap in 0..DODGE_AHEAD && b.vx * side < -DODGE_SPEED / 2f) from = side
+                if (gap in 0..DODGE_AHEAD && b.vx * side < -DODGE_SPEED / 2f) {
+                    from = side
+                    threatOf = b.main
+                }
             }
         }
         return from
+    }
+
+    // ------------------------------------------------------------------ warmth, water and air (5b)
+
+    /**
+     * Warmth, water and air, each a count per figure, all by rules without chance. Returns whether it fainted.
+     * - Cold rises while the air (or water) in its cells is below [COLD_TEMP], twice as fast below [FREEZING_TEMP];
+     *   it falls in milder air, and fast where it feels a fire ([warmth]) or the air round it is [WARM_AIR].
+     *   Freezing ([COLD_SHOW]) it shivers and seeks warmth until it is quite warm again, from [COLD_SLOW] it walks
+     *   at half pace, at [COLD_MAX] it faints.
+     * - Thirst rises every step and falls in the village (it has a well). Thirsty ([THIRSTY]) it drinks fresh water
+     *   it comes to ([drink]); at [THIRST_MAX] it faints.
+     * - Breath falls while its head is in smoke, firedamp or the gas of oil (twice as fast in black smoke) and comes
+     *   back in clean air; it runs for clean air ([clean]); out of breath it faints.
+     */
+    private fun needs(k: Int, step: Int): Boolean {
+        val x = xs[k]
+        val y = ys[k]
+        if (waits[k] > 0) waits[k]--
+        // warmth: the air or water in its cells, and a fire it can feel
+        var sum = 0f
+        var n = 0
+        for (r in 0 until HEIGHT) {
+            val yy = y - r
+            if (yy in 0 until h) {
+                sum += world.temp[at(x, yy)]
+                n++
+            }
+        }
+        val felt = if (n > 0) sum / n else world.ambient
+        val hot = warmth(k).let { if (it < 0 && felt >= WARM_AIR) MaterialTable.AIR else it }
+        warmBy[k] = hot
+        val was = colds[k]
+        colds[k] = when {
+            hot >= 0 -> maxOf(0, was - WARM_RATE)
+            felt < FREEZING_TEMP -> was + 2
+            felt < COLD_TEMP -> was + 1
+            felt >= MILD_TEMP -> maxOf(0, was - 2)
+            else -> maxOf(0, was - 1)
+        }
+        if (hot >= 0 && was >= COLD_SHOW) world.note(Seen.FOLK_WARM, hot)
+        if (hot >= 0 && was > 0 && colds[k] == 0) did[Did.WARMED]++
+        if (was < COLD_SHOW && colds[k] >= COLD_SHOW) {
+            did[Did.COLD]++
+            world.note(Seen.FOLK_COLD, world.mat[at(x, maxOf(0, y - HEIGHT + 1))].toInt())
+        }
+        if (colds[k] >= COLD_SHOW) chills[k] = 1 else if (colds[k] == 0) chills[k] = 0
+        if (colds[k] >= COLD_MAX) {
+            faint(k, Cause.COLD)
+            return true
+        }
+        // water
+        if (atHome(k)) thirsts[k] = maxOf(0, thirsts[k] - WELL) else thirsts[k]++
+        if (thirsts[k] >= THIRSTY && (step + ids[k]) % LOOK_EVERY == 0) drink(k)
+        if (thirsts[k] >= THIRST_MAX) {
+            faint(k, Cause.THIRST)
+            return true
+        }
+        // air: the two upper cells, head and chest
+        var bad = -1
+        for (r in HEIGHT - 2 until HEIGHT) {
+            val yy = y - r
+            if (yy < 0) continue
+            val m = world.mat[at(x, yy)].toInt()
+            if (foul[m]) {
+                bad = m
+                break
+            }
+        }
+        val before = fouled[k]
+        fouled[k] = bad >= 0
+        if (bad >= 0) {
+            breaths[k] -= if (bad == blackSmokeId) 2 else 1
+            if (!before) {
+                did[Did.CHOKE]++
+                world.note(Seen.FOLK_CHOKE, bad)
+            }
+            if (breaths[k] <= 0) {
+                faint(k, Cause.AIR)
+                return true
+            }
+            if ((states[k] == WARM || states[k] == KINDLE) && breaths[k] <= BREATH_MAX - FLEE_AFTER) states[k] = WALK
+        } else {
+            breaths[k] = minOf(BREATH_MAX, breaths[k] + BREATH_BACK)
+        }
+        return false
+    }
+
+    /**
+     * Warmth it feels: flames, embers, lava, anything burning or glowing within [WARM_REACH] cells to either side,
+     * from the row under its feet to the row over its head, as far as nothing blocks it. The material of the
+     * nearest, or -1; its side goes to [warmSide].
+     */
+    private fun warmth(k: Int): Int {
+        val x = xs[k]
+        val y = ys[k]
+        var best = WARM_REACH + 1
+        var what = -1
+        warmSide[k] = 0
+        for (side in 0..1) {
+            val d = if (side == 0) dirs[k] else -dirs[k]
+            for (r in -1..HEIGHT) {
+                val yy = y - r
+                if (yy < 0 || yy >= h) continue
+                for (s in 1 until best) {
+                    val xx = x + d * s
+                    if (xx < 0 || xx >= w) break
+                    val i = at(xx, yy)
+                    val m = world.mat[i].toInt()
+                    if (warming[m] || world.flags[i].toInt() and Flag.BURNING != 0 || world.temp[i] >= GLOWING) {
+                        best = s
+                        what = m
+                        warmSide[k] = d
+                        break
+                    }
+                    if (bearsAt(xx, yy)) break
+                }
+            }
+        }
+        return what
+    }
+
+    /**
+     * The side (-1, 1) of the nearest glow of a fire, flames, embers or anything burning or glowing, within
+     * [GLOW_SIGHT] cells along its rows, from under its feet to over its head, as far as nothing blocks the view; its
+     * own way first if both are as near. 0 if it sees none.
+     */
+    private fun glow(k: Int): Int {
+        val x = xs[k]
+        val y = ys[k]
+        var near = GLOW_SIGHT + 1
+        var to = 0
+        for (side in 0..1) {
+            val d = if (side == 0) dirs[k] else -dirs[k]
+            for (r in -1..HEIGHT) {
+                val yy = y - r
+                if (yy < 0 || yy >= h) continue
+                for (s in 1 until near) {
+                    val xx = x + d * s
+                    if (xx < 0 || xx >= w) break
+                    val i = at(xx, yy)
+                    val m = world.mat[i].toInt()
+                    if (flame[m] || world.flags[i].toInt() and Flag.BURNING != 0 || world.temp[i] >= GLOWING) {
+                        near = s
+                        to = d
+                        break
+                    }
+                    if (bearsAt(xx, yy)) break
+                }
+            }
+        }
+        return to
+    }
+
+    /** Thirsty, it drinks fresh water at its feet or a cell to either side: that cell of water is gone. Never salt water. */
+    private fun drink(k: Int) {
+        val x = xs[k]
+        val y = ys[k]
+        var salt = false
+        for (c in 0 until 6) {
+            val xx = x + when (c / 2) {
+                0 -> 0
+                1 -> dirs[k]
+                else -> -dirs[k]
+            }
+            val yy = y + c % 2
+            if (xx < 0 || xx >= w || yy < 0 || yy >= h) continue
+            val m = world.mat[at(xx, yy)].toInt()
+            if (m == waterId) {
+                world.set(xx, yy, MaterialTable.AIR, world.ambient)
+                thirsts[k] = 0
+                did[Did.DRINK]++
+                world.note(Seen.FOLK_DRINK, m)
+                return
+            }
+            if (m == saltId) salt = true
+        }
+        if (salt) {
+            did[Did.NO_SALT]++
+            world.note(Seen.FOLK_NO_SALT, saltId)
+        }
+    }
+
+    /**
+     * Out of foul air: the side where clean air at head height is nearer, looking along its own rows up to
+     * [FLEE_LOOK] cells as far as walls let it; its own way first if both are as near. 0 if there is none.
+     */
+    private fun clean(k: Int): Int {
+        val x = xs[k]
+        val y2 = ys[k] - (HEIGHT - 2)
+        val y3 = ys[k] - (HEIGHT - 1)
+        if (y3 < 0) return 0
+        var near = Int.MAX_VALUE
+        var to = 0
+        for (side in 0..1) {
+            val d = if (side == 0) dirs[k] else -dirs[k]
+            for (s in 1..FLEE_LOOK) {
+                if (s >= near) break
+                val xx = x + d * s
+                if (xx < 1 || xx > w - 2) break
+                val b2 = bearsAt(xx, y2)
+                val b3 = bearsAt(xx, y3)
+                if (b2 && b3) break
+                if (!b2 && !b3 && !foul[world.mat[at(xx, y2)].toInt()] && !foul[world.mat[at(xx, y3)].toInt()]) {
+                    near = s
+                    to = d
+                    break
+                }
+            }
+        }
+        return to
+    }
+
+    /**
+     * Freezing with no fire near, it kindles firewood at a flame that is already there, never from nothing: a flame
+     * or embers and firewood, both within [KINDLE_REACH] columns and about its height (the wood beside it, not
+     * under its feet, nor anchored ground). It takes the nearest of each and brings the wood to its burning heat;
+     * whether it burns (wet wood does not) is the world's affair. Returns whether it did.
+     */
+    private fun kindle(k: Int): Boolean {
+        val x = xs[k]
+        val y = ys[k]
+        var fire = -1
+        var fireD = Int.MAX_VALUE
+        var wood = -1
+        var woodD = Int.MAX_VALUE
+        for (yy in maxOf(0, y - HEIGHT - 1)..minOf(h - 1, y + 1)) {
+            for (xx in maxOf(0, x - KINDLE_REACH)..minOf(w - 1, x + KINDLE_REACH)) {
+                val i = at(xx, yy)
+                val m = world.mat[i].toInt()
+                val f = world.flags[i].toInt()
+                val d = Math.abs(xx - x) + Math.abs(yy - y)
+                if (flame[m] || f and Flag.BURNING != 0) {
+                    if (d < fireD) {
+                        fire = i
+                        fireD = d
+                    }
+                } else if (firewood[m] && yy <= y && f and Flag.ANCHORED == 0 && world.temp[i] < mt.igniteTemp[m]) {
+                    if (d < woodD) {
+                        wood = i
+                        woodD = d
+                    }
+                }
+            }
+        }
+        if (fire < 0 || wood < 0) return false
+        val wx = wood % w
+        val wy = wood / w
+        val m = world.mat[wood].toInt()
+        world.setTemperature(wx, wy, maxOf(world.temp[wood], mt.igniteTemp[m] + KINDLE_OVER))
+        world.wake(wx, wy)
+        if (wx != x) dirs[k] = if (wx > x) 1 else -1
+        states[k] = KINDLE
+        timers[k] = KINDLE_STEPS
+        waits[k] = KINDLE_PAUSE
+        did[Did.KINDLE]++
+        world.note(Seen.FOLK_KINDLE, m)
+        return true
     }
 
     private fun fall(k: Int) {
@@ -497,6 +975,7 @@ class Folk internal constructor(private val world: World) {
         drops[k] = 0f
         if (fell >= FAINT_FALL) {
             did[Did.FALL_HURT]++
+            world.note(Seen.FOLK_FALL, if (ys[k] + 1 < h) world.mat[at(xs[k], ys[k] + 1)].toInt() else MaterialTable.AIR)
             faint(k, Cause.FALL)
             return
         }
@@ -526,6 +1005,7 @@ class Folk internal constructor(private val world: World) {
             states[k] = SINK
             timers[k] = 0
             did[Did.TIRED]++
+            world.note(Seen.FOLK_TIRED, world.mat[at(x, ys[k])].toInt())
             return
         }
         if ((step + ids[k]) % SWIM_EVERY != 0) return
@@ -608,6 +1088,13 @@ class Folk internal constructor(private val world: World) {
         timers[k] = BACK_STEPS
         staminas[k] = SWIM_STAMINA
         rides[k] = 0
+        // looked after in the village: warm, with water and breath again
+        colds[k] = 0
+        chills[k] = 0
+        thirsts[k] = 0
+        breaths[k] = BREATH_MAX
+        waits[k] = 0
+        fouled[k] = false
         did[Did.BACK]++
     }
 
@@ -681,7 +1168,7 @@ class Folk internal constructor(private val world: World) {
 
     class Saved internal constructor(internal val ints: IntArray, internal val floats: FloatArray, internal val n: Int, internal val home: IntArray)
 
-    private val intFields get() = arrayOf(ids, xs, ys, dirs, states, timers, falls, staminas, runs, startXs, startYs, rides, faintCounts, causes)
+    private val intFields get() = arrayOf(ids, xs, ys, dirs, states, timers, falls, staminas, runs, startXs, startYs, rides, faintCounts, causes, colds, thirsts, breaths, waits, chills)
 
     internal fun save(): Saved {
         val n = count
@@ -720,6 +1207,11 @@ class Folk internal constructor(private val world: World) {
             mix(timers[k])
             mix(staminas[k])
             mix(faintCounts[k])
+            mix(colds[k])
+            mix(thirsts[k])
+            mix(breaths[k])
+            mix(waits[k])
+            mix(chills[k])
         }
     }
 
@@ -731,6 +1223,19 @@ class Folk internal constructor(private val world: World) {
         const val DROWN = 3
         const val BURIED = 4
         const val HEAT = 5
+        const val COLD = 6
+        const val THIRST = 7
+        const val AIR = 8
+    }
+
+    /** What a figure lacks, shown over its head: [needs]. */
+    object Need {
+        const val COLD = 1
+        const val THIRST = 2
+        const val AIR = 4
+
+        /** So cold it walks slower. */
+        const val FROZEN = 8
     }
 
     /** Rules that acted, counted in [did]. */
@@ -747,7 +1252,14 @@ class Folk internal constructor(private val world: World) {
         const val FALL_HURT = 9
         const val FAINT = 10
         const val BACK = 11
-        const val COUNT = 12
+        const val COLD = 12
+        const val WARMED = 13
+        const val KINDLE = 14
+        const val DRINK = 15
+        const val NO_SALT = 16
+        const val CHOKE = 17
+        const val FLEE = 18
+        const val COUNT = 19
     }
 
     companion object {
@@ -764,6 +1276,8 @@ class Folk internal constructor(private val world: World) {
         const val SINK = 3
         const val FAINT = 4
         const val BACK = 5
+        const val WARM = 6
+        const val KINDLE = 7
 
         /** At most this many figures. */
         const val MAX = 200
@@ -786,8 +1300,9 @@ class Folk internal constructor(private val world: World) {
         const val ABYSS = 9
         const val SWIM_DEPTH = 3
 
-        /** It sees this far ahead, and looks every this many steps. */
+        /** It sees this far ahead, and looks every this many steps; freezing it sees the glow of a fire this far on either side. */
         const val SIGHT = 10
+        const val GLOW_SIGHT = 40
         const val LOOK_EVERY = 4
 
         /** This hot is scorching: seen it turns back, in it it faints (°C). */
@@ -817,9 +1332,53 @@ class Folk internal constructor(private val world: World) {
         /** Weight of a figure on a body, as cells of water. */
         const val FIGURE_MASS = 4f
 
+        /** Air colder than this (°C) chills it, twice as fast below [FREEZING_TEMP]; from [MILD_TEMP] it warms up quickly. */
+        const val COLD_TEMP = 5f
+        const val FREEZING_TEMP = -10f
+        const val MILD_TEMP = 15f
+
+        /** Cold: from [COLD_SHOW] it freezes (and shows it), from [COLD_SLOW] it walks at half pace, at [COLD_MAX] it faints. */
+        const val COLD_SHOW = 600
+        const val COLD_SLOW = 1200
+        const val COLD_MAX = 2400
+        const val COLD_WALK_EVERY = 16
+
+        /** A fire warms it from this many cells off, by this much cold a step; freezing it goes this near, but not nearer than [WARM_CLOSE]. */
+        const val WARM_REACH = 6
+        const val WARM_RATE = 6
+        const val WARM_STOP = 4
+        const val WARM_CLOSE = 2
+
+        /** This hot (°C), a cell warms like a fire; air this warm round it warms it as fast. */
+        const val GLOWING = 300f
+        const val WARM_AIR = 25f
+
+        /** Thirst: from [THIRSTY] (2 minutes) it drinks fresh water it comes to; at [THIRST_MAX] (5 minutes) it faints; the well of the village takes this much a step. */
+        const val THIRSTY = 7200
+        const val THIRST_MAX = 18000
+        const val WELL = 30
+
+        /** Breath: steps of foul air it bears; shown while it is in foul air and below [BREATH_SHOW]; clean air gives back this much a step. */
+        const val BREATH_MAX = 480
+        const val BREATH_SHOW = 360
+        const val BREATH_BACK = 4
+
+        /** After this many steps of foul air it runs for clean air, looking this far for it. */
+        const val FLEE_AFTER = 60
+        const val FLEE_LOOK = 40
+
+        /** Running from foul air it keeps running this many steps after it last found itself in it. */
+        const val FLEE_RUN = 2 * DODGE_EVERY
+
+        /** Kindling: flame and firewood this many columns off at most; it kneels this long, and kindles at most once in [KINDLE_PAUSE] steps. */
+        const val KINDLE_REACH = 12
+        const val KINDLE_STEPS = 45
+        const val KINDLE_PAUSE = 600
+        const val KINDLE_OVER = 120f
+
         private const val PLACE_LIFT = 12
         private const val BACK_SEARCH = 12
-        private const val INT_FIELDS = 15
+        private const val INT_FIELDS = 20
         private const val FLOAT_FIELDS = 4
     }
 }

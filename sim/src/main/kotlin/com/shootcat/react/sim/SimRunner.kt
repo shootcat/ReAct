@@ -57,7 +57,7 @@ class SimRunner(val session: Session, backdrop: IntArray) {
 
         /**
          * The inhabitants (Phase 5): for each of the first [folkCount], where its feet are, its direction, state,
-         * the step count of that state and its number; and the village (-1: none).
+         * the step count of that state, its number and what it lacks ([Folk.Need] bits); and the village (-1: none).
          */
         var folkCount = 0
         var folkX = IntArray(16)
@@ -66,6 +66,7 @@ class SimRunner(val session: Session, backdrop: IntArray) {
         var folkState = IntArray(16)
         var folkTimer = IntArray(16)
         var folkId = IntArray(16)
+        var folkNeeds = IntArray(16)
         var homeX = -1
         var homeY = -1
 
@@ -368,6 +369,7 @@ class SimRunner(val session: Session, backdrop: IntArray) {
                     back.folkState = IntArray(c)
                     back.folkTimer = IntArray(c)
                     back.folkId = IntArray(c)
+                    back.folkNeeds = IntArray(c)
                 }
                 for (k in 0 until nf) {
                     back.folkX[k] = folk.x(k)
@@ -376,6 +378,7 @@ class SimRunner(val session: Session, backdrop: IntArray) {
                     back.folkState[k] = folk.state(k)
                     back.folkTimer[k] = folk.timer(k)
                     back.folkId[k] = folk.id(k)
+                    back.folkNeeds[k] = folk.needs(k)
                 }
                 back.folkCount = nf
                 back.homeX = folk.homeX

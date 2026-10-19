@@ -95,7 +95,9 @@ class Phase5aAppTest {
         compose.onNodeWithTag("world").performTouchInput { up() }
         steps(10)
         assertEquals("a stroke puts down one", FIGURES.size + 1, onSim { it.folk.count })
-        val area = intArrayOf(160, ground(VILLAGE_X) - 40, 320, ground(VILLAGE_X) + 6)
+        // the picture cut to where the five stand (and the village), their feet included
+        val feet = onSim { w -> w.folk.figures().filter { it.id <= FIGURES.size }.map { it.y } } + ground(VILLAGE_X)
+        val area = intArrayOf(200, feet.min() - 16, 320, feet.max() + 4)
         shot("5a_bewohner_0s", area)
         steps(60 * 5)
         shot("5a_bewohner_5s", area)
@@ -192,6 +194,7 @@ class Phase5aAppTest {
 
     private companion object {
         const val VILLAGE_X = 305
-        val FIGURES = listOf(185, 200, 215, 230, 245)
+        /** On the flat of the meadow, between the hill and the village. */
+        val FIGURES = listOf(222, 234, 246, 258, 270)
     }
 }

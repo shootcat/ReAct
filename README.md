@@ -6,7 +6,7 @@ REACT wird ein Physik-Puzzle mit fein simulierter Materie, im Stil von Noita ode
 - Sand rieselt, Wasser fließt, Holz brennt, Lava erstarrt, Dampf steigt auf.
 - Was passiert, ergibt sich aus den **Eigenschaften** der Materialien (Dichte, Zündpunkt, Wärmeleitung …), nicht aus Rezepten.
 
-**Stand: Phase 5a ist fertig: Bewohner im Stil von Lemmings laufen, steigen Stufen, fallen, meiden Feuer, Lava, tiefes Wasser und Abgründe, weichen Körpern aus, schwimmen kurz, gehen über Brücken und Flöße und werden nach einer Ohnmacht ins Dorf gebracht; im Spielplatz mit den Werkzeugen „Bewohner“ und „Dorf“. Davor 4c: Körper kippen wirklich um, Regen und Schnee. Als Nächstes 5b (Bedürfnisse) und 5c (Ziele, Level).** Berichte: [`docs/PHASE1.md`](docs/PHASE1.md), [`docs/PHASE2.md`](docs/PHASE2.md), [`docs/PHASE3.md`](docs/PHASE3.md), [`docs/PHASE3B.md`](docs/PHASE3B.md), [`docs/PHASE3C.md`](docs/PHASE3C.md), [`docs/PHASE4.md`](docs/PHASE4.md), [`docs/PHASE4B.md`](docs/PHASE4B.md), [`docs/PHASE4C.md`](docs/PHASE4C.md), [`docs/PHASE5A.md`](docs/PHASE5A.md).
+**Stand: Phase 5b ist fertig: Die Bewohner brauchen Wärme, Wasser und Luft und zeigen mit Symbolen über dem Kopf, was ihnen fehlt. Im Frost frieren sie, werden langsamer und fallen in Ohnmacht; frierend gehen sie ans Feuer oder zünden Holz an einer vorhandenen Flamme an. Durstig trinken sie Süßwasser, nie Salzwasser. In Rauch und Grubengas bekommen sie keine Luft und laufen ins Freie. Dazu zehn Einträge im Entdeckungsbuch. Davor 5a: Laufen, Stufen, Fallen, Meiden, Ausweichen, Schwimmen, Dorf. Als Nächstes 5c (Ziele, Level „Bergleute“ und „Winternacht“).** Berichte: [`docs/PHASE1.md`](docs/PHASE1.md), [`docs/PHASE2.md`](docs/PHASE2.md), [`docs/PHASE3.md`](docs/PHASE3.md), [`docs/PHASE3B.md`](docs/PHASE3B.md), [`docs/PHASE3C.md`](docs/PHASE3C.md), [`docs/PHASE4.md`](docs/PHASE4.md), [`docs/PHASE4B.md`](docs/PHASE4B.md), [`docs/PHASE4C.md`](docs/PHASE4C.md), [`docs/PHASE5A.md`](docs/PHASE5A.md), [`docs/PHASE5B.md`](docs/PHASE5B.md).
 
 Die Raster-Version mit Leveln (Leitfaden V1 und V2) ist nicht mehr Teil dieses Branches. Sie liegt hier:
 - Commit `a7fc414` (Tag `grid-legacy`),
@@ -219,7 +219,7 @@ sim/                        Partikelsimulation, reines Kotlin (ohne Android)
   Terrain.kt                Wiese mit Teich (Startlandschaft), Rauschen nur aus Ganzzahl-Hashes
   Templates.kt              Weltgrößen und die übrigen Vorlagen: Leeres Feld, Insel, Küste, Berg, Vulkan, Höhlen, Wald am Hang
   Bodies.kt                 Körperphysik (Phase 4): starre Körper auf dem Zellraster, Stöße, Schwimmen, Zerbrechen, Schlafen
-  Folk.kt                   Bewohner (Phase 5): Figuren über dem Raster, Laufen, Stufen, Fallen, Meiden, Ausweichen, Schwimmen, Dorf
+  Folk.kt                   Bewohner (Phase 5): Figuren über dem Raster, Laufen, Stufen, Fallen, Meiden, Ausweichen, Schwimmen, Dorf; Wärme, Wasser, Luft, Lagerfeuer, Trinken
   Benchmark.kt              Schritte pro Sekunde: leere, voll aktive und belebte Welt, größte Welt, dazu 150 Körper
 level/                      Level (Phase 3), reines Kotlin auf sim/
   Png.kt                    PNG-Leser ohne Android und AWT
@@ -246,6 +246,7 @@ docs/PHASE4.md              Bericht zu Phase 4: Körperphysik, geänderte Level,
 docs/PHASE4B.md             Bericht zu Phase 4b: Wolken, Licht, Wasser, Kippen, Körperbilder, Holz, Leistung, Erdöl
 docs/PHASE4C.md             Bericht zu Phase 4c: Umkippen, Regen und Schnee, Nachweis aus der App, Level, Leistung
 docs/PHASE5A.md             Bericht zu Phase 5a: Bewohner, Grundverhalten, Dorf, Werkzeuge, Leistung
+docs/PHASE5B.md             Bericht zu Phase 5b: Bedürfnisse, Symbole, Lagerfeuer, Trinken, Atemnot, Entdeckungsbuch
 docs/ELEMENTE.md            Vorschläge, die noch nicht umgesetzt sind (Schwarzpulver; Brücken, Gelenke, Seile, Strömung; ein Öl-Level)
 docs/v2/                    Unterlagen der Raster-Version (Leitfaden V2)
 ```
