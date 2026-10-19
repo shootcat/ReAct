@@ -8,7 +8,7 @@ Die Bewohner nach Leitfaden V3, Abschnitt 7a, zweiter Teil. Sie brauchen jetzt *
 
 Alles folgt festen Regeln, ohne Zufall.
 
-**Build:** [beta-117](https://github.com/shootcat/ReAct/releases/tag/beta-117)
+**Build:** [beta-118](https://github.com/shootcat/ReAct/releases/tag/beta-118)
 
 ## Überblick
 
@@ -181,4 +181,8 @@ Der Unterschied der ganzen Schritte (0,7 ms) liegt im Rauschen des ausgelasteten
 - **Glut im Frost:** Zwei bis sechzehn Zellen Glut gehen bei −20 °C in einer halben Sekunde aus und werden zu Holzkohle. Das ist die bestehende Physik der Glut (sie kühlt unter ihre Zündtemperatur). Im Test zum Anzünden dient deshalb ein brennender Holzpfahl als Flamme. In der Buchszene reicht die Glut, weil sie dort lange genug glüht.
 - **Großes Feuer:** An einem großen, rauchenden Holzstapel dauert das Aufwärmen länger. Der Bewohner läuft vor herabfallenden Stücken (5a) und vor dichtem Rauch davon und kommt dann zurück, weil er den Feuerschein sieht.
 - **Rauch im Freien** steigt schnell auf. Ein Bewohner darin hat kurz Atemnot, muss aber selten fliehen. Unter einer Decke (Stollen) bleibt Grubengas stehen, dort ist es gefährlich.
-- **5a-Bilder aus der App:** Der Ausschnitt in Build 116 schnitt die Füße der Figuren ab. Die Tipppunkte liegen jetzt auf der flachen Wiese, und der Ausschnitt richtet sich nach der Höhe der Figuren (Build 117).
+- **5a-Bilder aus der App:** Der Ausschnitt in Build 116 schnitt die Füße der Figuren ab. Die Tipppunkte liegen jetzt auf der flachen Wiese, und der Ausschnitt richtet sich nach der Höhe der Figuren.
+- **Build 117 rot, im Test aus 4c:** `Phase4cEvidenceTest > coldCloudSnows` zählte nach 10 s vier „Regentropfen“ unter der Schneewolke bei −10 °C. Das waren Tropfen von Flocken, die auf den Blättern der Bäume geschmolzen sind (nur die Luft folgt den −10 °C, Bäume und Boden sind noch warm). Aus der Wolke fiel kein Regen.
+  - Wo die Flocken landen, hängt in der App vom Zeitpunkt des Pinselstrichs ab: In Build 116 waren es 0 solcher Tropfen.
+  - Der Test zählt jetzt als Regen nur, was noch aus der Wolke fällt (`World.inFlight`). Die Regel in der Simulation ist unverändert.
+  - Die 5b-Tests waren in Build 117 schon grün: Die Bewohner froren nach 1,8 s, zündeten an, wärmten sich und waren nach 3,5 s warm. Der durstige trank, der im Rauch hatte Atemnot, keiner wurde ohnmächtig.

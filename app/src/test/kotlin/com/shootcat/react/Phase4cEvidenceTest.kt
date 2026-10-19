@@ -248,7 +248,7 @@ class Phase4cEvidenceTest {
             seconds = listOf(0, 1, 2, 3, 10), zoom = 3,
         ) {
             val air = falling("snow", base, SKY_X0 - 15, SKY_X1 + 15, ground)
-            val drops = falling("water", base, SKY_X0 - 15, SKY_X1 + 15, ground)
+            val drops = falling("water", base, SKY_X0 - 15, SKY_X1 + 15, ground, sky = true)
             seen = maxOf(seen, air)
             rain = maxOf(rain, drops)
             fell.note() + ", %d Flocken in der Luft, %d Tropfen".format(air, drops)
@@ -314,13 +314,19 @@ class Phase4cEvidenceTest {
      * Cells of [what] falling through open air under the clouds (air above and below them), in columns [x0]..[x1] down
      * to row [y1] (by default everywhere).
      */
-    private fun falling(what: String, base: Int, x0: Int = 0, x1: Int = world.width - 1, y1: Int = world.height - 2): Int {
+    /**
+     * Lone cells of [what] in the air under the cloud. With [sky], only what still falls out of the cloud
+     * ([World.inFlight]): not a drop dripping off a leaf a flake melted on (build 117 counted four of those as rain).
+     */
+    private fun falling(what: String, base: Int, x0: Int = 0, x1: Int = world.width - 1, y1: Int = world.height - 2, sky: Boolean = false): Int {
         val m = mt.id(what)
         return onSim { w ->
             var n = 0
             for (y in base + 1..minOf(y1, w.height - 2)) for (x in maxOf(x0, 0)..minOf(x1, w.width - 1)) {
                 val i = y * w.width + x
-                if (w.mat[i].toInt() == m && w.mat[i - w.width].toInt() == MaterialTable.AIR && w.mat[i + w.width].toInt() == MaterialTable.AIR) n++
+                if (w.mat[i].toInt() == m && w.mat[i - w.width].toInt() == MaterialTable.AIR && w.mat[i + w.width].toInt() == MaterialTable.AIR &&
+                    (!sky || w.inFlight(i))
+                ) n++
             }
             n
         }
