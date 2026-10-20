@@ -1,7 +1,8 @@
 # Elemente: Vorschläge, die noch nicht umgesetzt sind
 
 Hier stehen Materialien und Regeln, die erwogen, aber bewusst (noch) nicht gebaut wurden, jeweils mit
-Begründung: Schwarzpulver (2d) und was der Körperphysik aus Phase 4 noch fehlt. Grundlage ist der Leitfaden V3
+Begründung: Schwarzpulver (2d), was der Körperphysik aus Phase 4 noch fehlt, und was die Bewohner (Phase 5c)
+brauchen könnten. Grundlage ist der Leitfaden V3
 (Abschnitt 2: Eigenschaften statt Rezepte).
 
 ## Schwarzpulver (Leitfaden V3, 4a.4.6)
@@ -104,3 +105,61 @@ der Phase. Hier steht, wie sie sich auf den bestehenden Löser setzen ließen.
 - *Vorschlag:* Ein schmaler Körper, der senkrecht auf einer Fläche gleicher Breite ruht, wird mit ihr verbunden
   (wie beim Verschmelzen ruhender Körper in Phase 4), solange nichts ihn anstößt. Er kippt erst bei einem Stoß
   oder wenn sein Schwerpunkt deutlich neben der Auflage liegt.
+
+## Bewohner: Kleidung, Baumwolle, Nahrung, Seil, Fackel (Phase 5c)
+
+**Stand: nicht umgesetzt, nur Vorschläge.** Die beiden Testlevel aus 5c kommen ohne neue Materialien aus:
+„Bergleute“ mit Teer, Grubengas, Geröll, Wasser und Sand, „Winternacht“ mit Holz, Holzkohle, Pech und Schnee.
+Alle Vorschläge folgen Grundsatz 1 (Eigenschaften statt Rezepte). Jeder würde ein neues Rohmaterial in die Level
+bringen, deshalb erst nach Rückfrage.
+
+### Kleidung
+
+- *Heute:* Alle Bewohner frieren gleich schnell: bei −10 °C und kälter nach 5 s, Ohnmacht nach 20 s.
+- *Vorschlag:* Kleidung ist keine Zelle der Welt, sondern eine Eigenschaft der Figur. Das Level gibt sie mit
+  (`"clothing": "warm"`). Warm gekleidet steigt die Kälte halb so schnell, nass gewordene Kleidung (Regen, Wasser
+  bis zur Hüfte) wärmt nicht mehr, bis sie am Feuer trocknet. Das passt zu den Eigenschaften, die es schon gibt
+  (`wets` und das Trocknen durch Wärme).
+- *Kosten:* ein Wert je Figur mehr, gespeichert wie die Kälte; keine neue Schleife.
+- *Spielidee:* In „Winternacht“ wären die Hirten warm gekleidet und könnten Holz holen, die Kinder nicht.
+
+### Baumwolle
+
+- *Vorschlag:* eine Pflanze wie das Gras (wächst auf Erde im Licht), die Samenkapseln trägt. Die Kapseln sind ein
+  loses Material „Baumwolle“ mit diesen Eigenschaften:
+  - leitet Wärme kaum (wie Schnee, 0,005), schmilzt aber nicht: ein Dämmstoff, der im Warmen bleibt;
+  - saugt Wasser auf (`absorbs`) und dämmt nass nicht mehr;
+  - brennt schnell und heiß, aber kurz (wie trockenes Gras).
+- *Kosten:* ein Material und eine Wuchsregel, die es für Gras schon gibt.
+- *Spielidee:* ein Haus dämmen, das sonst in der Nacht auskühlt; ein Docht, der eine Flamme von einem Feuer zum
+  nächsten trägt.
+
+### Nahrung
+
+- *Heute:* Die Bewohner haben drei Bedürfnisse: Wärme, Wasser und Luft (5b).
+- *Vorschlag:* Hunger als viertes Bedürfnis, langsamer als Durst (etwa 10 Minuten bis zur Ohnmacht). Essbar ist
+  eine Eigenschaft (`edible`) von Materialien, die es schon gibt: toter Fisch, Samen, Früchte eines Busches. Ein
+  hungriger Bewohner isst, was essbar ist und vor seinen Füßen liegt (wie beim Trinken), nie Verdorbenes:
+  `decay_product` gibt es schon, verdorbene Nahrung wäre ein eigenes, nicht essbares Material.
+- *Kosten:* ein Zähler je Figur (wie der Durst) und ein Blick auf die Zellen vor den Füßen alle 4 Schritte.
+- *Spielidee:* ein Dorf über den Winter bringen: Fische aus dem Eis holen, Samen trocken lagern.
+
+### Seil aus Pflanzenfasern
+
+- *Vorschlag:* ein Material „Seil“ aus Ranken (die es schon gibt): eine abgestorbene Ranke lässt sich mit der Hand
+  als Seil aufnehmen. Ein Seil ist eine Kette kurzer Glieder mit Gelenken (siehe „Gelenke, Seile, Hebel“ oben). Es
+  brennt und reißt, wenn die Last zu groß wird.
+- *Kosten:* die Gelenke im Körperlöser; das ist der eigentliche Aufwand.
+- *Spielidee:* eine Hängebrücke über eine Kluft, über die Bewohner gehen. Ein Versuch in „Winternacht“ mit einer
+  Brücke aus Scheiten zeigte, warum ein Seil fehlt: Frierende Bewohner zünden Holz in ihrer Nähe an, eine
+  Holzbrücke verbrennt also. Ein Seil wäre ebenso brennbar, hinge aber hoch genug über dem Boden.
+
+### Fackel
+
+- *Heute:* Feuer lässt sich nicht tragen. Der Eimer nimmt nichts, was brennt, und die Hand nichts, was heiß ist.
+  Die Bewohner zünden nur an einer Flamme an, die schon da ist (5b).
+- *Vorschlag:* ein Holzstab, an einem Ende mit Pech getränkt („Fackel“, ein Körper aus Holz und Pech). Die Hand
+  darf ihn halten, wenn nur das Pechende brennt. Er brennt etwa eine Minute und zündet an, was er berührt.
+- *Kosten:* eine Ausnahme in der Regel „zu heiß zum Anfassen“ für Körper, deren heiße Zellen alle am Ende liegen.
+- *Spielidee:* Feuer von einem Ort zum anderen bringen, etwa vom Hirtenfeuer ins Dorf.
+

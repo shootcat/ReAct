@@ -95,7 +95,9 @@ class BergleuteTest {
 
     @Test
     fun `the front of the fall tipped onto the fire, then the rest dug out, gold`() {
-        val run = solve("schutt_aufs_feuer", "scoop 64 63 3 20\npour 59 62 2 20\nscoop 67 63 3 20\npour 30 20 3 20\nscoop 71 63 3 20\npour 30 20 3 20\n")
+        // tipped low into the pit, the rubble makes no heap the miners would have to climb, and keeps the fire down
+        // whenever it comes (measured with 0 to 5 s of waiting first: always won, gold up to 4 s)
+        val run = solve("schutt_aufs_feuer", "scoop 64 63 3 20\npour 59 64 1 30\nscoop 67 63 3 20\npour 30 20 3 20\nscoop 71 63 3 20\npour 30 20 3 20\n")
         assertNotNull(run.result)
         assertEquals(0, run.blasts, "the gas went out harmlessly")
         assertEquals(0, run.faints)
