@@ -68,6 +68,11 @@ class Play(val level: Level, val materials: MaterialTable) {
         val p = FloatArray(goals.size)
         var done = true
         for ((k, g) in goals.withIndex()) {
+            if (g.failed(world)) {
+                state = State.LOST
+                progress = p
+                return
+            }
             val met = g.met(world)
             p[k] = g.progress(world)
             if (g.guards) {

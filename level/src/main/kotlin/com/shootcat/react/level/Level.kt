@@ -52,7 +52,10 @@ class Level(val spec: LevelSpec, val terrain: Picture, val anchor: Picture?) {
                 if (bright >= 128 && cells[i] != MaterialTable.AIR && !mt.animal[cells[i]]) world.setAnchored(i % width, i / width, true)
             }
         }
-        for (h in spec.heat) for (i in Area.of(h.area, width, height).cells) world.setTemperature(i % width, i / width, h.temp)
+        for (h in spec.heat) {
+            val only = h.material?.let { mt.id(it) }
+            for (i in Area.of(h.area, width, height).cells) if (only == null || world.mat[i].toInt() == only) world.setTemperature(i % width, i / width, h.temp)
+        }
         spec.weather?.let { w ->
             world.setWeather(
                 cloudBase = w.cloudBase ?: -1,
@@ -65,6 +68,15 @@ class Level(val spec: LevelSpec, val terrain: Picture, val anchor: Picture?) {
         }
         for (t in spec.trees) world.plantTree(t.x, t.y, t.tree)
         for (i in animals) world.placeAnimal(cells[i], i % width, i / width)
+        spec.folk?.let { f ->
+            f.village?.let { world.folk.setHome(it[0], it[1]) }
+            world.folk.backToStart = f.faintReturn == "start"
+            for (p in f.figures) {
+                val id = world.folk.add(p[0], p[1])
+                require(id != 0) { "${spec.id}: no room for an inhabitant at (${p[0]}, ${p[1]})" }
+                if (p.size > 2) world.folk.face(id, p[2])
+            }
+        }
         world.wakeAll()
     }
 

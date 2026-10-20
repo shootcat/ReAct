@@ -32,6 +32,8 @@ data class LevelSpec(
     val trees: List<Tree> = emptyList(),
     /** The weather (3c): where clouds form, the wind. Fixed for the level; there is no random weather in a level. */
     val weather: WeatherSpec? = null,
+    /** Inhabitants (Phase 5) and their village. */
+    val folk: FolkSpec? = null,
     val goals: List<GoalSpec>,
     val rating: Rating,
 )
@@ -47,8 +49,9 @@ data class Tools(
     val build: Boolean = false,
 )
 
+/** Cells of the [area] at [temp]; with [material], only the cells of that material (a fire, not the rock under it). */
 @Serializable
-data class Heat(val area: List<List<Int>>, val temp: Float)
+data class Heat(val area: List<List<Int>>, val temp: Float, val material: String? = null)
 
 /**
  * A level's weather (3c.5). [cloudBase]: the row at and above which steam in the open air turns into cloud
@@ -70,8 +73,21 @@ data class WeatherSpec(
 data class Tree(val x: Int, val y: Int, val tree: Boolean = true)
 
 /**
+ * The inhabitants of a level (Phase 5): where each stands at the start, `[x, y]` or `[x, y, dir]` (-1 looking
+ * left), the village (x, y on its ground), and where one that fainted is brought back to: "village", or "start"
+ * (where it stood at the start), for a level whose goal is to get them out.
+ */
+@Serializable
+data class FolkSpec(
+    val figures: List<List<Int>>,
+    val village: List<Int>? = null,
+    @SerialName("faint_return") val faintReturn: String = "village",
+)
+
+/**
  * One goal (Leitfaden V3, 5.2). [type] is one of material, fill, temperature, ignite, extinguish, light, grow,
- * protect. A goal counts once its state has held for [hold] seconds.
+ * protect, and for the inhabitants (Phase 5) bring, rescue, keep_warm. A goal counts once its state has held for
+ * [hold] seconds.
  */
 @Serializable
 data class GoalSpec(
@@ -91,6 +107,8 @@ data class GoalSpec(
     val max: Float? = null,
     /** Average light at least (light). */
     val light: Float = 0f,
+    /** How long the area must stay warm (keep_warm): the night, in seconds. */
+    val seconds: Float = 0f,
     val hold: Float = 2f,
 )
 

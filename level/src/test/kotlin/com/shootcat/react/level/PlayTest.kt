@@ -1,6 +1,7 @@
 package com.shootcat.react.level
 
 import com.shootcat.react.sim.Flag
+import com.shootcat.react.sim.Folk
 import com.shootcat.react.sim.MaterialTable
 import com.shootcat.react.sim.Session
 import kotlin.test.Test
@@ -198,5 +199,93 @@ class PlayTest {
             list,
         )
         assertFailsWith<IllegalStateException> { Action.parse("jump 1 2") }
+    }
+
+    /**
+     * The floor between the rock pillar and the basin, where the inhabitants of these tests walk (away from the
+     * loose earth at column 44, which falls).
+     */
+    private val floor = listOf(listOf(31, 20), listOf(50, 20), listOf(50, 32), listOf(31, 32))
+
+    private fun folkLevel(goals: List<GoalSpec>, folk: FolkSpec, ambient: Float? = null): Level {
+        val (g, m) = ground()
+        return Level(spec(goals).copy(folk = folk, ambient = ambient), g, m)
+    }
+
+    /** Figure [k] faints of cold at once: the frost of the level and its cold at the limit. */
+    private fun chill(play: Play, k: Int) {
+        val f = play.session.world.folk
+        f.setNeeds(f.id(k), cold = Folk.COLD_MAX - 1)
+    }
+
+    @Test
+    fun `inhabitants on their feet in the area count, one that fainted does not`() {
+        val goal = GoalSpec("bring", "Zwei Bewohner zwischen Fels und Becken", floor, amount = 2, hold = 5f)
+        val play = Play(folkLevel(listOf(goal), FolkSpec(listOf(listOf(36, 31), listOf(40, 31, -1))), ambient = -20f), mt)
+        val world = play.session.world
+        val bring = play.goals[0] as Goal.Bring
+        assertEquals(2, world.folk.count)
+        repeat(10) { play.session.tick() }
+        assertEquals(2, bring.count(world))
+        assertTrue(bring.met(world))
+        chill(play, 0)
+        repeat(3) { play.session.tick() }
+        assertEquals(Folk.FAINT, world.folk.state(0))
+        assertEquals(1, bring.count(world), "a fainted one does not count")
+        assertEquals(0.5f, bring.progress(world))
+        assertEquals(Play.State.PLAYING, play.state)
+    }
+
+    @Test
+    fun `a rescue counts the ones in the village, one that faints is brought back to where it started, not there`() {
+        val goal = GoalSpec("rescue", "Bring einen ins Dorf", basin, amount = 1, hold = 30f)
+        // one in the basin, which is the village; one outside, on the floor between pillar and basin
+        val folk = FolkSpec(listOf(listOf(60, 31), listOf(37, 31)), village = listOf(60, 31), faintReturn = "start")
+        val play = Play(folkLevel(listOf(goal), folk, ambient = -20f), mt)
+        val world = play.session.world
+        val rescue = play.goals[0] as Goal.Rescue
+        assertTrue(world.folk.backToStart)
+        repeat(10) { play.session.tick() }
+        assertTrue(world.folk.home(0))
+        assertTrue(!world.folk.home(1))
+        assertEquals(1, rescue.count(world))
+        // the one outside faints and is brought back where it stood, outside the village
+        chill(play, 1)
+        repeat(Folk.FAINT_STEPS + Folk.BACK_STEPS + 20) { play.session.tick() }
+        assertEquals(1, world.folk.figures()[1].faints)
+        assertTrue(world.folk.x(1) in 31..49, "brought back to the floor, at ${world.folk.x(1)}")
+        assertTrue(!world.folk.home(1))
+        // in a level without the setting it would have been brought into the village
+        val other = Play(folkLevel(listOf(goal), folk.copy(faintReturn = "village"), ambient = -20f), mt)
+        repeat(10) { other.session.tick() }
+        chill(other, 1)
+        repeat(Folk.FAINT_STEPS + Folk.BACK_STEPS + 20) { other.session.tick() }
+        assertTrue(other.session.world.folk.home(1))
+    }
+
+    @Test
+    fun `a village kept warm through the night wins, one that grows cold loses at once`() {
+        fun night(min: Float) = GoalSpec("keep_warm", "Halte das Dorf warm", basin, min = min, seconds = 3f)
+        val warm = Play(level(listOf(night(15f))), mt)
+        warm.perform(emptyList(), limitSeconds = 5)
+        assertEquals(Play.State.WON, warm.state)
+        assertTrue(warm.result!!.seconds >= 3f)
+        // the air of the level is about 20 °C: a night that asks for 30 °C is lost after the first two seconds
+        val cold = Play(level(listOf(night(30f))), mt)
+        cold.perform(emptyList(), limitSeconds = 5)
+        assertEquals(Play.State.LOST, cold.state)
+        assertTrue(cold.goals[0].failed(cold.session.world))
+        assertTrue(cold.session.world.step in Goal.KeepWarm.GRACE..Goal.KeepWarm.GRACE + Play.CHECK_EVERY)
+    }
+
+    @Test
+    fun `heat set in the level warms only the material it names`() {
+        val heap = listOf(listOf(22, 26), listOf(30, 26), listOf(30, 32), listOf(22, 32))
+        val (g, m) = ground()
+        val play = Play(Level(spec(listOf(fillBasin)).copy(heat = listOf(Heat(heap, 300f, "sand"))), g, m), mt)
+        val world = play.session.world
+        assertEquals(300f, world.temp[world.index(25, 30)])
+        assertTrue(world.temp[world.index(25, 27)] < 50f, "the air over the sand stays as it was")
+        assertTrue(world.temp[world.index(29, 31)] < 50f, "the rock beside it too")
     }
 }

@@ -128,6 +128,12 @@ class Folk internal constructor(private val world: World) {
     var homeY = -1
         private set
 
+    /**
+     * Where a figure that fainted is brought back to: the village (false), or where it first stood (true), in a level
+     * whose goal is to get them out to the village (5c), so that fainting never takes one there.
+     */
+    var backToStart = false
+
     /** How often each rule acted since this was last read (for the discovery book and tests): see [Did]. */
     val did = IntArray(Did.COUNT)
 
@@ -190,6 +196,12 @@ class Folk internal constructor(private val world: World) {
     fun face(id: Int, dir: Int) {
         for (k in 0 until count) if (ids[k] == id) dirs[k] = if (dir < 0) -1 else 1
     }
+
+    /** Figure [k] is in the village. */
+    fun home(k: Int) = atHome(k)
+
+    /** Figure [k] is on its feet: walking, warming itself or kindling (not falling, swimming, fainted, coming back). */
+    fun standing(k: Int) = states[k] == WALK || states[k] == WARM || states[k] == KINDLE
 
     /** How many figures are in the village. */
     fun atHomeCount(): Int {
@@ -866,7 +878,8 @@ class Folk internal constructor(private val world: World) {
 
     /**
      * Out of foul air: the side where clean air at head height is nearer, looking along its own rows up to
-     * [FLEE_LOOK] cells as far as walls let it; its own way first if both are as near. 0 if there is none.
+     * [FLEE_LOOK] cells as far as nothing stands at head height; its own way first if both are as near. 0 if there
+     * is none.
      */
     private fun clean(k: Int): Int {
         val x = xs[k]
@@ -881,10 +894,9 @@ class Folk internal constructor(private val world: World) {
                 if (s >= near) break
                 val xx = x + d * s
                 if (xx < 1 || xx > w - 2) break
-                val b2 = bearsAt(xx, y2)
-                val b3 = bearsAt(xx, y3)
-                if (b2 && b3) break
-                if (!b2 && !b3 && !foul[world.mat[at(xx, y2)].toInt()] && !foul[world.mat[at(xx, y3)].toInt()]) {
+                // a wall at head height ends the way (clean air seen through a hole over it is out of reach)
+                if (bearsAt(xx, y2) || bearsAt(xx, y3)) break
+                if (!foul[world.mat[at(xx, y2)].toInt()] && !foul[world.mat[at(xx, y3)].toInt()]) {
                     near = s
                     to = d
                     break
@@ -1058,8 +1070,9 @@ class Folk internal constructor(private val world: World) {
 
     /** Back to the village, or to where it was put down: on the ground there, its breath back, looking on. */
     private fun bringBack(k: Int) {
-        val tx = if (homeX >= 0) homeX else startXs[k]
-        val ty = if (homeX >= 0) homeY else startYs[k]
+        val village = homeX >= 0 && !backToStart
+        val tx = if (village) homeX else startXs[k]
+        val ty = if (village) homeY else startYs[k]
         var x = tx.coerceIn(1, w - 2)
         var y = ty.coerceIn(HEIGHT - 1, h - 2)
         // a little to the side where the place itself is taken

@@ -42,6 +42,7 @@ class Area(val cells: IntArray) {
  * A goal of a level (Leitfaden V3, 5.2). It says what, never how. [met] looks at the world as it is; the level
  * counts a goal once it has been met without a break for [holdSteps] steps. A goal that [guards] something
  * (animals, a building) is the other way round: it holds from the start and the level is lost when it breaks.
+ * A goal that can [fail] (a village that must stay warm through the night) loses the level when it does.
  */
 sealed class Goal(val text: String, val area: Area, val holdSteps: Int) {
     abstract fun met(world: World): Boolean
@@ -50,6 +51,20 @@ sealed class Goal(val text: String, val area: Area, val holdSteps: Int) {
     abstract fun progress(world: World): Float
 
     open val guards get() = false
+
+    /** It can no longer be reached: the level is lost. */
+    open fun failed(world: World): Boolean = false
+
+    /** The cells of the area, as a mask over the world (made when first needed). */
+    private var mask: BooleanArray? = null
+
+    protected fun inside(world: World, i: Int): Boolean {
+        val m = mask ?: BooleanArray(world.size).also { b ->
+            for (c in area.cells) b[c] = true
+            mask = b
+        }
+        return i in m.indices && m[i]
+    }
 
     /** At least [amount] cells of one of [materials] in the area. */
     class Material(text: String, area: Area, hold: Int, val materials: IntArray, val amount: Int) : Goal(text, area, hold) {
@@ -120,6 +135,62 @@ sealed class Goal(val text: String, val area: Area, val holdSteps: Int) {
         override fun progress(world: World) = (count(world).toFloat() / amount).coerceAtMost(1f)
     }
 
+    /** At least [amount] inhabitants on their feet in the area (Phase 5): not fainted, not being brought back. */
+    class Bring(text: String, area: Area, hold: Int, val amount: Int) : Goal(text, area, hold) {
+        fun count(world: World): Int {
+            val f = world.folk
+            var n = 0
+            for (k in 0 until f.count) if (f.standing(k) && inside(world, f.y(k) * world.width + f.x(k))) n++
+            return n
+        }
+        override fun met(world: World) = count(world) >= amount
+        override fun progress(world: World) = (count(world).toFloat() / amount).coerceAtMost(1f)
+    }
+
+    /**
+     * At least [amount] inhabitants who were shut in brought out into the village (Phase 5), on their feet. A
+     * rescue level brings one that fainted back to where it stood, never into the village; the area is where the
+     * goal is shown, the village is where they count.
+     */
+    class Rescue(text: String, area: Area, hold: Int, val amount: Int) : Goal(text, area, hold) {
+        fun count(world: World): Int {
+            val f = world.folk
+            var n = 0
+            for (k in 0 until f.count) if (f.standing(k) && f.home(k)) n++
+            return n
+        }
+        override fun met(world: World) = count(world) >= amount
+        override fun progress(world: World) = (count(world).toFloat() / amount).coerceAtMost(1f)
+    }
+
+    /**
+     * The air in the area (the village's houses) stays at [min] °C or warmer until the night is over, [until] steps
+     * (Phase 5). Met when the night has passed; failed as soon as the air there is colder, after the first
+     * [GRACE] steps (the level may begin with a house cooling down).
+     */
+    class KeepWarm(text: String, area: Area, val min: Float, val until: Int, private val gas: BooleanArray) : Goal(text, area, 0) {
+        fun average(world: World): Float {
+            var sum = 0.0
+            var n = 0
+            for (c in area.cells) if (gas[world.mat[c].toInt()]) {
+                sum += world.temp[c]
+                n++
+            }
+            if (n == 0) for (c in area.cells) {
+                sum += world.temp[c]
+                n++
+            }
+            return (sum / n).toFloat()
+        }
+        override fun met(world: World) = world.step >= until && !failed(world)
+        override fun failed(world: World) = world.step >= GRACE && average(world) < min
+        override fun progress(world: World) = (world.step.toFloat() / until).coerceIn(0f, 1f)
+
+        companion object {
+            const val GRACE = 2 * STEPS_PER_SECOND
+        }
+    }
+
     companion object {
         /** Turns the goals of a level file into goals for a world of [width] × [height]. */
         fun of(spec: GoalSpec, materials: MaterialTable, width: Int, height: Int): Goal {
@@ -141,6 +212,12 @@ sealed class Goal(val text: String, val area: Area, val holdSteps: Int) {
                 "light" -> Light(spec.text, area, hold, spec.light)
                 "grow" -> Grow(spec.text, area, hold, spec.amount.coerceAtLeast(1), BooleanArray(materials.count) { materials.organism[it] != Organism.NONE && !materials.animal[it] })
                 "protect" -> Protect(spec.text, area, ids.also { require(it.isNotEmpty()) }, spec.amount.coerceAtLeast(1))
+                "bring" -> Bring(spec.text, area, hold, spec.amount.coerceAtLeast(1))
+                "rescue" -> Rescue(spec.text, area, hold, spec.amount.coerceAtLeast(1))
+                "keep_warm" -> {
+                    require(spec.seconds > 0f) { "a keep_warm goal names the length of the night in seconds" }
+                    KeepWarm(spec.text, area, requireNotNull(spec.min) { "a keep_warm goal names its least temperature" }, (spec.seconds * STEPS_PER_SECOND).toInt(), BooleanArray(materials.count) { materials.kind[it] == Kind.GAS })
+                }
                 else -> error("unknown goal type '${spec.type}'")
             }
         }

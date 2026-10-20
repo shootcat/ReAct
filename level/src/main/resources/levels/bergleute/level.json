@@ -1,0 +1,102 @@
+{
+  "id": "bergleute",
+  "name": "Bergleute",
+  "area": "Mine",
+  "tier": "Kernniveau",
+  "seed": 606,
+  "tools": {
+    "bucket": true,
+    "bucket_size": 30
+  },
+  "heat": [
+    {
+      "area": [
+        [
+          58,
+          66
+        ],
+        [
+          62,
+          66
+        ],
+        [
+          62,
+          68
+        ],
+        [
+          58,
+          68
+        ]
+      ],
+      "temp": 400,
+      "material": "tar"
+    }
+  ],
+  "folk": {
+    "figures": [
+      [
+        124,
+        103
+      ],
+      [
+        136,
+        103,
+        -1
+      ],
+      [
+        152,
+        103
+      ],
+      [
+        166,
+        103,
+        -1
+      ]
+    ],
+    "village": [
+      26,
+      69
+    ],
+    "faint_return": "start"
+  },
+  "goals": [
+    {
+      "type": "rescue",
+      "text": "Bring mindestens drei Bergleute ins Dorf",
+      "area": [
+        [
+          6,
+          56
+        ],
+        [
+          46,
+          56
+        ],
+        [
+          46,
+          70
+        ],
+        [
+          6,
+          70
+        ]
+      ],
+      "amount": 3,
+      "hold": 1
+    }
+  ],
+  "rating": {
+    "gold": {
+      "seconds": 30,
+      "actions": 6
+    },
+    "silver": {
+      "seconds": 45,
+      "actions": 8
+    },
+    "bronze": {
+      "seconds": 240,
+      "actions": 40
+    }
+  }
+}

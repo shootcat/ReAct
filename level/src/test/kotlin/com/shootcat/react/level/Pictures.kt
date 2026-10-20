@@ -1,6 +1,7 @@
 package com.shootcat.react.level
 
 import com.shootcat.react.sim.BodySprite
+import com.shootcat.react.sim.Folk
 import com.shootcat.react.sim.Renderer
 import com.shootcat.react.sim.World
 import java.awt.image.BufferedImage
@@ -63,6 +64,7 @@ object Pictures {
             c = Renderer.mix(c, (l[1].toInt() shl 16) or (l[2].toInt() shl 8) or l[3].toInt(), l[0] / 255f)
             img.setRGB(qx, qy, c and 0xFFFFFF)
         }
+        drawFolk(world, img, ax, ay, scale)
         val file = File("build/pictures/$name.png")
         file.parentFile.mkdirs()
         ImageIO.write(img, "png", file)
@@ -91,6 +93,66 @@ object Pictures {
                 if (s[0] <= 0f) continue
                 val c = (s[1].toInt() shl 16) or (s[2].toInt() shl 8) or s[3].toInt()
                 into[qy * w + qx] = Renderer.mix(into[qy * w + qx], c, s[0] / 255f)
+            }
+        }
+    }
+
+    /**
+     * The inhabitants (Phase 5) as little figures in cells, as the app draws them more finely: legs, tunic, head; lying
+     * when fainted; the village as a hut with a flag. What they lack shows as a square over the head (blue cold, cyan
+     * thirst, grey air).
+     */
+    private fun drawFolk(world: World, img: BufferedImage, ax: Int, ay: Int, scale: Int) {
+        fun cell(x: Int, y: Int, c: Int, x0: Float = 0f, x1: Float = 1f, y0: Float = 0f, y1: Float = 1f) {
+            for (qy in ((y - ay + y0) * scale).toInt() until ((y - ay + y1) * scale).toInt()) for (qx in ((x - ax + x0) * scale).toInt() until ((x - ax + x1) * scale).toInt()) {
+                if (qx in 0 until img.width && qy in 0 until img.height) img.setRGB(qx, qy, c and 0xFFFFFF)
+            }
+        }
+        val folk = world.folk
+        if (folk.homeX >= 0) {
+            val hx = folk.homeX
+            val hy = folk.homeY
+            for (y in hy - 2..hy) for (x in hx - 2..hx + 2) cell(x, y, 0xB07A48)
+            for (x in hx - 3..hx + 3) cell(x, hy - 3, 0xB23A2E, y0 = 0.5f)
+            for (x in hx - 1..hx + 1) cell(x, hy - 3, 0xB23A2E)
+            cell(hx, hy, 0x5A3A22, 0.2f, 0.8f, 0.2f)
+            for (y in hy - 6..hy) cell(hx + 4, y, 0x6B6B6B, 0.4f, 0.6f)
+            cell(hx + 5, hy - 6, 0xF2A93B, 0f, 1f, 0f, 0.6f)
+        }
+        val tunics = intArrayOf(0x2F80ED, 0xE0533D, 0x27AE60, 0xF2A93B, 0x9B51E0, 0x00A3A3)
+        for (k in 0 until folk.count) {
+            val x = folk.x(k)
+            val y = folk.y(k)
+            val tunic = tunics[(folk.id(k) - 1).mod(tunics.size)]
+            when (folk.state(k)) {
+                Folk.FAINT -> {
+                    val d = folk.dir(k)
+                    cell(x - d, y, 0x3D3A4B, y0 = 0.4f)
+                    cell(x, y, tunic, y0 = 0.3f)
+                    cell(x + d, y, 0xF2C29B, 0.1f, 0.9f, 0.2f)
+                    cell(x + d, y - 1, 0xFFE066, 0.3f, 0.7f, 0.5f, 0.9f)
+                }
+                Folk.SWIM, Folk.SINK -> cell(x, y - 3, 0xF2C29B, 0.1f, 0.9f)
+                else -> {
+                    cell(x, y - 3, 0xF2C29B, 0.1f, 0.9f)
+                    cell(x, y - 3, 0x5A3A22, 0.1f, 0.9f, 0f, 0.35f)
+                    cell(x, y - 2, tunic, 0.05f, 0.95f)
+                    cell(x, y - 1, tunic, 0.05f, 0.95f, 0f, 0.6f)
+                    cell(x, y - 1, 0x3D3A4B, 0.15f, 0.85f, 0.6f)
+                    cell(x, y, 0x3D3A4B, 0.1f, 0.4f)
+                    cell(x, y, 0x3D3A4B, 0.6f, 0.9f)
+                }
+            }
+            val needs = folk.needs(k)
+            val icons = listOfNotNull(
+                if (needs and Folk.Need.COLD != 0) 0x5FA8FF else null,
+                if (needs and Folk.Need.THIRST != 0) 0x11B4D8 else null,
+                if (needs and Folk.Need.AIR != 0) 0x6E6A66 else null,
+            )
+            for ((j, c) in icons.withIndex()) {
+                val ix = x + j * 2 - (icons.size - 1)
+                cell(ix, y - 6, 0xFFFFFF)
+                cell(ix, y - 6, c, 0.2f, 0.8f, 0.2f, 0.8f)
             }
         }
     }

@@ -253,7 +253,8 @@ fun SandboxScreen(
                     }
                     Play.State.LOST -> if (seen !== Play.State.LOST) {
                         seen = Play.State.LOST
-                        lost = play.goals.firstOrNull { it.guards && !it.met(play.session.world) }?.text
+                        lost = play.goals.firstOrNull { it.failed(play.session.world) }?.text
+                            ?: play.goals.firstOrNull { it.guards && !it.met(play.session.world) }?.text
                             ?: play.goals.firstOrNull { it.guards }?.text ?: ""
                         sound.play("crumble", 0.8f)
                     }
