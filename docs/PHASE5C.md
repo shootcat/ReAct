@@ -9,7 +9,7 @@ Der Spieler formt die Welt, und sie tun von sich aus, was ihre Regeln aus 5a und
 
 Dazu kommen drei neue Zieltypen und zwei Testlevel mit gemessenen Lösungswegen und Fallen.
 
-**Build:** [beta-BUILD](https://github.com/shootcat/ReAct/releases/tag/beta-BUILD)
+**Build:** [beta-122](https://github.com/shootcat/ReAct/releases/tag/beta-122)
 
 ## Überblick
 

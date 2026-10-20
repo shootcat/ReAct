@@ -7,9 +7,9 @@ import android.os.Looper
 import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.lifecycle.ViewModelProvider
@@ -164,12 +164,22 @@ class Phase5cAppTest {
         compose.waitForIdle()
     }
 
-    /** Draws the screen into a PNG. */
+    /** Draws the screen into a PNG; a dialog (the end of the level, a window of its own) on top of it, the screen dimmed, as on the device. */
     private fun shot(name: String) {
         compose.waitForIdle()
-        val view = (compose.onRoot().fetchSemanticsNode().root as ViewRootForTest).view.rootView
-        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-        view.draw(Canvas(bitmap))
+        val windows = compose.onAllNodes(isRoot()).fetchSemanticsNodes().map { (it.root as ViewRootForTest).view.rootView }
+        val screen = windows.maxBy { it.width * it.height }
+        val bitmap = Bitmap.createBitmap(screen.width, screen.height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        screen.draw(canvas)
+        for (dialog in windows) {
+            if (dialog === screen) continue
+            canvas.drawColor(0x99000000.toInt())
+            canvas.save()
+            canvas.translate((screen.width - dialog.width) / 2f, (screen.height - dialog.height) / 2f)
+            dialog.draw(canvas)
+            canvas.restore()
+        }
         val dir = File("build/screenshots").apply { mkdirs() }
         File(dir, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
