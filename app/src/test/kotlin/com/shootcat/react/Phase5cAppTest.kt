@@ -40,9 +40,9 @@ import java.util.concurrent.atomic.AtomicReference
 /**
  * Phase 5c in the running app: the two levels with inhabitants, opened from the list of levels. "Bergleute": four
  * miners shut in behind a fall of rubble with firedamp, a fire of pitch in the mouth of the adit. "Winternacht": a
- * village in hard frost whose fire will not last the night. Each played to its end in the app with a solution from
- * the level tests (BergleuteTest, WinternachtTest), the actions given to the level's own play on the simulation's
- * thread, and pictured: "5c_*.png".
+ * village in hard frost whose fire pit will not glow through the night. Each played to its end in the app with a
+ * solution from the level tests (BergleuteTest, WinternachtTest), the actions given to the level's own play on the
+ * simulation's thread, and pictured: "5c_*.png".
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -72,11 +72,16 @@ class Phase5cAppTest {
         assertEquals(id, vm.level.value!!.play.level.spec.id)
     }
 
-    /** The level's play, as the simulation's thread sees it, after [actions] (played there, [seconds] at most). */
-    private fun play(actions: String, seconds: Int): Play.State {
+    /**
+     * The level's play, as the simulation's thread sees it, after [actions] (played there, [seconds] at most). From
+     * the start: the session first goes back to the very beginning of the level, exact to the step (as "Neu beginnen"
+     * does), so that the actions find the world as in the level tests, however long the app ran before.
+     */
+    private fun play(actions: String, seconds: Int, fromStart: Boolean = false): Play.State {
         val level = vm.level.value!!
         level.runner.speed = SimRunner.Speed.PAUSE
-        val state = onSim(level.runner) {
+        val state = onSim(level.runner) { session ->
+            if (fromStart) session.reset()
             level.play.perform(Action.parse(actions), limitSeconds = seconds)
             level.play.state
         }
@@ -110,8 +115,9 @@ class Phase5cAppTest {
         val world = vm.level.value!!.play.session.world
         assertEquals("four villagers", 4, world.folk.count)
         shot("5c_winternacht_start")
-        // the two logs from behind the first house laid on the hearth beside the fire; half a minute into the night
-        assertEquals(Play.State.PLAYING, play("hand 3 77\nhand 86 75\n", 30))
+        // the two logs from behind the first house laid on the hearth beside the fire pit; half a minute into the night
+        // (from the start: when the logs come and where the villagers then are decides the night, see WinternachtTest)
+        assertEquals(Play.State.PLAYING, play("hand 3 77\nhand 86 75\n", 30, fromStart = true))
         shot("5c_winternacht_nacht")
         // on to the morning
         val state = play("", 210)
@@ -126,8 +132,8 @@ class Phase5cAppTest {
     @Test
     fun winternachtLost(): Unit = ActivityScenario.launch(MainActivity::class.java).use { scenario ->
         open(scenario, "winternacht")
-        // snow from a roof on the fire: it goes out, and soon a villager lies frozen
-        val state = play("scoop 20 66 3 20\npour 79 72 2 20\n", 150)
+        // snow from a roof in the fire pit: it does not help, before morning a villager lies frozen
+        val state = play("scoop 20 66 3 20\npour 79 72 2 20\n", 175, fromStart = true)
         assertEquals(Play.State.LOST, state)
         val frozen = onSim(vm.level.value!!.runner) { s -> (0 until s.world.folk.count).count { s.world.folk.frozen(it) } }
         assertTrue("a villager lies frozen", frozen >= 1)

@@ -14,20 +14,20 @@
     {
       "area": [
         [
-          75,
-          76
-        ],
-        [
-          79,
-          76
-        ],
-        [
-          79,
+          74,
           77
         ],
         [
-          75,
+          85,
           77
+        ],
+        [
+          85,
+          78
+        ],
+        [
+          74,
+          78
         ]
       ],
       "temp": 400,
@@ -78,20 +78,20 @@
           78
         ]
       ],
-      "seconds": 200
+      "seconds": 180
     }
   ],
   "rating": {
     "gold": {
-      "seconds": 200,
+      "seconds": 180,
       "actions": 2
     },
     "silver": {
-      "seconds": 200,
+      "seconds": 180,
       "actions": 4
     },
     "bronze": {
-      "seconds": 200,
+      "seconds": 180,
       "actions": 40
     }
   }

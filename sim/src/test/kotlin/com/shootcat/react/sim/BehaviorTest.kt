@@ -139,6 +139,24 @@ class BehaviorTest {
     }
 
     @Test
+    fun `a heap of glowing charcoal burns down and goes out, it does not glow for ever`() {
+        // charcoal put out for want of air and lit again burns on with what is left of it: before, every cell got its
+        // whole burning time again each time it caught, and a few cells of the heap glowed on and on without using
+        // themselves up (measured: 5 cells still glowing after 10 minutes, the heap the same size since minute 3)
+        val lab = Lab()
+        lab.rect("charcoal", 25, 52, 38, 61)
+        lab.rect("charcoal", 25, 52, 38, 52, 500f)
+        val charcoal = lab.id("charcoal")
+        fun glowing() = (0 until lab.world.size).count { lab.world.flags[it].toInt() and Flag.BURNING != 0 && lab.world.mat[it].toInt() == charcoal }
+        lab.seconds(60f)
+        assertTrue(glowing() > 0, "after a minute it still glows: ${glowing()}")
+        // (measured: out after about 135 s)
+        lab.seconds(180f)
+        assertEquals(0, glowing(), "after four minutes it is out")
+        assertTrue(lab.count("charcoal") < 120, "what glowed is used up: ${lab.count("charcoal")} of 140 left")
+    }
+
+    @Test
     fun `lava meeting water makes basalt and steam`() {
         val lab = Lab()
         lab.rect("water", 2, 45, 61, 61)

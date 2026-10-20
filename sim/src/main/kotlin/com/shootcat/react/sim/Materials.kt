@@ -408,6 +408,12 @@ class MaterialTable(val specs: List<MaterialSpec>, val ambient: Float) {
     val decayShare = FloatArray(count) { specs[it].decayShare }
     val catchSteps = IntArray(count) { ((specs[it].catchTime ?: 0f) * STEPS_PER_SECOND).toInt() }
 
+    /**
+     * Goes out to itself and catches again (charcoal): what is left of a cell that went out burns on when it is lit
+     * again, so that glowing on and off uses it up all the same.
+     */
+    val smoulders = BooleanArray(count) { specs[it].quenchProduct == specs[it].id }
+
     /** Something slow happens to it now and then (random ticks): oil seeps, evaporates, gives off gas; oily ground passes its oil down. */
     val slow = BooleanArray(count) { stains[it] > 0f || evaporates[it] > 0f || outgas[it] >= 0 || unstained[it] >= 0 }
 

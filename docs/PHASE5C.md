@@ -9,7 +9,8 @@ Der Spieler formt die Welt, und sie tun von sich aus, was ihre Regeln aus 5a und
 
 Dazu kommen drei neue Zieltypen und zwei Testlevel mit gemessenen Lösungswegen und Fallen.
 
-**Build:** [beta-122](https://github.com/shootcat/ReAct/releases/tag/beta-122)
+**Build:** [beta-122](https://github.com/shootcat/ReAct/releases/tag/beta-122); Nachtrag (Holzkohle-Korrektur, neuer Herd in
+„Winternacht“): [beta-123](https://github.com/shootcat/ReAct/releases/tag/beta-123)
 
 ## Überblick
 
@@ -19,7 +20,7 @@ Dazu kommen drei neue Zieltypen und zwei Testlevel mit gemessenen Lösungswegen 
 | Ziel: rette eingeschlossene Bewohner ins Dorf (`rescue`) | gebaut, getestet |
 | Ziel: halte das Dorf eine Zeit lang warm (`keep_warm`) | gebaut, getestet; zwei Formen, siehe unten |
 | Level 6 „Bergleute“ (Mine) | 4 Lösungswege, 2 Fallen, alle getestet |
-| Level 7 „Winternacht“ (Berg) | 3 Lösungswege, 5 Fallen, alle getestet |
+| Level 7 „Winternacht“ (Berg) | 3 Lösungswege, 4 Fallen, alle getestet; Verlässlichkeit über Zeitpunkt und Ablagestelle gemessen |
 | Neue Materialien | keine nötig; Vorschläge (Kleidung, Baumwolle, Nahrung, Seil, Fackel) in `docs/ELEMENTE.md` |
 | Leistung: 50 Bewohner, voll aktive Welt, 150 Körper | auf dem Rechner gemessen; den Wert auf dem Gerät liefert „Leistung messen“ |
 | Nachweis aus der App | `Phase5cAppTest`, Bilder am Release |
@@ -82,38 +83,47 @@ Bilder: `docs/phase5c/level6_*.png` (Start, die vier Wege, die zwei Fallen).
 ## Level 7 „Winternacht“ (Berg, Kernniveau)
 
 Ein Dorf auf einem Felsband hoch im Berg, eine Nacht bei −15 °C. Es gibt vier Bewohner und zwei Holzhäuser mit
-Schnee auf den Dächern. Auf dem Platz steht ein niedriger Steinherd mit einem kleinen Holzfeuer, das die Nacht nicht
-übersteht. Eine Felsnase schließt den Platz nach Osten. Holz ist knapp: Hinter dem ersten Haus liegen zwei Scheite.
-Am Hang gibt es eine Pechquelle und den Meiler eines Köhlers. Werkzeuge sind Eimer und Hand.
+Schnee auf den Dächern. Auf dem Platz steht ein niedriger Steinherd mit einer **Glutgrube**: Eine Reihe Holz brennt
+auf einem Bett aus Holzkohle. Die Glut zieht sich von oben nach unten und hält etwa eine Minute, nicht bis zum Morgen.
+Eine Felsnase schließt den Platz nach Osten. Holz ist knapp: Hinter dem ersten Haus liegen zwei Scheite. Am Hang gibt
+es eine Pechquelle und den Meiler eines Köhlers. Werkzeuge sind Eimer und Hand.
 
-Ziel: **Niemand im Dorf darf bis zum Morgen erfrieren** (Nacht 200 s).
+Ziel: **Niemand im Dorf darf bis zum Morgen erfrieren** (Nacht 180 s).
 
-Die Bewohner wärmen sich von selbst am Feuer. Frierend zünden sie Brennholz an, das nahe bei einer Flamme liegt, aber
-nie ohne Flamme (5b). Die Hitze eines Feuers geht in den Herd und in den Fels und hält den Platz noch eine Weile warm,
-nachdem es aus ist.
+Die Bewohner wärmen sich von selbst an der Glut. Frierend zünden sie Brennholz an, das nahe bei einer Flamme liegt,
+aber nie ohne Flamme (5b). Die Hitze des Feuers geht in den Herd und in den Fels und hält den Platz noch eine Weile
+warm, nachdem es aus ist.
 
 | Weg | Handgriffe | Ergebnis | Medaille | höchste Kälte (Ohnmacht bei 2400) |
 |---|---|---|---|---|
-| Die Scheite neben das Feuer auf den Herd legen, eine Zelle Abstand | 2 | Morgen erreicht | Gold | 988 |
-| Die Scheite neben dem Herd auf den Boden legen; frierende Bewohner zünden sie an der Flamme selbst an | 2 | Morgen erreicht | Gold | 1020 |
-| Die Scheite neben das Feuer, nach 10 s Kohle aus dem Meiler darauf | 4 | Morgen erreicht | Silber | 988 |
-| ohne Eingriff | 0 | verloren nach 122 s | – | – |
-| *Falle:* Schnee vom Dach aufs Feuer | 2 | verloren nach 20 s | – | – |
-| *Falle:* ein Eimer kalte Kohle aufs kleine Feuer, es erstickt | 2 | verloren nach 31 s | – | – |
-| *Falle:* Pech aufs Feuer, es brennt lange, aber der schwarze Rauch vertreibt die Bewohner vom Feuer | 2 | verloren nach 48 s | – | – |
-| *Falle:* die Scheite oben aufs Feuer, sie ersticken es | 2 | verloren nach 181 s | – | – |
-| *Falle:* die Scheite erst nach 60 s; die Glut ist aus, niemand zündet sie an | 2 | verloren nach 118 s | – | – |
+| Die Scheite auf den Herd neben die Glutgrube legen | 2 | Morgen erreicht | Gold | 740 |
+| Die Scheite neben dem Herd auf den Boden legen; frierende Bewohner zünden sie an der Glut selbst an | 2 | Morgen erreicht | Gold | 1133 |
+| Die Scheite auf den Herd, nach 10 s Kohle aus dem Meiler dazu auf den Herd | 4 | Morgen erreicht | Silber | 1094 |
+| ohne Eingriff | 0 | verloren nach 117 s | – | – |
+| *Falle:* ein Eimer kalte Kohle in die Glutgrube, sie erstickt | 2 | verloren nach 86 s | – | – |
+| *Falle:* die Scheite oben auf die Glutgrube, sie ersticken sie | 2 | verloren nach 60 s | – | – |
+| *Falle:* Pech in die Grube, es brennt lange, aber der schwarze Rauch vertreibt die Bewohner | 2 | verloren nach 100 s | – | – |
+| *Falle:* die Scheite erst nach 60 s; die Glut ist aus, niemand zündet sie an | 2 | verloren nach 106 s | – | – |
+| *hilft nicht:* Schnee vom Dach in die Grube; er nässt das Holz, die Kohle darunter glimmt weiter | 2 | verloren nach 128 s | – | – |
 
-**Empfindlichkeit:** Winternacht reagiert stärker auf die genaue Ablagestelle als die anderen Level.
-- Mit 0 bis 5 s Wartezeit vor dem ersten Griff gewinnt der Holzweg immer, und Schnee aufs Feuer verliert immer.
-- Bei einer Zelle Versatz kippt das Ergebnis aber teils um:
-  - Die Scheite direkt am Feuer (ohne Abstand) brennen sofort mit ab; diese Variante verlor bei 128 s.
-  - Am Boden zwei Zellen weiter links verlor der Weg bei 190 s.
+**Wie verlässlich die Wege sind.** Gemessen in einer offenen Nacht: Wann erfriert der erste Bewohner, je nachdem,
+wann (Wartezeit vor dem ersten Griff) und wo die Scheite hinkommen? Gewonnen heißt: niemand vor 180 s.
 
-Dahinter stehen das Feuer (mit Zufall, aber deterministisch) und die Wege der Bewohner. Die Tests legen feste Abläufe
-fest und sind wiederholbar. Für Spieler bedeutet das: Holz neben, nicht auf das Feuer, und rechtzeitig.
+| Weg, Ablagestelle | Wartezeiten | gewonnen |
+|---|---|---|
+| auf den Herd, x 86 | 0 bis 30 s, je 5 s | 7 von 7 |
+| auf den Herd, x 87 | 0 bis 30 s, je 5 s | 7 von 7 |
+| auf den Herd, x 88 | 0 bis 40 s, je 2,5 s | 15 von 17 (verloren bei 0 s und 20 s, nach 142 und 137 s) |
+| auf den Herd, x 90 (der Scheit kippt über die Kante) | 0 bis 30 s, je 5 s | 5 von 7 |
+| auf den Boden, x 64 | 0 bis 32,5 s, je 2,5 s | 14 von 14; ab 35 s ist die Glut zu schwach, verloren |
+| auf den Boden, x 60 / 62 / 66 | 0 bis 30 s, je 5 s | 4 / 6 / 6 von 7 |
+| auf den Herd, dann Kohle aus dem Meiler | 0 bis 30 s, je 5 s | 7 von 7 |
 
-Bilder: `docs/phase5c/level7_*.png` (Start, drei Wege, fünf Fallen, ohne Eingriff).
+Zusammen gewinnen die Scheite auf dem Herd in 34 von 38 Nächten, die Scheite am Boden in 30 von 35. Ganz verlässlich
+ist es nicht: Die Bewohner gehen, wohin ihre Regeln sie führen, und wie lange der Boden nach dem Feuer warm hält,
+hängt davon ab. Wer die Scheite nach etwa 40 s bringt, kommt zu spät.
+
+Bilder: `docs/phase5c/level7_*.png` (Start, drei Wege, vier Fallen, Schnee, ohne Eingriff).
 
 ## Feinere Regeln für die Bewohner (aus 5b)
 
@@ -163,9 +173,67 @@ gehen an das Level auf dem Faden der Simulation. Die Bilder hängen am Release:
 - `5c_winternacht_start.png`, `5c_winternacht_nacht.png` (nach 30 s, Holz neben dem Feuer), `5c_winternacht_morgen.png` (Medaille);
 - `5c_winternacht_erfroren.png`: Schnee aufs Feuer, die Nacht ist verloren.
 
-In der App hat das Level schon gut 2 s gelaufen, bevor der Test eingreift. Deshalb gelten die Medaillen aus den
-Level-Tests dort nicht auf den Schritt genau. Gewonnen und verloren wird gleich, wie die Messung mit Wartezeit oben
-zeigt.
+In der App hat das Level schon gut 2 s gelaufen, bevor der Test eingreift. Bei „Bergleute“ ändert das nichts: Der
+Gold-Weg gewinnt mit 0 bis 5 s Wartezeit (in der App: Gold, 0:23, 6 Griffe). Bei „Winternacht“ hängt die Nacht davon
+ab, wann die Scheite kommen (siehe „Wie verlässlich die Wege sind“). Der Test setzt das Level deshalb vorher auf den
+Anfang zurück, so wie „Neu beginnen“, auf den Schritt genau (geprüft: gleicher Weltzustand wie frisch geladen). Dann
+spielt er in der App dieselbe Nacht wie der Level-Test.
+
+## Nachtrag: Holzkohle-Korrektur und neuer Herd für „Winternacht“
+
+Nach dem 5c-Bericht kam „mach weiter“. Der Leitfaden V3 hat nach Phase 5 keine weitere Phase; der eigene
+Simulationsmodus (7b) soll ausdrücklich jetzt nicht gebaut werden. Offen war nur meine Frage zur Holzkohle. Ich habe
+„mach weiter“ als Ja zu dieser Korrektur verstanden.
+
+**Die Korrektur.** Geht glühende Holzkohle aus Mangel an Luft aus, behält sie, was von ihr übrig ist. Fängt sie wieder
+Feuer, brennt sie damit weiter und nicht mit ihrer vollen Brenndauer. Die Zufallszahl für die Brenndauer wird dabei
+trotzdem gezogen. So läuft der Zufall der Welt gleich weiter, und es ändert sich nur, was die Kohle wirklich anders
+macht. Beim ersten Versuch (vor dem 5c-Bericht) fehlte genau das: Die Zufallsfolge lief auseinander, und daran lagen
+die Brüche in der Waldvorlage und in Level 4, nicht an der Kohle selbst.
+
+| Messung: Haufen Holzkohle 14 × 10, oben angezündet | ohne Korrektur | mit Korrektur |
+|---|---|---|
+| nach 3 min | 107 von 140 Zellen übrig, 5 glimmen | aus nach 135 s |
+| nach 10 min | 101 übrig, 2 glimmen noch | – |
+| kleiner Haufen 6 × 4 | nach 10 min glimmt noch 1 Zelle | aus nach 90 s |
+
+Neuer Test: `BehaviorTest`, „ein Haufen glühender Holzkohle brennt herunter und geht aus“.
+
+**Folgen für Bestehendes:**
+- **Waldvorlage:** Der Felsbrocken rollt nach dem Baumbrand weiter in den See; `TemplatesTest` ist unverändert grün.
+- **Level 4 „Gewitterfeuer“:** Ob ein später Blitz den Stapel noch entzündet, bleibt Zufall der Weltsaat; der Zufall
+  verläuft jetzt etwas anders. Neu gemessen: Ein Pfahl auf dem Stapel bei 90, 120, 130 oder 145 s zündet ihn (bei
+  150 s zu spät für eine Medaille); bei 85, 95 bis 115, 125, 135 und 140 s nicht. Der Test „noch später“ nimmt deshalb
+  145 statt 125 s. Der Bronzeweg bei 90 s und alle übrigen Wege sind unverändert.
+- **Level 6 „Bergleute“:** unverändert, alle Zeiten gleich; dort brennt Teer, keine Holzkohle.
+- **Level 1 bis 3 und 5:** unverändert grün.
+
+**„Winternacht“ neu gebaut.** Beim Nachmessen fiel auf, dass das alte Level fast nur in den ersten Sekunden lösbar
+war. Das galt schon vor der Korrektur:
+- Das kleine Holzfeuer auf dem Herd war nach etwa 9 s fast aus.
+- Scheite, die danach neben das Feuer kamen, fingen kein Feuer mehr. Sie versperrten den Bewohnern im Osten den Weg
+  zum Herd.
+- Gemessen ohne die Korrektur: Wartete man 6, 8 oder 10 s, ging die Nacht verloren, bei 6 und 8 s schon nach 25 s.
+  Mit der Korrektur ging zusätzlich die Wartezeit 2 s verloren.
+- Auf dem Gerät hätte ein Spieler also nur wenige Sekunden Zeit gehabt.
+
+Ich habe verschiedene Herde gemessen: zwei Lagen Holz, ein Glutbett, ein drittes Scheit, Kohlehaufen in mehreren
+Formen, Gruben in mehreren Tiefen und Breiten, einen breiteren Herd. Am besten ist eine **Glutgrube**: oben eine Reihe
+Holz, darunter Holzkohle (11 Zellen breit, 4 tief). Die Nacht dauert jetzt 180 statt 200 s. So werden die knappen
+Niederlagen (erster Bewohner erfroren nach 183 bis 195 s) zu Siegen, und alle Fallen verlieren weiter mit mindestens
+50 s Abstand. Vergleich:
+
+| | altes Level (mit Korrektur) | neues Level |
+|---|---|---|
+| Scheite neben das Feuer, Wartezeit 0 bis 10 s | 7 von 11 gewonnen, danach immer verloren | 0 bis 40 s: 34 von 38 gewonnen (4 Stellen) |
+| Scheite auf den Boden | 7 von 11 (0 bis 10 s), danach meist verloren | 0 bis 32,5 s: 30 von 35 (4 Stellen) |
+| Zeit, die ein Spieler hat | etwa 5 s | etwa 35 bis 40 s |
+
+Ein breiterer Herd (damit ein Scheit nicht über die Kante kippt) war deutlich schlechter: nur 3 bis 4 von 7
+gewonnen. Der zusätzliche Stein schluckt Wärme. Ich habe ihn wieder verworfen.
+
+Tests: sim 228 und level 89 grün auf dem Rechner. Die App-Tests (`Phase5cAppTest`) spielen Winternacht mit dem neuen
+Herd.
 
 ## Abweichungen und offene Punkte
 
@@ -184,18 +252,7 @@ zeigt.
   - Ein Herdfeuer im Haus setzte die Holzwände in Brand. Ein Ofen ohne Abzug erstickte in seinem Rauch.
 
   „Niemand erfriert“ misst stattdessen, worum es geht, und lässt die Bewohner handeln.
-- **Holzkohle glimmt beliebig lange (Befund, nicht geändert).**
-  - *Befund:* Geht glühende Holzkohle aus und fängt wieder Feuer, bekommt sie jedes Mal ihre volle Brenndauer neu.
-    Was immer wieder an- und ausgeht, verbraucht sich so nie.
-  - *Versuch:* Ich habe eine Korrektur gebaut und getestet: Die Restbrenndauer bleibt erhalten. Sie verändert aber
-    Bestehendes:
-    - In der Waldvorlage rollt der Felsbrocken nach dem Baumbrand nicht mehr in den See, weil ihn Asche und Kohlereste
-      stützen.
-    - Der Zufallsverlauf des Gewitters in Level 4 verschiebt sich, so dass drei zufallsabhängige Spätwege andere
-      Zeitpunkte bräuchten.
-  - *Entscheidung:* Ich habe die Korrektur deshalb zurückgenommen; Winternacht funktioniert mit und ohne sie.
-    **Zur Freigabe:** Soll die Korrektur kommen, mit neu vermessenen Spätwegen in Level 4 und angepasster
-    Waldvorlage?
+- **Holzkohle glimmt beliebig lange:** im Nachtrag behoben (siehe dort).
 - **Wärme im Fels.** Fels leitet Wärme in dieser Simulation sehr schnell, im Versuch etwa 50 Zellen in 60 s. Das prägt
   Winternacht:
   - Ein Feuer wärmt den Boden des ganzen Platzes, und die Bewohner bleiben nach dem Feuer noch rund eine Minute warm.

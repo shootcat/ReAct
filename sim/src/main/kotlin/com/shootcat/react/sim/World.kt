@@ -1290,7 +1290,9 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
     /** Cell [i] catches fire. */
     private fun kindle(x: Int, y: Int, i: Int, m: Int) {
         flags[i] = (flags[i].toInt() or Flag.BURNING).toByte()
-        life[i] = burnLife(m).toShort()
+        // (drawn in any case, so that the chances of the world run on alike)
+        val full = burnLife(m)
+        if (!materials.smoulders[m] || life[i] <= 0) life[i] = full.toShort()
         events[Event.IGNITE]++
         note(Seen.IGNITE, m)
         if (y < height - 1 && materials.wets[mat[i + width].toInt()]) note(Seen.BURN_ON_WATER, m)
@@ -1382,7 +1384,8 @@ class World(val width: Int, val height: Int, val materials: MaterialTable, seed:
         val product = materials.quenchProduct[m]
         if (product == m) {
             flags[i] = (flags[i].toInt() and Flag.BURNING.inv()).toByte()
-            life[i] = 0
+            // charcoal keeps what is left of it for when it catches again
+            if (!materials.smoulders[m]) life[i] = 0
             wake(x, y)
         } else {
             change(x, y, i, product)

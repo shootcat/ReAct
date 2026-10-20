@@ -140,9 +140,10 @@ class GewitterfeuerTest {
     @Test
     fun `a post stood on the pile even later, as long as the storm lasts, bronze`() {
         // the plateau drains into the cave (Phase 4): the rain wets the wood only on top, it still burns. Whether
-        // a stroke still kindles it this late is chance. Measured (4c, rain by the density of the cloud, the storm
-        // 150 s): a post put there at 95, 100, 105, 115, 125, 135 or 145 s kindles it; at 110, 120, 130 or 140 s not
-        val (_, r) = lateOnPile(125, 180)
+        // a stroke still kindles it this late is chance. Measured (charcoal keeps what is left of it, the storm
+        // 150 s): a post put there at 90, 120, 130 or 145 s kindles it (at 150 s too late for a medal); at 85, 95 to
+        // 115, 125, 135 or 140 s not
+        val (_, r) = lateOnPile(145, 200)
         assertEquals(Medal.BRONZE, assertNotNull(r).medal)
     }
 
