@@ -200,6 +200,9 @@ class Folk internal constructor(private val world: World) {
     /** Figure [k] is in the village. */
     fun home(k: Int) = atHome(k)
 
+    /** Figure [k] lies fainted of cold, or is being brought back after it. */
+    fun frozen(k: Int) = (states[k] == FAINT || states[k] == BACK) && causes[k] == Cause.COLD
+
     /** Figure [k] is on its feet: walking, warming itself or kindling (not falling, swimming, fainted, coming back). */
     fun standing(k: Int) = states[k] == WALK || states[k] == WARM || states[k] == KINDLE
 
@@ -319,6 +322,16 @@ class Folk internal constructor(private val world: World) {
     private fun free(x: Int, y: Int): Boolean {
         if (x < 0 || x >= w || y >= h || y - HEIGHT + 1 < 0) return false
         for (r in 0 until HEIGHT) if (bearsAt(x, y - r)) return false
+        return true
+    }
+
+    /** A figure could stand in column [x] with its feet at [y] or a step up without getting hot: below [WARM_NEAR] everywhere. */
+    private fun bearable(x: Int, y: Int): Boolean {
+        if (x < 0 || x >= w) return false
+        for (yy in maxOf(0, y - HEIGHT - CLIMB + 1)..y) {
+            val i = at(x, yy)
+            if (fearsome[world.mat[i].toInt()] || world.temp[i] >= WARM_NEAR) return false
+        }
         return true
     }
 
@@ -490,12 +503,14 @@ class Folk internal constructor(private val world: World) {
             return
         }
         // freezing, it looks out for the glow of a fire on either side and turns towards it
+        var drawn = false
         if (chilled && runs[k] == 0 && (step + ids[k]) % LOOK_EVERY == 0) {
             val to = glow(k)
             if (to != 0 && to != dirs[k]) {
                 dirs[k] = to
                 did[Did.TURN]++
             }
+            drawn = to != 0
         }
         // what it sees ahead; out of breath it runs through smoke and steam rather than back into them
         if ((step + ids[k]) % LOOK_EVERY == 0) {
@@ -506,7 +521,8 @@ class Folk internal constructor(private val world: World) {
                     states[k] = WARM
                     return
                 }
-            } else if (d > 0) {
+            } else if (d > 0 && !(drawn && murky[sawWhat])) {
+                // (drawn to the glow of a fire it does not see yet, it goes on through the smoke in front of it)
                 dirs[k] = -dirs[k]
                 did[Did.TURN]++
                 world.note(Seen.FOLK_TURN, sawWhat)
@@ -546,9 +562,15 @@ class Folk internal constructor(private val world: World) {
                 dirs[k] = -dirs[k]
                 states[k] = WALK
             }
-        } else if (warmBy[k] < 0 && (sawFire == 0 || sawFire > WARM_STOP)) {
-            // the fire is out, or drew back (it goes after it)
-            states[k] = WALK
+        } else if (warmBy[k] < 0) {
+            if (sawFire == 0 || sawFire > WARM_STOP) {
+                // the fire is out, or drew back (it goes after it)
+                states[k] = WALK
+            } else if ((step + ids[k]) % WALK_EVERY == 0 && bearable(xs[k] + dirs[k], ys[k])) {
+                // it feels nothing of it yet (a big fire's hot air reaches far, or lies below it): a step nearer, as
+                // near as the heat lets it
+                stride(k)
+            }
         }
     }
 
@@ -1361,6 +1383,9 @@ class Folk internal constructor(private val world: World) {
         const val WARM_RATE = 6
         const val WARM_STOP = 4
         const val WARM_CLOSE = 2
+
+        /** Not warm yet at a fire, it steps nearer where nothing it would stand in is this hot (°C). */
+        const val WARM_NEAR = 60f
 
         /** This hot (°C), a cell warms like a fire; air this warm round it warms it as fast. */
         const val GLOWING = 300f

@@ -130,6 +130,38 @@ class FolkNeedsTest {
     }
 
     @Test
+    fun `freezing, drawn to the glow of a fire it cannot see yet, it goes on through the smoke before it`() {
+        val lab = lab(ambient = -20f)
+        lab.rect("wood", 104, 66, 106, 69, t = 400f)
+        lab.folk.add(70, 69)
+        lab.folk.setNeeds(1, cold = 700)
+        // a wall of smoke between, kept standing
+        val smoke = lab.id("smoke")
+        var reached = -1
+        for (s in 0 until 900) {
+            for (y in 60..69) for (x in 84..86) lab.world.set(x, y, smoke, -10f)
+            lab.world.step()
+            if (lab.only().x > 90 && reached < 0) reached = s
+        }
+        println("through smoke towards the glow: past it after ${reached / 60f} s, now at ${lab.only().x}, state ${lab.only().state}, faints ${lab.only().faints} cause ${lab.only().cause}")
+        assertTrue(reached in 0..900, "it went on through the smoke")
+        assertTrue(lab.only().faints == 0 || lab.only().cause != Folk.Cause.COLD, "and did not freeze")
+    }
+
+    @Test
+    fun `at a big fire whose hot air reaches far it steps nearer until it feels the warmth`() {
+        val lab = lab(ambient = -20f)
+        // a big fire: its hot air stands well out to the side
+        lab.rect("wood", 100, 62, 109, 69, t = 400f)
+        lab.folk.add(70, 69)
+        lab.folk.setNeeds(1, cold = 1000)
+        val warm = lab.until(1800) { it.cold == 0 }
+        println("big fire: warm after ${warm / 60f} s, at column ${lab.only().x}, faints ${lab.only().faints}")
+        assertTrue(warm in 1..1800, "it got warm: $warm")
+        assertEquals(0, lab.only().faints, "and did not faint, of cold or of the heat")
+    }
+
+    @Test
     fun `freezing it kindles firewood at a flame that is there, never from nothing`() {
         fun scene(embers: Boolean, ambient: Float): Lab {
             val lab = lab(ambient = ambient)

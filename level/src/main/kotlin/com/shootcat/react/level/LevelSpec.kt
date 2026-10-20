@@ -101,13 +101,13 @@ data class GoalSpec(
     val amount: Int = 0,
     /** Share of the area (fill). */
     val share: Float = 0f,
-    /** Average temperature at least (temperature). */
+    /** Average temperature at least (temperature; keep_warm: of the air in the area, without it nobody may freeze). */
     val min: Float? = null,
     /** Average temperature at most (temperature). */
     val max: Float? = null,
     /** Average light at least (light). */
     val light: Float = 0f,
-    /** How long the area must stay warm (keep_warm): the night, in seconds. */
+    /** How long the village must stay warm (keep_warm): the night, in seconds. */
     val seconds: Float = 0f,
     val hold: Float = 2f,
 )

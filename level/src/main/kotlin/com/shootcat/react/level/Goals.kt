@@ -164,11 +164,12 @@ sealed class Goal(val text: String, val area: Area, val holdSteps: Int) {
     }
 
     /**
-     * The air in the area (the village's houses) stays at [min] °C or warmer until the night is over, [until] steps
-     * (Phase 5). Met when the night has passed; failed as soon as the air there is colder, after the first
-     * [GRACE] steps (the level may begin with a house cooling down).
+     * The village stays warm until the night is over, [until] steps (Phase 5). With [min], the air in the area (the
+     * houses) stays at [min] °C or warmer, after the first [GRACE] steps (the level may begin with a house cooling
+     * down); without it, nobody freezes: the level is lost as soon as an inhabitant lies fainted of cold. Met when
+     * the night has passed and it has not failed.
      */
-    class KeepWarm(text: String, area: Area, val min: Float, val until: Int, private val gas: BooleanArray) : Goal(text, area, 0) {
+    class KeepWarm(text: String, area: Area, val min: Float?, val until: Int, private val gas: BooleanArray) : Goal(text, area, 0) {
         fun average(world: World): Float {
             var sum = 0.0
             var n = 0
@@ -182,8 +183,17 @@ sealed class Goal(val text: String, val area: Area, val holdSteps: Int) {
             }
             return (sum / n).toFloat()
         }
+
+        /** Inhabitants lying fainted of cold. */
+        fun frozen(world: World): Int {
+            val f = world.folk
+            var n = 0
+            for (k in 0 until f.count) if (f.frozen(k)) n++
+            return n
+        }
+
         override fun met(world: World) = world.step >= until && !failed(world)
-        override fun failed(world: World) = world.step >= GRACE && average(world) < min
+        override fun failed(world: World) = if (min == null) frozen(world) > 0 else world.step >= GRACE && average(world) < min
         override fun progress(world: World) = (world.step.toFloat() / until).coerceIn(0f, 1f)
 
         companion object {
@@ -216,7 +226,7 @@ sealed class Goal(val text: String, val area: Area, val holdSteps: Int) {
                 "rescue" -> Rescue(spec.text, area, hold, spec.amount.coerceAtLeast(1))
                 "keep_warm" -> {
                     require(spec.seconds > 0f) { "a keep_warm goal names the length of the night in seconds" }
-                    KeepWarm(spec.text, area, requireNotNull(spec.min) { "a keep_warm goal names its least temperature" }, (spec.seconds * STEPS_PER_SECOND).toInt(), BooleanArray(materials.count) { materials.kind[it] == Kind.GAS })
+                    KeepWarm(spec.text, area, spec.min, (spec.seconds * STEPS_PER_SECOND).toInt(), BooleanArray(materials.count) { materials.kind[it] == Kind.GAS })
                 }
                 else -> error("unknown goal type '${spec.type}'")
             }

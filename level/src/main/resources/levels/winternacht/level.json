@@ -1,0 +1,98 @@
+{
+  "id": "winternacht",
+  "name": "Winternacht",
+  "area": "Berg",
+  "tier": "Kernniveau",
+  "seed": 707,
+  "ambient": -15,
+  "tools": {
+    "bucket": true,
+    "bucket_size": 30,
+    "hand": true
+  },
+  "heat": [
+    {
+      "area": [
+        [
+          75,
+          76
+        ],
+        [
+          79,
+          76
+        ],
+        [
+          79,
+          77
+        ],
+        [
+          75,
+          77
+        ]
+      ],
+      "temp": 400,
+      "material": "wood"
+    }
+  ],
+  "folk": {
+    "figures": [
+      [
+        60,
+        77
+      ],
+      [
+        66,
+        77,
+        -1
+      ],
+      [
+        92,
+        77
+      ],
+      [
+        98,
+        77,
+        -1
+      ]
+    ]
+  },
+  "goals": [
+    {
+      "type": "keep_warm",
+      "text": "Niemand im Dorf darf bis zum Morgen erfrieren",
+      "area": [
+        [
+          54,
+          60
+        ],
+        [
+          108,
+          60
+        ],
+        [
+          108,
+          78
+        ],
+        [
+          54,
+          78
+        ]
+      ],
+      "seconds": 200
+    }
+  ],
+  "rating": {
+    "gold": {
+      "seconds": 200,
+      "actions": 2
+    },
+    "silver": {
+      "seconds": 200,
+      "actions": 4
+    },
+    "bronze": {
+      "seconds": 200,
+      "actions": 40
+    }
+  }
+}
